@@ -2,7 +2,8 @@
  * Provisioning (setup-flow spec, step 4; design §1 step 7): the option the owner launched becomes a real team.
  *
  *   1. checkPlan: the plan comes back from the browser, so every field is checked again (archetypes, shape, skills
- *      the library can load, rehires that are still free).
+ *      the library can load, rehires that are still free). Then the text documents among the plan's uploads (the
+ *      opening DM's files) are copied to <data>/projects/<pid>/files/inputs/, and charter.md lists them under Inputs.
  *   2. One db transaction: agents (new hires), the project (team, or dm for a solo expert), members, threads, and
  *      one kickoff in the lead's inbox (kind `assignment`: the charter plus "write the plan and assign first
  *      tasks"). The runtime's queue drains it; nothing here runs a model. Then `org` is announced.
@@ -29,6 +30,7 @@ import {
   type StaffableArchetype,
 } from "@/lib/project";
 import { materializeSkills } from "@/lib/skills/compose";
+import { formatBytes } from "@/lib/uploads";
 import type { Library } from "@/lib/skills/library";
 import type { Composition } from "@/lib/skills/types";
 import type { Bus } from "@/server/cache/bus";
@@ -37,6 +39,7 @@ import { getAgent } from "@/server/directory";
 import type { RuntimeDb } from "@/server/runtime/db";
 import { threadId } from "@/server/runtime/threads";
 import { RUNTIME, VaultConflictError, type Vault } from "@/server/runtime/vault";
+import { copyInputs, UploadError } from "@/server/uploads";
 import { agentIdFor, isListedName, pickName } from "./names";
 import { liveProjects, loadable, MAX_LIVE_PROJECTS, MAX_SKILLS } from "./plan";
 
@@ -72,9 +75,14 @@ export interface CheckedPlan {
   members: CheckedMember[];
   budgetUsd: number;
   option?: { label: string; summary: string; etaDays?: number };
+  /** Upload ids, at most MAX_INPUTS, no repeats. */
+  uploads: string[];
 }
 
-const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
+/** Upload ids a launch carries into the project. */
+const MAX_INPUTS = 20;
+
+const obj =(v: unknown): Record<string, unknown> | null => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 
 /** Every field of a plan from the browser, checked against the library and the db. Throws PlanError. */
 export function checkPlan(raw: unknown, library: Library, db: RuntimeDb): CheckedPlan {
@@ -127,19 +135,22 @@ export function checkPlan(raw: unknown, library: Library, db: RuntimeDb): Checke
   }
 
   const option = obj(plan.option);
+  const uploads = [...new Set(Array.isArray(plan.uploads) ? plan.uploads.filter((u): u is string => typeof u === "string") : [])];
+  if (uploads.length > MAX_INPUTS) throw new PlanError(`A launch can carry at most ${MAX_INPUTS} files.`);
   return {
     charter,
     kind,
     members,
     budgetUsd: cleanBudget(plan.budgetUsd),
     option: option ? { label: clean(option.label, 24), summary: clean(option.summary, 140), etaDays: cleanEta(option.etaDays) } : undefined,
+    uploads,
   };
 }
 
 const bullets = (items: string[]) => (items.length ? items.map((i) => `- ${i}`).join("\n") : "- (none given)");
 
-/** charter.md: what the PM reads first, and what the kickoff carries. */
-export function charterMd(plan: CheckedPlan, team: { agentId: string; name: string }[]): string {
+/** charter.md: what the PM reads first, and what the kickoff carries. `inputs`: the owner's files in /project/inputs/. */
+export function charterMd(plan: CheckedPlan, team: { agentId: string; name: string }[], inputs: { path: string; bytes: number }[] = []): string {
   const c = plan.charter;
   const o = plan.option;
   const roles = plan.members.map((m, i) => {
@@ -170,6 +181,9 @@ export function charterMd(plan: CheckedPlan, team: { agentId: string; name: stri
     "",
     ...roles,
     "",
+    ...(inputs.length
+      ? ["## Inputs", "", "The owner's files, in the project folder. Read them before you plan.", "", ...inputs.map((f) => `- ${f.path} (${formatBytes(f.bytes)})`), ""]
+      : []),
   ].join("\n");
 }
 
@@ -209,7 +223,11 @@ export async function provision(raw: unknown, nonce: string, deps: ProvisionDeps
     taken.add(name.toLowerCase());
     return { agentId: agentIdFor(name), name };
   });
-  const spec = charterMd(plan, team);
+  // Before any row: an upload id that isn't a stored file refuses the launch, and a retry copies again harmlessly.
+  const inputs = await copyInputs(plan.uploads, projectId).catch((e) => {
+    throw e instanceof UploadError ? new PlanError(e.message) : e;
+  });
+  const spec = charterMd(plan, team, inputs);
   const lead = team[0].agentId;
 
   const created = db.tx(() => {

@@ -264,6 +264,8 @@ export interface LaunchPlan {
   budgetUsd: number;
   /** Which option this was, for the charter. */
   option?: { label: string; summary: string; etaDays?: number };
+  /** Upload ids from the conversation that led here; its text documents become the project's /project/inputs/. */
+  uploads?: string[];
 }
 
 /** The LaunchPlan for one option card, with the owner's edits to the shared charter and the budget. */
