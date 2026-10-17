@@ -80,7 +80,8 @@ Details and evidence: `docs/design/team-setup.md`.
 - **What she knows:** her prompt (`src/lib/chief-prompt.ts`) gets the live state the browser shows (statuses, "now" lines, pending approvals), ledger stats per team, and a roster to staff from.
 - **Starting a project:**
   - Being redesigned (2026-10-17). A fresh company is just you and Mira, with no fixed roster. For a project, Mira sets up a PM. The PM sets the goal and each role's qualifications, then staffs the team with domain experts built from an archetype, past workers' memory and a config. A small task goes to one expert in a DM. Until the PM exists, Start a project has no one to staff.
-  - Today she replies with a ` ```project ` JSON block, which becomes a proposal card: the A-team, assignments and a spec.
+  - **Mira staffs; the PM scopes** (owner, 2026-10-17). Mira never asks the owner about the work's details (price, features, positioning) and never holds a team for them. She lists up to 3 open questions on the charter, and the project's PM asks the owner those after launch.
+  - She replies with a ` ```project ` v2 block holding 2 or 3 options, which become side-by-side option cards.
   - **Launch** creates the channel, puts the members to work on it, and the lead posts a live kickoff.
   - Launched teams live only in the browser and are lost on refresh. They send their context with every message.
 - **Heartbeat:** 25 s after load, then every 20 min while the tab is visible.

@@ -29,10 +29,15 @@ const H_SETS: Record<Archetype | "*", string[]> = {
   coordinator: ["assign_task", "plan", "board"],
 };
 
-/** H §3 "EXISTS" rows: the only entries that are ready today, besides what the runtime registered since (SHIPPED). */
-const H_READY = ["file_tools", "chart", "markdown", "project"];
+/** H §3 "EXISTS" rows, plus the panes built since (plan: the state views); ready today besides SHIPPED. */
+const H_READY = ["file_tools", "chart", "markdown", "project", "plan"];
 /** R6: You.com Research, on every agent whose toolset has it, behind the approval gate (src/server/runtime/approvals.ts). */
 const SHIPPED = ["research"];
+
+/** Ready panes and the component that draws them; a ready pane must have one. */
+const PANE_COMPONENTS: Record<string, { file: string; component: string }> = {
+  "pane:plan": { file: "../../components/state/PlanView.tsx", component: "PlanView" },
+};
 
 /** H §3 tiers that are not T0/T1 (everything else is T0 for present entries, T1 for writes, T0 for reads). */
 const H_TIERS: Record<string, string> = {
@@ -109,7 +114,12 @@ describe("registry: H §4 load-time checks", () => {
     for (const d of REGISTRY.filter((x) => x.status === "ready")) {
       for (const c of d.calls) expect(RUNTIME_CALLS.has(c), `${d.id}: tool ${c}`).toBe(true);
       if (d.fence) expect(REPO_FENCES.has(d.fence), `${d.id}: fence ${d.fence}`).toBe(true);
-      if (!d.calls.length && !d.fence) {
+      if (d.renderer?.startsWith("pane:")) {
+        // A derived pane: its component exists and is exported.
+        const pane = PANE_COMPONENTS[d.renderer];
+        expect(pane, `${d.id}: a component for ${d.renderer}`).toBeDefined();
+        expect(readFileSync(new URL(pane.file, import.meta.url), "utf8")).toContain(`export function ${pane.component}(`);
+      } else if (!d.calls.length && !d.fence) {
         // Markdown tables and code blocks: Streamdown with the code plugin.
         expect(d.id).toBe("markdown");
         expect(MARKDOWN_TSX).toContain('from "streamdown"');

@@ -156,10 +156,45 @@ export interface ApprovalRow {
 export type NewApproval = Pick<ApprovalRow, "threadId" | "agentId" | "projectId" | "tool" | "toolCallId" | "args" | "title" | "detail"> &
   Partial<Pick<ApprovalRow, "runId" | "estUsd">>;
 
+export type MessageRole = "owner" | "agent";
+
+/** One line of a thread's transcript: what the owner or the agent said, never rewritten. */
+export interface MessageRow {
+  /** Increasing: the order it was said in. */
+  id: number;
+  threadId: string;
+  /** The run it went to (owner) or came from (agent); null when it didn't go through the runtime. */
+  runId: string | null;
+  role: MessageRole;
+  /** "owner", or the agent's id. */
+  author: string;
+  text: string;
+  /** Upload ids (`<sha256>.<ext>`) attached to it. */
+  uploads: string[];
+  /** The sender's own id for it, so the page that sent it can match the saved row. */
+  ref: string | null;
+  at: string;
+}
+
+export interface PageOptions {
+  /** Only rows older than this id. */
+  before?: number;
+  /** Default 200. */
+  limit?: number;
+}
+
+export interface MessagePage {
+  /** Oldest first. */
+  messages: MessageRow[];
+  /** Older rows exist before the first one. */
+  more: boolean;
+}
+
 export type NewProject = Pick<ProjectRow, "kind" | "name"> & Partial<Omit<ProjectRow, "kind" | "name" | "createdAt" | "closedAt">>;
 export type NewAgent = Pick<AgentRow, "id" | "name" | "archetype"> & Partial<Pick<AgentRow, "modelTier" | "config" | "status" | "seededFromAgentId">>;
 export type NewMember = Pick<ProjectMemberRow, "projectId" | "agentId"> & Partial<Pick<ProjectMemberRow, "role" | "qualifications">>;
 export type NewRun = Pick<RunRow, "threadId" | "trigger" | "lane"> & Partial<Pick<RunRow, "id" | "assignmentId">>;
+export type NewMessage = Pick<MessageRow, "threadId" | "role" | "author" | "text"> & Partial<Pick<MessageRow, "runId" | "uploads" | "ref">>;
 
 // ------------------------------------------------------------------------------------------ migrations
 
@@ -266,7 +301,24 @@ const MIGRATIONS: ((db: DatabaseSync, now: string) => void)[] = [
   (db) => {
     db.exec("ALTER TABLE projects ADD COLUMN budget_usd REAL");
   },
-  // 3: approvals (R6), one per gated tool call.
+  // 3: the transcript, append-only: the checkpointer's messages get compacted, these never do.
+  (db) => {
+    db.exec(`
+      CREATE TABLE messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_id TEXT NOT NULL REFERENCES threads(id),
+        run_id TEXT REFERENCES runs(id),
+        role TEXT NOT NULL CHECK (role IN ('owner', 'agent')),
+        author TEXT NOT NULL,
+        text TEXT NOT NULL,
+        uploads_json TEXT NOT NULL DEFAULT '[]',
+        ref TEXT,
+        at TEXT NOT NULL
+      );
+      CREATE INDEX messages_by_thread ON messages (thread_id, id);
+    `);
+  },
+  // 4: approvals (R6), one per gated tool call.
   (db) => {
     db.exec(`
       CREATE TABLE approvals (
@@ -389,6 +441,18 @@ const toApproval = (r: Raw): ApprovalRow => ({
   createdAt: String(r.created_at),
   decidedAt: str(r.decided_at),
   note: str(r.note),
+});
+
+const toMessage = (r: Raw): MessageRow => ({
+  id: Number(r.id),
+  threadId: String(r.thread_id),
+  runId: str(r.run_id),
+  role: r.role as MessageRole,
+  author: String(r.author),
+  text: String(r.text),
+  uploads: json<string[]>(r.uploads_json, []),
+  ref: str(r.ref),
+  at: String(r.at),
 });
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -565,6 +629,32 @@ export class RuntimeDb {
       this.sql.prepare("UPDATE runs SET status = ?, ended_at = ?, error = ? WHERE id = ?").run(status, new Date().toISOString(), error ?? null, id);
     },
   };
+
+  /** The transcript. Append-only: there is no update and no delete. */
+  readonly messages = {
+    add: (m: NewMessage): MessageRow => {
+      const { lastInsertRowid } = this.sql
+        .prepare("INSERT INTO messages (thread_id, run_id, role, author, text, uploads_json, ref, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(m.threadId, m.runId ?? null, m.role, m.author, m.text, JSON.stringify(m.uploads ?? []), m.ref ?? null, new Date().toISOString());
+      return this.one(toMessage, "SELECT * FROM messages WHERE id = ?", lastInsertRowid)!;
+    },
+    /** A thread's latest `limit` rows (before row `before`, when given), oldest first. */
+    page: (threadId: string, opts: PageOptions = {}): MessagePage =>
+      this.messagePage("SELECT * FROM messages WHERE thread_id = ? AND id < ? ORDER BY id DESC LIMIT ?", threadId, opts),
+    /** The same over every thread of a project (a channel's members), merged in the order it was said. */
+    projectPage: (projectId: string, opts: PageOptions = {}): MessagePage =>
+      this.messagePage(
+        "SELECT m.* FROM messages m JOIN threads t ON t.id = m.thread_id WHERE t.project_id = ? AND m.id < ? ORDER BY m.id DESC LIMIT ?",
+        projectId,
+        opts,
+      ),
+  };
+
+  // Ids increase as rows are written, so id order is the order things were said, across threads too.
+  private messagePage(sql: string, key: string, { before, limit = 200 }: PageOptions): MessagePage {
+    const rows = this.all(toMessage, sql, key, before ?? Number.MAX_SAFE_INTEGER, limit + 1);
+    return { messages: rows.slice(0, limit).reverse(), more: rows.length > limit };
+  }
 
   readonly inbox = {
     add: <P>(threadId: string, kind: InboxKind, payload: P): InboxRow<P> => {

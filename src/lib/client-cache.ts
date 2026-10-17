@@ -146,10 +146,10 @@ async function fetchJson(url: string): Promise<unknown> {
   return res.json();
 }
 
-/** One EventSource for the whole app; it covers every stats, files, rules, skills and org topic. */
+/** One EventSource for the whole app; it covers every stats, files, rules, skills, org, project state and messages topic. */
 const listenInBrowser: Listen = ({ change, refresh }) => {
   window.addEventListener("focus", refresh);
-  const source = new EventSource("/api/events?topics=stats,files,rules,skills,org");
+  const source = new EventSource("/api/events?topics=stats,files,rules,skills,org,state,messages");
   let opened = false;
   source.onopen = () => {
     // Changes made while the stream was down were missed.

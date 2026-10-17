@@ -161,6 +161,22 @@ describe("POST /api/projects/plan", () => {
 });
 
 describe("POST /api/projects", () => {
+  it("hands Mira's open questions to the PM: listed in the charter, and the kickoff tells the PM to ask the owner", async () => {
+    const { launchPlanOf } = await import("@/lib/project");
+    const open = ["Which price band?", "Bluetooth pairing or a one-way link?"];
+    const launchPlan = launchPlanOf((await plan({ ...PROPOSAL, open })).body, 1);
+    const { body } = await launch({ plan: launchPlan, nonce: "nonce-open-01" });
+    const d = await db();
+    const project = d.projects.get(body.projectId)!;
+    const pm = d.members.list(project.id)[0];
+    const vault = (await import("@/server/runtime/vault")).getVault();
+    const charter = await vault.show(`projects/${project.id}/state/charter.md`);
+    expect(charter).toMatch(/## Open questions/);
+    for (const q of open) expect(charter).toContain(q);
+    const [kickoff] = d.inbox.pending(`a:${pm.agentId}:p:${project.id}`);
+    expect(String((kickoff.payload as { instruction: string }).instruction)).toMatch(/ask the owner/i);
+  });
+
   it("provisions the picked option from an empty DATA_DIR: rows, home files, skills, charter and one kickoff", async () => {
     const launchPlan = await balancedPlan();
     const { nextChange } = await import("@/server/cache/testing");

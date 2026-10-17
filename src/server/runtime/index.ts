@@ -20,6 +20,7 @@ import type { Limiter } from "./limiter";
 import { executeRun } from "./run";
 import { parseThreadId, ThreadQueue } from "./threads";
 import type { ResearchToolDeps } from "./tools/research";
+import { announceMessage } from "./transcript";
 import { buildWorker, type Worker } from "./worker";
 
 export interface RuntimeOptions {
@@ -42,6 +43,8 @@ export interface SendResult {
   /** The run that will answer, when one is known. */
   runId?: string;
   inboxId: number;
+  /** Its row in the thread's transcript. */
+  messageId: number;
 }
 
 export class UnknownThreadError extends Error {
@@ -78,17 +81,32 @@ export class Runtime {
     );
   }
 
-  /** An owner message to a thread. Throws UnknownThreadError for a thread the runtime db doesn't have. */
-  send(threadId: string, message: { text: string; from?: string }): SendResult {
+  /**
+   * An owner message to a thread, saved to its transcript as it's accepted. `ref` is the sender's id for it.
+   * Throws UnknownThreadError for a thread the runtime db doesn't have.
+   */
+  send(threadId: string, message: { text: string; from?: string; ref?: string }): SendResult {
     if (!this.db.threads.get(threadId)) throw new UnknownThreadError(threadId);
-    const item = this.db.inbox.add<DmPayload>(threadId, "dm", { text: message.text, from: message.from ?? "owner" });
-    if (this.queue.isBusy(threadId)) return { delivered: "inbox", runId: this.active.get(threadId), inboxId: item.id };
+    const from = message.from ?? "owner";
     // A thread waiting on an approval stays paused: the resumed run reads the message before its next model call.
-    if (this.approvals.waiting(threadId)) return { delivered: "inbox", inboxId: item.id };
-    const run = this.db.runs.create({ threadId, trigger: "dm", lane: "interactive" });
+    const busy = this.queue.isBusy(threadId) || this.approvals.waiting(threadId);
+    const { item, run, saved } = this.db.tx(() => {
+      const item = this.db.inbox.add<DmPayload>(threadId, "dm", { text: message.text, from });
+      const run = busy ? undefined : this.db.runs.create({ threadId, trigger: "dm", lane: "interactive" });
+      const runId = run?.id ?? this.active.get(threadId) ?? null;
+      const saved = this.db.messages.add({ threadId, runId, role: "owner", author: from, text: message.text, ref: message.ref });
+      return { item, run, saved };
+    });
+    announceMessage(threadId);
+    if (!run) return { delivered: "inbox", runId: this.active.get(threadId), inboxId: item.id, messageId: saved.id };
     // A failure is on the run row (and, with streaming, on the thread's events); nobody awaits it here.
     this.queue.enqueue(threadId, { runId: run.id }).catch(() => {});
-    return { delivered: "run", runId: run.id, inboxId: item.id };
+    return { delivered: "run", runId: run.id, inboxId: item.id, messageId: saved.id };
+  }
+
+  /** The run in progress on the thread, if one is. */
+  activeRun(threadId: string): string | undefined {
+    return this.active.get(threadId);
   }
 
   /** Resolves once nothing runs or waits on the thread. */
@@ -159,7 +177,14 @@ export class Runtime {
     // Stats teams are projects; a DM or company thread counts toward the company (Mira's HQ team).
     const team = project.kind === "team" ? project.id : HQ.id;
     return executeRun(
-      { db: this.db, worker: this.worker(threadId), events: this.events, activate, ledger: { team, agent: agent.id, asked: MODELS[agent.modelTier] } },
+      {
+        db: this.db,
+        worker: this.worker(threadId),
+        events: this.events,
+        activate,
+        announce: announceMessage,
+        ledger: { team, agent: agent.id, asked: MODELS[agent.modelTier] },
+      },
       threadId,
       runId,
       input,

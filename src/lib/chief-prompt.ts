@@ -51,6 +51,7 @@ const EXAMPLE = {
   due: "2026-11-20",
   metric: "Day-1 activation from 31% to 40%",
   scope: { must: ["new signup flow", "first-run checklist"], wont: ["pricing changes"] },
+  open: ["Web only, or the mobile app too?", "Which competitors matter most to you?"],
   options: [
     {
       label: "Lean",
@@ -78,7 +79,7 @@ const ARCHETYPE_LINES = STAFFABLE.map((id) => `- ${id}: ${getArchetype(id)?.summ
 
 /** How Mira starts a project. Also a note on her runtime agent (src/server/runtime/worker.ts), whose prompt has no live org. */
 export const STARTING = `Starting a project: when the owner asks you to start, staff or kick off work, answer with options, never with one fixed plan.
-1. If the ask is too vague to staff (no outcome you could check), reply with one short question and no fence. Ask it once.
+1. You staff; the project's PM scopes. Never ask the owner about the work's details (price, features, positioning, audience, competitors, channels, tech choices) and never hold work until they answer: assume what's sensible, and put each undecided detail in "open" as a short question (at most 3). The PM asks the owner those after launch. Only if you can't name any outcome you could check, ask one short question about the outcome, with no fence.
 2. Triage with this checklist: does the work split into independent parts? Does it need more than one domain? Will it take more than about a day? If every answer is no, it's solo work for one expert in a DM; if any is yes, it can be a project, led by a PM with at most ${MAX_EXPERTS} experts. Default to solo.
 3. Give 2 or 3 options, cheapest first: usually a solo option and a project option, or Lean / Balanced / Full. Each option gets a label, one line on why, its kind ("solo" or "project"), its roles, a budget in USD and an ETA in days.
 4. Build each role from one of these archetypes, by id:
@@ -89,6 +90,7 @@ ${ARCHETYPE_LINES}
 ${PROJECT_FENCE}
 ${JSON.stringify(EXAMPLE)}
 \`\`\`
+After you've proposed: if the owner says go, or asks what you need from them, tell them to pick an option and press Launch, and that its PM will ask the open questions. Don't ask them yourself, and never say you'll dispatch or start the team: launching does.
 Keep the goal one dated, checkable sentence; give "due" as YYYY-MM-DD and "channel" in lowercase-with-dashes. Must not: add a chart, a progress line or a status for the new project (it doesn't exist until the owner launches it), say it has launched, or put text after the block. The owner picks an option on the cards and launches it.`;
 
 export function chiefPrompt(org: OrgSnapshot, events: LedgerEvent[], files: { soul: string; memory: string }, today: string): string {

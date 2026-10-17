@@ -117,6 +117,24 @@ describe("decide: arg constraints", () => {
     expect(fired(ev({ args: { path: "/projects/acme/x/a.md" } }), [one])).toEqual([]);
   });
 
+  it("path globs ignore case and Unicode normal form, as macOS resolves file names", () => {
+    const r = denyWhen({ path: "path", op: "path_glob", value: "/projects/Acme/**" });
+    expect(fired(ev({ args: { path: "/PROJECTS/acme/a.md" } }), [r])).toEqual(["r_tool01"]);
+    // Composed é in the rule, e + combining accent in the call.
+    const cafe = denyWhen({ path: "path", op: "path_glob", value: "/projects/caf\u00e9/*" });
+    expect(fired(ev({ args: { path: "/projects/cafe\u0301/a.md" } }), [cafe])).toEqual(["r_tool01"]);
+  });
+
+  it("a path that climbs out of its top-level folder, or isn't absolute, meets every restricting path test and no relaxing one", () => {
+    const deny = denyWhen({ path: "path", op: "path_not_glob", value: "/projects/acme/**" });
+    const allow = toolRule({ id: "r_allow1", effect: "allow", args: [{ path: "path", op: "path_glob", value: "/projects/acme/**" }] });
+    for (const path of ["/projects/acme/../../projects/acme/a.md", "/../projects/acme/a.md", "projects/acme/a.md"]) {
+      expect([path, fired(ev({ args: { path } }), [deny, allow])]).toEqual([path, ["r_tool01"]]);
+    }
+    // A .. that stays inside its top-level folder just resolves.
+    expect(fired(ev({ args: { path: "/projects/acme/x/../a.md" } }), [deny, allow])).toEqual(["r_allow1"]);
+  });
+
   it("path_not_glob holds when the path is outside the glob", () => {
     const r = denyWhen({ path: "path", op: "path_not_glob", value: "/projects/acme/**" });
     expect(fired(ev({ args: { path: "/projects/acme/../bluebird/a.md" } }), [r])).toEqual(["r_tool01"]);
