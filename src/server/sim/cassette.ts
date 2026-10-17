@@ -188,30 +188,38 @@ export function createCassette(opts: CassetteOptions): Cassette {
   const { file, mode } = opts;
   const upstream = opts.upstream ?? ((input: Input, init?: RequestInit) => globalThis.fetch(input, init));
   const all: CassetteEntry[] = [];
+  const byId = new Map<string, CassetteEntry>();
+  /** Requests started per key in this instance. */
+  const started = new Map<string, number>();
+  const id = (key: string, n: number) => `${key}#${n}`;
 
+  const keep = (entry: CassetteEntry) => {
+    all.push(entry);
+    byId.set(id(entry.key, entry.n), entry);
+  };
   if (mode === "record") {
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, `${JSON.stringify({ v: 1, kind: "cassette", createdAt: new Date().toISOString() })}\n`);
   } else {
-    all.push(...load(file));
+    load(file).forEach(keep);
   }
-
   const append = (entry: CassetteEntry) => {
     appendFileSync(file, `${JSON.stringify(entry)}\n`);
-    all.push(entry);
+    keep(entry);
   };
 
   const cassetteFetch = async (input: Input, init?: RequestInit): Promise<Response> => {
-    const started = performance.now();
+    const t0 = performance.now();
     const { canonical, key, request } = canonicalOf(input, init);
+    // Before any await, so the n-th call to start is the n-th occurrence whatever finishes first.
+    const n = (started.get(key) ?? 0) + 1;
+    started.set(key, n);
     if (mode !== "record") {
-      const hit = all.find((e) => e.key === key);
+      const hit = byId.get(id(key, n));
       if (hit) return replay(hit);
     }
     const res = await upstream(input, init);
-    return record(res, started, (response) =>
-      append({ v: 1, key, n: 1, canonical, request, response, recordedAt: new Date().toISOString() }),
-    );
+    return record(res, t0, (response) => append({ v: 1, key, n, canonical, request, response, recordedAt: new Date().toISOString() }));
   };
 
   return {
