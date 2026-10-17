@@ -319,6 +319,9 @@ function Line({ text, state }: { text: string; state?: State }) {
 
 const LIMIT_ORDER: Access[] = ["deny", "ask", "allow"];
 
+/** Rules in force by id, each with the sentence it reads as. */
+type RuleIndex = Map<string, { rule: Rule; sentence: string }>;
+
 function PermissionRow({
   p,
   rules,
@@ -327,7 +330,7 @@ function PermissionRow({
   removal,
 }: {
   p: Permission;
-  rules: Map<string, Rule>;
+  rules: RuleIndex;
   open: boolean;
   onToggle: () => void;
   removal: (id: string, where: string) => Removal;
@@ -336,7 +339,7 @@ function PermissionRow({
   const groups = LIMIT_ORDER.map((a) => ({ a, texts: p.limits.filter((l) => l.access === a).map((l) => l.text) })).filter((g) => g.texts.length);
   const shown = groups.slice(0, 2);
   const rest = groups.slice(2).flatMap((g) => g.texts);
-  const yours = p.ruleIds.map((id) => rules.get(id)).find((r): r is Rule => r !== undefined && ownedByYou(r) && !r.locked);
+  const yours = p.ruleIds.map((id) => rules.get(id)).find((r) => r !== undefined && ownedByYou(r.rule) && !r.rule.locked);
   return (
     <Row
       icon={CAPABILITY_ICON[p.id] ?? Tag}
@@ -355,18 +358,18 @@ function PermissionRow({
       {shown.map((g, i) => (
         <Line key={g.a} state={g.a} text={[...g.texts, ...(i === shown.length - 1 ? rest : [])].join(" · ")} />
       ))}
-      <WhoSetIt locked={p.locked} yours={yours} removal={yours ? removal(yours.id, "row") : null} />
+      <WhoSetIt locked={p.locked} yours={yours?.rule} sentence={yours?.sentence ?? ""} removal={yours ? removal(yours.rule.id, "row") : null} />
     </Row>
   );
 }
 
-function WhoSetIt({ locked, yours, removal }: { locked: boolean; yours: Rule | undefined; removal: Removal | null }) {
+function WhoSetIt({ locked, yours, sentence, removal }: { locked: boolean; yours: Rule | undefined; sentence: string; removal: Removal | null }) {
+  // A div, not a p: the remove popover inside holds paragraphs of its own.
   const cls = "pt-[3px] text-[12.5px] leading-[18px] text-muted";
-  if (locked) return <p className={cls}>Locked: can&apos;t be loosened</p>;
-  if (!yours || !removal) return <p className={cls}>Default</p>;
-  const sentence = yours.reason ?? "This rule";
+  if (locked) return <div className={cls}>Locked: can&apos;t be loosened</div>;
+  if (!yours || !removal) return <div className={cls}>Default</div>;
   return (
-    <p className={cls}>
+    <div className={cls}>
       You ·{" "}
       <span className="relative inline-block">
         <button
@@ -383,7 +386,7 @@ function WhoSetIt({ locked, yours, removal }: { locked: boolean; yours: Rule | u
           )}
         </AnimatePresence>
       </span>
-    </p>
+    </div>
   );
 }
 
@@ -417,7 +420,7 @@ function Permissions({
 }: {
   name: string;
   permissions: Permission[];
-  rules: Map<string, Rule>;
+  rules: RuleIndex;
   open: string | null;
   onToggle: (key: string) => void;
   removal: (id: string, where: string) => Removal;
@@ -883,7 +886,7 @@ export function RulesTab({ agentId, projectId, onNotify }: { agentId?: string; p
   });
   if (!data) return <LoadState error={error} onRetry={() => void cache.revalidate(resource.key)} />;
 
-  const byId = new Map(data.rules.map((r) => [r.id, r]));
+  const byId: RuleIndex = new Map(data.rules.map((r) => [r.id, { rule: r, sentence: data.readBack[r.id] ?? r.reason ?? "A rule you added" }]));
   const yours = data.rules.filter(ownedByYou);
   return (
     <div className="@container">
@@ -921,7 +924,7 @@ export function RulesTab({ agentId, projectId, onNotify }: { agentId?: string; p
               <YourRuleRow
                 key={r.id}
                 rule={r}
-                sentence={data.readBack[r.id] ?? r.reason ?? "A rule you added"}
+                sentence={byId.get(r.id)!.sentence}
                 fresh={fresh.has(r.id)}
                 reveal={fresh.has(r.id) && saved.has(r.id)}
                 removal={removal(r.id, "list")}
