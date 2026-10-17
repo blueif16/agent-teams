@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 import { getRuntime, UnknownThreadError } from "@/server/runtime";
-import { pageQuery } from "@/server/runtime/transcript";
+import { isRef, pageQuery } from "@/server/runtime/transcript";
 
 /*
  * An owner message to an agent's thread (research D §10):
@@ -11,7 +11,6 @@ import { pageQuery } from "@/server/runtime/transcript";
  * request: it carries on if the tab closes.
  */
 const MAX_TEXT = 20_000;
-const REF = /^[\w-]{1,64}$/;
 
 export async function POST(req: Request, ctx: RouteContext<"/api/threads/[id]/messages">) {
   const { id } = await ctx.params;
@@ -24,7 +23,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/threads/[id]/me
   const text = typeof body.text === "string" ? body.text.trim() : "";
   if (!text) return Response.json({ error: "The message is empty." }, { status: 400 });
   if (text.length > MAX_TEXT) return Response.json({ error: `Keep a message under ${MAX_TEXT} characters.` }, { status: 413 });
-  const ref = typeof body.ref === "string" && REF.test(body.ref) ? body.ref : undefined;
+  const ref = isRef(body.ref) ? body.ref : undefined;
   try {
     return Response.json(getRuntime().send(id, { text, ref }), { status: 202 });
   } catch (e) {
