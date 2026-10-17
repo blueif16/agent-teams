@@ -6,7 +6,7 @@
  * decision; only a grant relaxes, and only ask → allow. Locked rules can't be relaxed by a grant.
  */
 
-export type Archetype = "chief" | "lead" | "writer" | "researcher" | "analyst" | "engineer" | "coordinator";
+export type Archetype = "chief" | "lead" | "writer" | "researcher" | "analyst" | "engineer" | "designer" | "coordinator";
 
 /** Data labels on spans of text: `secret.<kind>`, `pii.<kind>`, `owner_private`, `project:<id>`, `untrusted`. */
 export type Label = string;
