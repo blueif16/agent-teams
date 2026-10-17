@@ -1,4 +1,5 @@
 /* stub */
+import { cites_facts, excludes, max_words, mentions, prices_supported, sections } from "./docs";
 import { exists, monotonic_tiers, recompute, sources_cited, table_rows, verbatim_quote } from "./tables";
 import type { CheckRegistry, CheckResult } from "./types";
 
@@ -9,7 +10,7 @@ export const CHECK_FNS: CheckRegistry = {
   table_rows,
   sources_cited,
   verbatim_quote,
-  cites_facts: todo,
+  cites_facts,
   verbatim_in: todo,
   no_foreign_text: todo,
   single_cta: todo,
@@ -17,10 +18,10 @@ export const CHECK_FNS: CheckRegistry = {
   frames: todo,
   recompute,
   chart_matches: todo,
-  prices_supported: todo,
+  prices_supported,
   monotonic_tiers,
-  mentions: todo,
-  excludes: todo,
-  sections: todo,
-  max_words: todo,
+  mentions,
+  excludes,
+  sections,
+  max_words,
 };
