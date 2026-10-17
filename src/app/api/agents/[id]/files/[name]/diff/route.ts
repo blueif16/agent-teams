@@ -1,4 +1,5 @@
-import { getVault, VaultNotFoundError } from "@/server/runtime/vault";
+import { agentVault } from "@/lib/agent-files";
+import { VaultNotFoundError } from "@/server/runtime/vault";
 import { fileOr404, vaultError } from "../file";
 
 /**
@@ -13,7 +14,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/agents/[id]/file
   const to = query.get("to");
   if (!to) return Response.json({ error: "Send ?to=<change>, and optionally &from=<change>." }, { status: 400 });
 
-  const vault = getVault();
+  const vault = await agentVault();
   try {
     let from = query.get("from") || null;
     if (!from) {

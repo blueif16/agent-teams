@@ -7,21 +7,29 @@
  * MEMORY.md is what it has learned by doing: work done, mistakes, and the
  * approaches that worked.
  *
- * Server only. Files live at agents/<id>/ and are created from templates on
- * first read; existing files are never overwritten by templates.
- * On Vercel the bundled files are read-only, so edits go to /tmp and last only
- * as long as the instance.
+ * Server only. Locally the files live in the vault (.data/vault/agents/<id>/,
+ * design §8b): every change is a commit with its source (seed, owner, pin), and
+ * secrets are scrubbed before anything reaches git. The repo's agents/ folder
+ * only seeds the vault once; missing files are created from templates.
+ * On Vercel the disk is read-only, so edits go to /tmp, unversioned, and last
+ * only as long as the instance.
  * Reads and writes go through the server cache, so a file is read from disk
  * once and every save announces files:agent:<id>.
  */
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { getServerCache } from "@/server/cache";
+import { getServerCache, set as setCached } from "@/server/cache";
+import { announceCommit, getVault, OWNER, RUNTIME, VaultConflictError, type ScrubResult, type Vault } from "@/server/runtime/vault";
 import { AGENTS, CHIEF_ID, TEAMS_BY_ID } from "./data";
+import { scan } from "./policy/detectors";
 import type { Agent } from "./types";
 
-const ROOT = path.join(process.cwd(), "agents");
-const WRITE_ROOT = process.env.VERCEL ? path.join(tmpdir(), "agent-teams", "agents") : ROOT;
+const VERSIONED = !process.env.VERCEL;
+/** The repo's agents/: the vault's seed locally, the bundled read-only copy on Vercel. */
+const repoRoot = () => path.join(process.cwd(), "agents");
+/** Where files are read and written: the current app vault's agents/, or /tmp on Vercel. */
+const writeRoot = () => (VERSIONED ? path.join(getVault().dir, "agents") : path.join(tmpdir(), "agent-teams", "agents"));
 
 export type AgentType = "chief" | "lead" | "writer" | "researcher" | "analyst" | "engineer" | "designer" | "coordinator";
 export type AgentFile = "soul" | "memory";
@@ -104,8 +112,46 @@ export const INHERENT: Record<AgentType, string[]> = {
 
 const today = () => new Date().toISOString().slice(0, 10);
 const bullets = (lines: string[]) => lines.map((l) => `- ${l}`).join("\n");
-const fileOf = (id: string, which: AgentFile, root = WRITE_ROOT) =>
-  path.join(root, id, which === "soul" ? "SOUL.md" : "MEMORY.md");
+const fileName = (which: AgentFile) => (which === "soul" ? "SOUL.md" : "MEMORY.md");
+const fileOf = (id: string, which: AgentFile, root = writeRoot()) => path.join(root, id, fileName(which));
+const vaultPath = (id: string, which: AgentFile) => `agents/${id}/${fileName(which)}`;
+
+/** Secrets (labels secret.*) in a file body become placeholders; PII stays, the owner wrote it on purpose. */
+async function scrubSecrets(text: string): Promise<ScrubResult> {
+  const spans = (await scan(text)).filter((s) => s.label.startsWith("secret.")).sort((a, b) => b.start - a.start);
+  let out = text;
+  for (const s of spans) out = `${out.slice(0, s.start)}[redacted ${s.label}]${out.slice(s.end)}`;
+  return { text: out, redacted: spans.length };
+}
+
+let wired: { vault: Vault; ready: Promise<Vault> } | null = null;
+
+/**
+ * The app vault, ready for agent files: the secret scrub and the cache hook plugged in, and the repo's agents/
+ * imported once (a no-op when the vault already has them). Every writer and the history routes go through this.
+ * Wired again whenever the app's vault is replaced (setVault).
+ */
+export function agentVault(): Promise<Vault> {
+  const vault = getVault();
+  if (wired?.vault === vault) return wired.ready;
+  const ready = (async () => {
+    vault.configure({
+      scrub: scrubSecrets,
+      // Cache first, then announce, so a view that revalidates on the topic reads the committed content.
+      onCommit: (p, content, commit) => {
+        setCached(path.join(vault.dir, p), content);
+        return announceCommit(p, content, commit);
+      },
+    });
+    if (existsSync(repoRoot())) await vault.importFrom(repoRoot());
+    return vault;
+  })().catch((e) => {
+    if (wired?.vault === vault) wired = null;
+    throw e;
+  });
+  wired = { vault, ready };
+  return ready;
+}
 
 function soulTemplate(agent: Agent): string {
   const team = TEAMS_BY_ID[agent.teamId];
@@ -156,7 +202,7 @@ _None recorded yet._
 async function readInfo(file: string): Promise<FileInfo> {
   const { content, updated } = await getServerCache().files.read(file);
   // Vercel stamps bundled files with a fixed 2018 date; the build time is the honest bound.
-  const bundled = WRITE_ROOT !== ROOT && file.startsWith(ROOT);
+  const bundled = !VERSIONED && file.startsWith(repoRoot());
   return { content, updated: (bundled && process.env.AGENTS_BUILT_AT) || updated };
 }
 
@@ -171,12 +217,25 @@ async function readIfThere(file: string): Promise<FileInfo | null> {
 
 async function ensure(id: string, which: AgentFile): Promise<FileInfo> {
   const file = fileOf(id, which);
-  const found = (await readIfThere(file)) ?? (WRITE_ROOT !== ROOT ? await readIfThere(fileOf(id, which, ROOT)) : null);
-  if (found) return found;
   const agent = AGENTS[id];
+  const template = () => (which === "soul" ? soulTemplate(agent) : memoryTemplate(agent));
+  if (VERSIONED) {
+    const vault = await agentVault();
+    const found = await readIfThere(file);
+    if (found) return found;
+    // expectedBlob null: only if the file still doesn't exist, so a racing request's file is never overwritten.
+    await vault
+      .write({ path: vaultPath(id, which), content: template(), author: RUNTIME, source: "seed", expectedBlob: null, trailers: { Archetype: agentType(agent) } })
+      .catch((e) => {
+        if (!(e instanceof VaultConflictError)) throw e;
+      });
+    return readInfo(file);
+  }
+  const found = (await readIfThere(file)) ?? (await readIfThere(fileOf(id, which, repoRoot())));
+  if (found) return found;
   // Exclusive: never overwrites a file another request created first.
   await getServerCache()
-    .files.write(file, which === "soul" ? soulTemplate(agent) : memoryTemplate(agent), { exclusive: true })
+    .files.write(file, template(), { exclusive: true })
     .catch((e) => {
       if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
     });
@@ -189,10 +248,13 @@ export async function readAgentFiles(id: string): Promise<{ soul: FileInfo; memo
   return { soul, memory };
 }
 
-export async function writeAgentFile(id: string, which: AgentFile, content: string): Promise<FileInfo> {
+/** Saves a file; `source` says why ("owner" edited it in the profile, "pin" came from a 📌). */
+export async function writeAgentFile(id: string, which: AgentFile, content: string, source: "owner" | "pin" = "owner"): Promise<FileInfo> {
   if (!AGENTS[id]) throw new Error(`Unknown agent "${id}"`);
   const file = fileOf(id, which);
-  await getServerCache().files.write(file, content.endsWith("\n") ? content : `${content}\n`);
+  const body = content.endsWith("\n") ? content : `${content}\n`;
+  if (VERSIONED) await (await agentVault()).write({ path: vaultPath(id, which), content: body, author: OWNER, source });
+  else await getServerCache().files.write(file, body);
   return readInfo(file);
 }
 
@@ -211,5 +273,5 @@ export async function addStandingInstruction(id: string, text: string): Promise<
     const rest = soul.content.slice(at + marker.length).replace(/^\n+/, "").replace(/^_None yet\.[^\n]*\n?/, "");
     content = `${head}\n\n${line}\n${rest}`;
   }
-  await writeAgentFile(id, "soul", content);
+  await writeAgentFile(id, "soul", content, "pin");
 }

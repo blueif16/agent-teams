@@ -22,11 +22,12 @@ export interface ServerCache {
 
 // On Vercel the disk is read-only except /tmp, so writes live there and last only as long as the instance.
 const dataDir = () => (process.env.VERCEL ? path.join(tmpdir(), "agent-teams") : path.join(process.cwd(), ".data"));
-// The same roots agent-files.ts reads and writes (ROOT and, on Vercel, WRITE_ROOT).
-const agentRoots = () => [
-  path.join(process.cwd(), "agents"),
-  ...(process.env.VERCEL ? [path.join(tmpdir(), "agent-teams", "agents")] : []),
-];
+// The same roots agent-files.ts reads and writes: locally the vault's agents/ (getVault's dir: $VAULT_DIR, else
+// .data/vault); on Vercel the bundled agents/ and its /tmp copy.
+const agentRoots = () =>
+  process.env.VERCEL
+    ? [path.join(process.cwd(), "agents"), path.join(tmpdir(), "agent-teams", "agents")]
+    : [path.resolve(process.env.VAULT_DIR || path.join(dataDir(), "vault"), "agents")];
 
 function createServerCache(): ServerCache {
   const bus = new Bus();

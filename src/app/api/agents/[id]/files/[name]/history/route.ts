@@ -1,4 +1,4 @@
-import { getVault } from "@/server/runtime/vault";
+import { agentVault } from "@/lib/agent-files";
 import { fileOr404 } from "../file";
 
 /*
@@ -12,5 +12,5 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/agents/[id]/fil
   const { id, name } = await ctx.params;
   const file = fileOr404(id, name);
   if (file instanceof Response) return file;
-  return Response.json(await getVault().history(file));
+  return Response.json(await (await agentVault()).history(file));
 }
