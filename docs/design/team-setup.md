@@ -1,0 +1,205 @@
+# Team setup, end to end (design v1, DRAFT)
+
+How a team goes from "I want X" to experts working on it, and the runtime, memory, prompts and privacy rules
+underneath. Every line marked **PROPOSED** waits on the owner; everything else is decided (see `DECISIONS.md`).
+Evidence lives in `docs/research/` (A dots/Muse · B prompt patterns · C similar systems · D Deep Agents runtime ·
+E privacy · F orchestrator memory); cited as `[D §7]`.
+
+## 0. Principles (each one is what the research converged on)
+
+1. **Default to one expert.** Teams only when the work splits into independent parts: multi-agent setups lose
+   39–70% on sequential tasks [C §6]. Mira's triage defaults to solo.
+2. **One writer per artifact, and nobody paraphrases.** Experts post work straight to the channel; the PM plans,
+   assigns and accepts, it never relays [C: Cognition, telephone game].
+3. **State lives in files written by checked tools.** The lead's plan, decisions and roster are files that code
+   validates; "done" needs evidence; progress comes from artifacts, never a worker's own number [B a-pattern 4, F §3].
+4. **One memory writer.** Agents and background jobs only propose; dreaming commits ops that code validates, each
+   citing evidence ids [B 3, D §3b].
+5. **Gate plans and consequential actions, not steps.** Owners reject 39% of plans but 3% of per-action prompts
+   [C: Claude Code]; one launch card, then gates only where an action is external, irreversible, costly or new.
+6. **Wake on events.** Only Mira has a timer heartbeat; everyone else wakes on a message, assignment or approval
+   [C: Paperclip burned 57% of 313M tokens on a 5-min CEO heartbeat].
+7. **Stable prefix first, changing content last** so Crusoe's cache keeps hitting; the date goes last [B e, F §4].
+8. **Privacy is enforced in code at fixed hook points.** Detectors are one layer; egress allowlists, taint and
+   approvals must hold when detectors miss [E §1, §6].
+
+## 1. The setup flow
+
+| # | Step | Who | Output | Gate |
+|---|---|---|---|---|
+| 1 | Ask | Owner → Mira (DM) | the request | — |
+| 2 | Triage | Mira, by checklist | **solo** (one expert, DM) or **project** (a PM) | one-tap override on her reply |
+| 3 | Brief | PM | `charter.md`: dated goal, success metric, scope must/won't, roles + qualifications, budget | — |
+| 4 | Source | PM | past projects (charter, retro, decisions, ledger) + talent (agents, memories, acceptance) | — |
+| 5 | Staff | PM | per role: **rehire** the best match, or **create** an expert (archetype + config + seeded memory) | — |
+| 6 | Approve | Owner | one editable **launch card**: brief, roster (new/rehired + why + record), budget, wake policy | **the** gate; "request revision" loops to 3–5 |
+| 7 | Provision + kickoff | Runtime, then PM | rows, threads, home files, channel; PM writes the DAG and assigns first tasks | — |
+
+- **Staffing loop (step 4–5)** copies Captain Agent [C §2]: role description → retrieve from the agent library →
+  a selector that may answer **"none fits"** → create the missing expert → save it to the library. GAIA: no library
+  18.2 → agent library 29.1 → agent + tool libraries 40.6.
+- **Staffing check** before the card: no two roles with the same qualifications, every qualification covered.
+- **PROPOSED Q1 · PM is the lead for the whole project.** It writes the plan, assigns, accepts work against the
+  qualifications it wrote, and records decisions. It never relays: experts post directly, owner DMs go straight to
+  experts [A, C: every studied product keeps one persistent coordinator].
+- **PROPOSED Q2 · Gates.** One launch card (step 6). During the project: new hires, budget at 80% (warn) and 100%
+  (pause), scope changes, and tool calls in tiers T4–T6 (§6). Small tasks: no card.
+- **PROPOSED Q3 · Rehiring keeps the identity.** Same agent (name, mascot, record, career memory), a **fresh thread
+  per project** (`a:{agent}:p:{project}` [D §1]) with project-scoped memory seeded from a filtered subset. At most
+  2 live projects per agent. Lessons cross projects only through gated dreaming [A: cross-task carry-over was the
+  failure OpenAI measured; C §3].
+- **PROPOSED Q4 · Expert config** = archetype · brief (objective, deliverables, success criteria, non-goals,
+  escalate-to) · tools and skills (small list) · model tier · budget (USD + share of the per-model TPM) · autonomy
+  per tool tier · wake policy · memory scope + seed · reporting line. Persona is **tone only**: personas alone add no
+  accuracy and irrelevant persona detail can cost up to ~30 points [C §2].
+- **PROPOSED Q5 · Triage.** Mira decides with an explicit checklist (independent parts? > 1 domain? > ~1 day?),
+  defaults to solo, says which she chose; the owner flips it with one tap; a solo expert may ask to upgrade.
+- **PROPOSED Q6 · Start small.** At most 3 experts at launch; the PM asks to hire more later (a gate) [C: Paperclip
+  users hired 11, 4 were useful].
+
+## 2. Agents: identity, files, threads
+
+- **Archetypes:** lead, writer, researcher, analyst, engineer, coordinator (+ chief for Mira). Each has an Inherent
+  section (existing `INHERENT` in `src/lib/agent-files.ts`) and a SKILL.md for step-by-step procedure, so briefs stay
+  short [B 4].
+- **Home files** (`agents/<id>/`, editable in the profile): `SOUL.md` (Inherent + per-project section + 📌 standing
+  instructions) and `MEMORY.md` (Mistakes, Best approaches). **PROPOSED Q7:** drop MEMORY.md's "Done" section for a
+  **Track record** line computed by code from the ledger; four products keep task progress out of memory [B 5].
+  Memory lines are facts, not commands, and tagged stated / observed / inferred with a source [B 10].
+- **Freshness:** our own `HomeFiles` middleware reads SOUL/MEMORY every call; the stock `memory` option freezes
+  them per thread, so dreaming's edits would never reach a persistent agent [D §0 finding 2].
+- **Threads:** one per agent × project, durable in SQLite (`SqliteSaver`). One run per thread at a time via a queue;
+  two concurrent runs fork the checkpoint and lose messages [D §0 finding 6]. A DM mid-run is delivered through an
+  inbox drained before the next model call [D §1, §11 step 4].
+
+## 3. Runtime (Deep Agents JS, local first) [D §10]
+
+- Modules under `src/server/runtime/`: `db` (`.data/runtime.db`), `checkpointer`, `models` (`crusoe()` with an
+  injectable `fetch`), `limiter` (per-model RPM + **TPM**, lanes, header calibration), `resilience` (fallback outermost,
+  retry inner: today's order is inverted [D §0 finding 3]), `home-files`, `backends`, `inbox`, `agents`, `threads`
+  (queue), `run`, `bus` (SSE), `ledger-callbacks`, `tools/assign`, `approvals`, `scheduler`, `heartbeat`, `dream/*`,
+  `recovery`.
+- Tables: projects, agents, project_members, threads, runs, inbox, assignments, approvals, memories, dreams,
+  heartbeat_notes [D §10]. The JSONL ledger stays the stats source of truth (adds `thread`, `run`).
+- `write_todos` is opt-in since deepagents 1.12 [D §0 finding 1]; the **Plan panel reads the lead's `dag.json`**
+  (§4), not todos.
+- One new dependency: `@langchain/langgraph-checkpoint-sqlite@^1.1.0` (compatibility verified [D §0]).
+- Fetch chain to Crusoe: `privacyScrub → limit → fetch`. It's the only point that also catches summarization's own
+  model call [E §8].
+
+## 4. The lead's memory and compaction [F]
+
+- **Durable state** under `.data/projects/<pid>/state/`, written **only** by structured tools (mounted read-only for
+  file tools): `charter.md`, `dag.json` (tasks + PM todos: id, status, owner, deps, acceptance, blocker, evidence,
+  last report; ≤ 60 open), `decisions.md` (ADR: decision, why, approved by + ledger ref, supersedes; ≤ 25 active),
+  `roster.json`, `open.json` (questions/risks; owner questions become cards), `prefs.md`, `journal/`, `windows/`.
+- **Lead tools:** `add_task`, `update_task({id, expectedRev, …})` (legal transitions only; `done` needs evidence),
+  `assign_task`, `record_decision`, `raise_item`/`resolve_item`, `note_owner_pref`, `update_member`, `log_progress`,
+  `set_charter` (owner approval). Workers: `report({taskId, status, summary, evidence[], blocker?})` → runtime updates
+  the DAG, roster and the lead's deltas [F §9.2].
+- **Context order:** system (role, tools, SOUL+MEMORY, charter) → window opener (code-rendered state digest ≤ 4K +
+  merged summary + file pointers) → append-only history → `<state_delta>` lines at the tail.
+- **Triggers** on real `usage.input_tokens`: lead 64K soft / 96K hard, Mira 48K / 80K, workers 96K / 128K. Reason:
+  every agent shares one 500K tokens/min bucket per model; a 170K call (the deepagents default) is 34% of it [F §4].
+- **Compaction** replaces deepagents' summarizer (same middleware name): compact at idle, never mid tool round;
+  an in-context, cached compaction turn files every **unfiled** owner message / report into state tools first, then
+  writes a 9-section summary; validate; render a new opener from the files; **quiz** with 4 code-generated probes
+  ("who owns t7, what blocks it"); retry once, else degrade with a longer tail and a ledger row [F §9.4].
+- **Mira:** `.data/company/index.json` (code-computed rollups per project), company decisions, owner prefs, an inbox
+  of everything waiting on the owner; read-only access to PM files.
+
+## 5. Dreaming and the heartbeat
+
+- **Dreaming** (per agent, background lane, never while the agent runs) [D §3b, D-dreaming-notes]:
+  - Triggers: task end + 10 min idle · nightly 02:00 · project close (→ retro + talent profile) · memory over cap.
+  - A cheap NOOP gate first (Nemotron Lightning: "anything worth remembering?"); the writer runs on main.
+  - Output is **ops** (add / update / retire / noop), each citing evidence that code maps from short numbers, so it
+    can't cite something that doesn't exist. Code validates and applies; ≤ 25% of items retired per dream; old file
+    saved first; **SOUL.md never edited**; heartbeat transcripts never used as input.
+  - Compaction vs dreaming: compaction is per thread and writes only the opener + state facts; dreaming is per agent
+    and writes MEMORY.md; at project close it reads the DAG and decisions log.
+  - **PROPOSED Q8:** dreams auto-apply with an undo and a diff in the profile; edits to cross-project memory or a
+    talent profile ask the owner.
+- **Heartbeat** (Mira only, timer) [A clone 1–2, B 7]: a read-only child reads a code-computed diff of the company
+  and proposes; Mira decides. Speaks only on a listed trigger (meaningful change, completion, failure, an owner
+  action needed) with a P0/P1/P2 tag; otherwise `QUIET` (with a logged reason; the app swallows it). Silent while her
+  own last question is unanswered.
+
+## 6. Privacy and tool rules [E]
+
+- **Rule model:** our own JSON DSL `policy/v1` (Cedar-like semantics; Cedar/Rego can't express redact/ask, labelled
+  flows, grants or budgets). Kinds: `tool`, `flow`, `grant`, `budget`, `classifier`. Labels: `secret.*`, `pii.*`,
+  `owner_private`, `project:<id>`, `untrusted`. Sinks: Crusoe, LangSmith, web, email, APIs, own memory, cross-project
+  memory, other teams. Most restrictive wins; grants only turn ask → allow; `locked` rules can't be relaxed [E §4].
+- **Tiers:** T0 internal read and T1 internal write auto-allow · T2 memory auto for self, asks for cross-project ·
+  T3 public read egress auto unless sensitive context or an untrusted destination · T4 communicate asks per recipient
+  · T5 state-changing APIs ask · T6 money/credentials ask every time (secrets by reference only) · T7 shell denied
+  without a sandbox [E §6].
+- **Detector pack** (copy, local): gitleaks `config/gitleaks.toml` (MIT, 222 rules) + 3 secretlint rules (MIT) ·
+  TypeScript ports of Presidio recognizers with context words and validators (MIT) · LangSmith's secret rules for
+  traces · `jev-secrets` (MIT) approach: reversible pseudonymisation, re-scan after rewrite, refuse to send on a leak.
+  **Not** trufflehog (AGPL) or secrets-patterns-db (CC-BY-SA). Port fixes: strip `(?i)`, `\z` → `$`, `(?P<` → `(?<`;
+  scan in a worker with a timeout [E §3].
+- **Enforcement points (verified):** Crusoe `fetch` wrapper · `wrapModelCall` (covers the system message, where
+  SOUL/MEMORY live) · `wrapToolCall` for args and results (+ `humanInTheLoopMiddleware`, `interruptMode: "per_call"`)
+  · `toolCallLimitMiddleware` for budgets · deepagents filesystem `permissions` for paths · LangSmith
+  `createSecretAnonymizer` via `LangChainTracer({ client })` · memory/dream writes [E §8].
+- **Natural language → rules:** compile with GLM-5.3 from trusted context only → schema-validated
+  `{rules, assumptions, questions}` → ≤ 3 multiple-choice questions → plain-English read-back rendered **from the
+  JSON** (so it can't disagree with what's enforced) → conflict check → **dry run** over the last 7–30 days of calls
+  ("would block 3, redact 12, ask 5") → save in enforce or shadow mode [E §5].
+- **Views:** V1 tool-call strip under each message (data-class chips + outcome: allowed / redacted / asked / blocked
+  / shadow; click → spans, what the model saw, the rule) · V2 approval cards with grant scope (once / project /
+  30 days), red blocked rows, "Recently blocked" · V3 data-flow Sankey (class → agent → sink; trifecta badge) ·
+  V4 rules page (NL box, proposal + dry run, rules, grants with revoke, per-agent "what I can do") [E §7].
+- **PROPOSED Q9–Q11** (from E §11): LangSmith keeps tracing with the anonymizer on (vs metadata only) · PII
+  tokenized before Crusoe by default or secrets only · which Jev tool/rules the owner uses today.
+
+## 7. Prompts [B §3]
+
+- **Shared prefix** (identical for every agent): the system in third person · message envelope + trust labels ·
+  reactions are orders · approval tiers · only tool calls reach anyone · report status lines (`result:` /
+  `needs input:` / `failed:`) · truth rules · instruction priority · chat style.
+- **Mira:** triage table · check existing agents before creating · ≤ 3 clarifying questions, once · proposal card
+  via prepare → launch · dispatch and end the turn (never poll) · verify and relay · escalation list.
+- **PM:** fixed setup checklist (Brief → Source → Staff → Approve → Kickoff) · staffing rule · assignment brief
+  template (code fills fixed slots; the model writes only the task paragraph [B 1]) · lead loop · escalation.
+- **Expert:** what each request type authorizes · ask vs proceed · advisor checkpoint (GLM-5.3) · self-check ·
+  report contract · channel etiquette.
+- **Dreaming:** offline, history only, act on nothing · inputs in order · consolidate → reflect → proposed ops.
+- For DeepSeek Flash, copy the older and small-model prompt styles (if-then rules over judgment paragraphs) [B 5].
+- Reply budget from app counters: owner away > 30 min → ≤ 80 words; ≥ 2 unanswered agent replies → status update
+  instead of a message [B 8].
+
+## 8. UI changes
+
+- **Launch card v2:** brief, roster (new/rehired, why, record), budget, wake policy, "request revision".
+- **Plan panel** from `dag.json`; **team panel** from `roster.json` + charter; **decisions** list.
+- **Approval cards** from the `approvals` table (resume via `POST /api/approvals/[id]`), with grant scope.
+- **Tool-call strip** (V1), **data flows** (V3), **rules page** (V4); dream diffs in the agent profile.
+
+## 8b. Versioning and lineage (requirement; design pending research G)
+
+- **Every agent-facing file is versioned with git underneath:** SOUL.md, MEMORY.md, notes, skills, the lead's state
+  files and Mira's company files. The owner can open any file's history, see who changed it, when and why, read the
+  diff, and restore.
+- **Inheritance is visible:** a new agent built from past agents keeps provenance for each skill version and memory
+  item it inherited, shown as a lineage graph (ancestors, descendants, what came from whom).
+- Open until `docs/research/G-versioning-lineage.md` lands: one vault repo vs per agent, library, commit trailers,
+  the lineage schema, and how "forget" works when history is permanent (secrets must be scrubbed before commit).
+
+## 9. Build order
+
+Tracks run in parallel where they don't share files; each step ships with a test that fails when it's wrong
+(tests listed in the cited section).
+
+| Track | Steps |
+|---|---|
+| **R runtime** [D §11] | R1 durable thread *(building)* · R3 limiter + middleware order *(building)* · R2 home files + backends + permissions · R4 thread queue + DM inbox · R5 streaming bridge (SSE: plan, now line, ledger rows) · R6 approvals · R7 assignment round-trip · R8 scheduler (heartbeat + dreaming) |
+| **M lead memory** [F §10] | M1 state module + tools · M2 worker `report` → DAG/roster/deltas · M3 window opener + replacement summarizer (cache hit ≥ 0.8 from turn 3) · M4 compaction turn files unfiled items · M5 quiz + fallback · M6 Mira rollups + dream at close |
+| **P privacy** [E §10] | P1 detector pack + false-positive tests · P2 Crusoe + LangSmith scrub · P3 policy engine (a deny never relaxes) · P4 tool gate + approvals · P5 taint · P6 project boundary · P7 NL compiler (eval) · P8 UI |
+| **S setup flow** | S1 Mira triage + `project` card v2 · S2 PM brief/source/staff tools + agent library · S3 provisioning (`POST /api/projects`) + kickoff |
+| **U UI** | U1 Plan/team panels from state files · U2 approval cards from the runtime · U3 tool-call strip · U4 rules page |
+
+Order of dependence: R1–R4 → R5–R7 → M and S; P1–P3 can start any time; P4 after R6; U follows the step it renders.
+Needs a working Crusoe key for R5 and M3 (the current key expires 2026-10-18).
