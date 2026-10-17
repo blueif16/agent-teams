@@ -5,7 +5,7 @@ description: UI rules for the Agent Teams app (dots-style agent chat with Slack 
 
 # Agent Teams UI
 
-The look copies OpenAI's dots (plush mascots, iMessage bubbles, chat left and the agent's work in a browser-style pane right) with Slack's structure (rail, channel sidebar, threads). Don't invent a new visual language; extend this one.
+The look copies OpenAI's dots (plush mascots, iMessage bubbles, chat left and agent and team panels in a pane right) with Slack's structure (rail, channel sidebar, threads). Don't invent a new visual language; extend this one.
 
 ## Tokens (src/app/globals.css `@theme`)
 
@@ -17,7 +17,6 @@ The look copies OpenAI's dots (plush mascots, iMessage bubbles, chat left and th
 | `accent` | #4166eb | your bubbles, primary buttons, selection |
 | `accent-soft` | #a9b7f6 | disabled send |
 | `pane` | #f9fbfc | workspace pane |
-| `cobalt` / `paper` | #2033a4 / #fbf9f5 | slide art |
 
 Type: Inter at 15px/22px for messages, 13–14px for UI, 12.5px for meta. Bubbles are radius 20px; pills are fully round; menus are radius 16–20px with a soft shadow.
 
@@ -36,7 +35,7 @@ Nothing clickable is silent. Use the CSS utilities for hover and press, and `mot
 | New thread items | `motion.div` enter: opacity 0, y 12, scale 0.97 → rest, `ENTER` spring |
 | Popovers and menus | `AnimatePresence` + scale 0.94 → 1 from the anchor's corner |
 | State changes (status chip, badges, approvals) | key on the state so it pops (`POP` spring); approvals flash green and draw the check |
-| Confirmations with no visible change (copy, download, pause) | `Toast` via `notify()` |
+| Confirmations with no visible change (copy, pause) | `Toast` via `notify()` |
 
 Springs live in `src/components/ui.tsx`: `SPRING` for highlights and panels, `POP` for pop-ins. `MotionConfig reducedMotion="user"` wraps the app, and globals.css turns off transforms under `prefers-reduced-motion`.
 
@@ -50,7 +49,7 @@ Springs live in `src/components/ui.tsx`: `SPRING` for highlights and panels, `PO
 ## Agents and teams
 
 - A mascot always opens that agent's panel, wherever it appears. Only `#channel` (the pill, the `#` button) opens the team panel.
-- Status and the "now" line come from the shared `status` and `doing` state in `AgentTeams.tsx`. Pass `status` to every mascot at 48 px or more, so its Rive action matches the chat. Never read `agent.status` or `agent.task` from seed data in a view.
+- Status, the "now" line and the plan come from the shared `status`, `doing` and `plans` state in `AgentTeams.tsx`; the `Agent` type carries none of them. Pass `status` to every mascot at 48 px or more, so its Rive action matches the chat. An empty `doing` renders nothing.
 
 ## Reactions are orders
 
@@ -58,7 +57,7 @@ Reactions on agent messages are quick orders, not decoration. The set is fixed i
 
 👍 Go ahead · 👀 Dig in · 🔁 Redo · ✋ Hold · 📌 Remember
 
-Reacting sends the order to the agent (it replies live with a quote line), drops a labeled chip under the message, and applies the side effect: ✋ sets the agent idle, 📌 adds to its Remembers list. Hovering a message shows the bar; clicking or right-clicking it opens the quick-actions menu, which has the orders plus message, ask, hand off, check in, profile and copy.
+Reacting sends the order to the agent (it replies live with a quote line), drops a labeled chip under the message, and applies the side effect: ✋ sets the agent idle, 📌 adds to its Remembers list. Hovering a message shows the bar; clicking or right-clicking it opens the quick-actions menu, which has the orders plus message, ask, hand off, profile and copy.
 
 ## Gotchas found in this repo
 

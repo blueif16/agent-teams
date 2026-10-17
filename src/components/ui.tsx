@@ -140,7 +140,7 @@ export function inline(line: string): ReactNode[] {
   return out;
 }
 
-/** Dark pill confirming an action, e.g. a download or a pause. */
+/** Dark pill confirming an action, e.g. a copy or a pause. */
 export function Toast({ toast }: { toast: { id: number; text: string } | null }) {
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center" aria-live="polite">
