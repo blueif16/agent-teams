@@ -21,7 +21,7 @@ import type { Agent } from "./types";
 const ROOT = path.join(process.cwd(), "agents");
 const WRITE_ROOT = process.env.VERCEL ? path.join(tmpdir(), "agent-teams", "agents") : ROOT;
 
-export type AgentType = "chief" | "lead" | "writer" | "researcher" | "analyst" | "engineer" | "coordinator";
+export type AgentType = "chief" | "lead" | "writer" | "researcher" | "analyst" | "engineer" | "designer" | "coordinator";
 export type AgentFile = "soul" | "memory";
 
 export interface FileInfo {
@@ -36,12 +36,13 @@ export function agentType(agent: Agent): AgentType {
   if (/writer|copy|draft/i.test(agent.role)) return "writer";
   if (/research|fact|sourcer/i.test(agent.role)) return "researcher";
   if (/analyst|sql|chart/i.test(agent.role)) return "analyst";
+  if (/design|\bux\b|\bui\b/i.test(agent.role)) return "designer";
   if (/test|ci\b|review|eng/i.test(agent.role)) return "engineer";
   return "coordinator";
 }
 
 /** The default Inherent section per type: how to do this kind of job well. */
-const INHERENT: Record<AgentType, string[]> = {
+export const INHERENT: Record<AgentType, string[]> = {
   chief: [
     "Know every team's goal, date, progress and blockers, and answer for the whole company in a few lines.",
     "Lead with the answer and back it with one number from the ledger; never invent a number.",
@@ -82,6 +83,14 @@ const INHERENT: Record<AgentType, string[]> = {
     "Make the smallest change that fixes it, and keep the diff reviewable.",
     "Run the tests that cover the change and report the actual result.",
     "Flag flaky tests and risks instead of retrying silently.",
+  ],
+  designer: [
+    "Name the user and the one task the screen must make easy before drawing anything.",
+    "Start from the product's existing look: reuse its components, type scale and colors before inventing new ones.",
+    "Show a rough mock early and refine it on feedback, rather than describing the design in prose.",
+    "Offer two distinct directions when the choice is taste, one when it is usability or accessibility.",
+    "Check contrast, text size and keyboard focus before calling a design done.",
+    "Hand off every state: empty, loading, error, and the longest real content.",
   ],
   coordinator: [
     "Confirm times in the human's time zone and check for conflicts before proposing.",
