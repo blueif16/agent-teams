@@ -6,7 +6,7 @@
  *   now    the one-line "what it's doing" ("Reading brief.md"), from tool starts or a tool's own writer
  *   plan   the todo list after write_todos
  *   tool   a tool call starting, ending or failing
- *   done   the run finished; `text` is its final answer
+ *   done   the run finished; `text` is its final answer, `message` its transcript row (when it said something)
  *   error  the run failed
  * Every event carries its run id.
  */
@@ -17,7 +17,7 @@ export type ThreadEvent =
   | { type: "now"; run: string; text: string }
   | { type: "plan"; run: string; todos: { content: string; status: TodoStatus }[] }
   | { type: "tool"; run: string; phase: "start" | "end" | "error"; id: string; name: string; input?: unknown; output?: string }
-  | { type: "done"; run: string; text: string }
+  | { type: "done"; run: string; text: string; message?: number }
   | { type: "error"; run: string; message: string };
 
 export type ThreadEventType = ThreadEvent["type"];

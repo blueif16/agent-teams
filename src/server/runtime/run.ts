@@ -17,6 +17,8 @@ export interface RunContext {
   events: ThreadEvents;
   /** Marks `runId` as the run in progress on the thread (InboxDrain delivers to it); returns the undo. */
   activate(runId: string): () => void;
+  /** Tells the app the thread's transcript has a new row. */
+  announce?(threadId: string): void;
   /** Ledger fields: the stats team, the agent, and the model it runs on. */
   ledger: { team: string; agent: string; asked: string };
 }
@@ -80,9 +82,13 @@ export async function executeRun(ctx: RunContext, threadId: string, runId: strin
     await ledger.flush();
     const state = await worker.graph.getState({ configurable: { thread_id: threadId } });
     const last = (state.values as { messages?: BaseMessage[] }).messages?.at(-1);
+    const text = last?.getType() === "ai" ? last.text : "";
+    // The answer goes to the transcript now, as said: compaction may rewrite the working context later.
+    const saved = text ? db.messages.add({ threadId, runId, role: "agent", author: ctx.ledger.agent, text }) : undefined;
     db.runs.finish(runId, "done");
     db.threads.setStatus(threadId, "idle");
-    emit({ type: "done", run: runId, text: last?.getType() === "ai" ? last.text : "" });
+    if (saved) ctx.announce?.(threadId);
+    emit({ type: "done", run: runId, text, ...(saved && { message: saved.id }) });
   } catch (e) {
     await ledger.flush();
     const message = (e as Error).message || String(e);

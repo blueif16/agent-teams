@@ -10,6 +10,7 @@
  *   files:agent:<id>   one of an agent's Markdown files changed
  *   rules              a privacy or tool rule was saved or removed
  *   skills             the skill library changed (skills/index.json or a vendored file)
+ *   messages:<thread>  a row was added to a thread's transcript (src/server/runtime/db.ts)
  *   config             never sent: code and .env.local change only with a restart, and a client
  *                      revalidates what it shows when its stream reconnects
  */
@@ -30,6 +31,7 @@ export const TOPICS = {
   files: (id: string) => `files:agent:${id}`,
   rules: "rules",
   skills: "skills",
+  messages: (threadId: string) => `messages:${threadId}`,
 };
 
 export class Bus {

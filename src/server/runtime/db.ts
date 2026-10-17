@@ -126,10 +126,38 @@ export interface InboxRow<P = unknown> {
   deliveredAt: string | null;
 }
 
+export type MessageRole = "owner" | "agent";
+
+/** One line of a thread's transcript: what the owner or the agent said, never rewritten. */
+export interface MessageRow {
+  /** Increasing: the order it was said in. */
+  id: number;
+  threadId: string;
+  /** The run it went to (owner) or came from (agent); null when it didn't go through the runtime. */
+  runId: string | null;
+  role: MessageRole;
+  /** "owner", or the agent's id. */
+  author: string;
+  text: string;
+  /** Upload ids (`<sha256>.<ext>`) attached to it. */
+  uploads: string[];
+  /** The sender's own id for it, so the page that sent it can match the saved row. */
+  ref: string | null;
+  at: string;
+}
+
+export interface MessagePage {
+  /** Oldest first. */
+  messages: MessageRow[];
+  /** Older rows exist before the first one. */
+  more: boolean;
+}
+
 export type NewProject = Pick<ProjectRow, "kind" | "name"> & Partial<Omit<ProjectRow, "kind" | "name" | "createdAt" | "closedAt">>;
 export type NewAgent = Pick<AgentRow, "id" | "name" | "archetype"> & Partial<Pick<AgentRow, "modelTier" | "config" | "status" | "seededFromAgentId">>;
 export type NewMember = Pick<ProjectMemberRow, "projectId" | "agentId"> & Partial<Pick<ProjectMemberRow, "role" | "qualifications">>;
 export type NewRun = Pick<RunRow, "threadId" | "trigger" | "lane"> & Partial<Pick<RunRow, "id" | "assignmentId">>;
+export type NewMessage = Pick<MessageRow, "threadId" | "role" | "author" | "text"> & Partial<Pick<MessageRow, "runId" | "uploads" | "ref">>;
 
 // ------------------------------------------------------------------------------------------ migrations
 
@@ -236,6 +264,23 @@ const MIGRATIONS: ((db: DatabaseSync, now: string) => void)[] = [
   (db) => {
     db.exec("ALTER TABLE projects ADD COLUMN budget_usd REAL");
   },
+  // 3: the transcript, append-only: the checkpointer's messages get compacted, these never do.
+  (db) => {
+    db.exec(`
+      CREATE TABLE messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_id TEXT NOT NULL REFERENCES threads(id),
+        run_id TEXT REFERENCES runs(id),
+        role TEXT NOT NULL CHECK (role IN ('owner', 'agent')),
+        author TEXT NOT NULL,
+        text TEXT NOT NULL,
+        uploads_json TEXT NOT NULL DEFAULT '[]',
+        ref TEXT,
+        at TEXT NOT NULL
+      );
+      CREATE INDEX messages_by_thread ON messages (thread_id, id);
+    `);
+  },
 ];
 
 // ---------------------------------------------------------------------------------------------- rows
@@ -317,6 +362,18 @@ const toInbox = <P>(r: Raw): InboxRow<P> => ({
   createdAt: String(r.created_at),
   deliveredRunId: str(r.delivered_run_id),
   deliveredAt: str(r.delivered_at),
+});
+
+const toMessage = (r: Raw): MessageRow => ({
+  id: Number(r.id),
+  threadId: String(r.thread_id),
+  runId: str(r.run_id),
+  role: r.role as MessageRole,
+  author: String(r.author),
+  text: String(r.text),
+  uploads: json<string[]>(r.uploads_json, []),
+  ref: str(r.ref),
+  at: String(r.at),
 });
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -491,6 +548,27 @@ export class RuntimeDb {
     },
     finish: (id: string, status: Exclude<RunStatus, "queued" | "running">, error?: string): void => {
       this.sql.prepare("UPDATE runs SET status = ?, ended_at = ?, error = ? WHERE id = ?").run(status, new Date().toISOString(), error ?? null, id);
+    },
+  };
+
+  /** The transcript. Append-only: there is no update and no delete. */
+  readonly messages = {
+    add: (m: NewMessage): MessageRow => {
+      const { lastInsertRowid } = this.sql
+        .prepare("INSERT INTO messages (thread_id, run_id, role, author, text, uploads_json, ref, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(m.threadId, m.runId ?? null, m.role, m.author, m.text, JSON.stringify(m.uploads ?? []), m.ref ?? null, new Date().toISOString());
+      return this.one(toMessage, "SELECT * FROM messages WHERE id = ?", lastInsertRowid)!;
+    },
+    /** The latest `limit` rows (before row `before`, when given), oldest first. */
+    page: (threadId: string, { before, limit = 200 }: { before?: number; limit?: number } = {}): MessagePage => {
+      const rows = this.all(
+        toMessage,
+        "SELECT * FROM messages WHERE thread_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+        threadId,
+        before ?? Number.MAX_SAFE_INTEGER,
+        limit + 1,
+      );
+      return { messages: rows.slice(0, limit).reverse(), more: rows.length > limit };
     },
   };
 
