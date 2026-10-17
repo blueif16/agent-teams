@@ -551,3 +551,38 @@ describe("aborting a replay", () => {
     await expect(post(play.fetch, chat("Draft the launch plan"), { signal: AbortSignal.abort() })).rejects.toMatchObject({ name: "AbortError" });
   });
 });
+
+describe("modes", () => {
+  it("update replays what it has without the upstream, and records what it doesn't", async () => {
+    await recordAll([chat("Draft the launch plan")], [text("recorded plan")]);
+    const up = fakeUpstream([text("live market")]);
+
+    const upd = createCassette({ file, mode: "update", upstream: up.fetch });
+    expect(await (await post(upd.fetch, chat("Draft the launch plan"))).text()).toBe("recorded plan");
+    expect(up.calls).toHaveLength(0);
+    expect(await (await post(upd.fetch, chat("Size the market"))).text()).toBe("live market");
+    expect(up.calls).toHaveLength(1);
+
+    const play = createCassette({ file, mode: "replay", upstream: offline });
+    expect(await (await post(play.fetch, chat("Draft the launch plan"))).text()).toBe("recorded plan");
+    expect(await (await post(play.fetch, chat("Size the market"))).text()).toBe("live market");
+  });
+
+  it("update starts a missing file with the cassette header", async () => {
+    const upd = createCassette({ file, mode: "update", upstream: fakeUpstream([text("live")]).fetch });
+    await bytesOf(await post(upd.fetch, chat("Draft the launch plan")));
+
+    const [header, entry] = (await readFile(file, "utf8")).trim().split("\n").map((l) => JSON.parse(l));
+    expect(header).toMatchObject({ v: 1, kind: "cassette" });
+    expect(entry).toMatchObject({ v: 1, n: 1 });
+  });
+
+  it("record starts the file over: a recording is one run, never patched", async () => {
+    await recordAll([chat("Draft the launch plan")], [text("old run")]);
+    await recordAll([chat("Size the market")], [text("new run")]);
+
+    const play = createCassette({ file, mode: "replay", upstream: offline });
+    expect((await post(play.fetch, chat("Draft the launch plan"))).status).toBe(598);
+    expect(await (await post(play.fetch, chat("Size the market"))).text()).toBe("new run");
+  });
+});
