@@ -129,10 +129,11 @@ export function createClientCache({ fetcher, storage, listen }: ClientCacheOptio
       startListening();
       return revalidate(key);
     },
-    /** Apply a change we already know about (a save), without a round trip. */
-    mutate<T>(key: string, update: (data: T | undefined) => T) {
+    /** Apply a change we already know about (a save), without a round trip. Returning undefined changes nothing. */
+    mutate<T>(key: string, update: (data: T | undefined) => T | undefined) {
       const e = entry(key);
-      publish(key, e, { data: update(e.snap.data as T | undefined) });
+      const data = update(e.snap.data as T | undefined);
+      if (data !== undefined) publish(key, e, { data });
     },
   };
 }

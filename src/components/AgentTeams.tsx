@@ -7,8 +7,11 @@ import { AGENTS, CHIEF, CHIEF_ID, HQ, TEAMS, TEAMS_BY_ID } from "@/lib/data";
 import { excerpt, orderText, ORDERS_BY_KEY, type OrderKey } from "@/lib/orders";
 import { parseProject, PROJECT_FENCE, START_PROJECT, visibleText } from "@/lib/project";
 import { withChartSummaries } from "@/lib/charts";
+import { prefetch } from "@/lib/client-cache";
 import type { AgentStatus, Message, OrgSnapshot, PlanStep, Team } from "@/lib/types";
 import { ChiefMenu } from "./Chief";
+import { identityOf } from "./Identity";
+import { agentStats } from "./Performance";
 import { Mascot } from "./Mascot";
 import { OrgContext } from "./org";
 import { IconButton, Toast } from "./ui";
@@ -140,6 +143,12 @@ export function AgentTeams() {
       .then((r) => r.json())
       .then((d: { live: boolean }) => setLive(d.live))
       .catch(() => setLive(false));
+  }, []);
+
+  // Mira's panel is the one opened most, so her stats and files are ready before it is.
+  useEffect(() => {
+    void prefetch(agentStats(CHIEF_ID));
+    void prefetch(identityOf(CHIEF_ID));
   }, []);
 
   const notify = useCallback((text: string) => {

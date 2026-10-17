@@ -1,6 +1,7 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronDown } from "lucide-react";
+import { useCached, type Resource } from "@/lib/client-cache";
 import { AGENTS } from "@/lib/data";
 import { useOrg } from "./org";
 import { tierOf } from "@/lib/models";
@@ -11,7 +12,9 @@ import { POP, SPRING } from "./ui";
 
 /*
  * Performance tabs: concise records of how efficiently agents work, from
- * GET /api/stats (the same numbers the HR agent will judge by).
+ * GET /api/stats (the same numbers the HR agent will judge by), through the
+ * client cache: they paint what they showed last and refresh when the ledger
+ * announces a change.
  * Token series colors were run through the dataviz palette validator
  * (light surface): all checks pass; aqua sits under 3:1 contrast, so every
  * chart has a legend, tooltips and a table view.
@@ -41,31 +44,13 @@ function split(p: { input: number; cached: number; output: number }) {
   return { cached: p.cached, fresh: Math.max(0, p.input - p.cached), output: p.output };
 }
 
-/** Fetches stats now, every 15s, and when the window regains focus. */
-function useStats<T>(url: string) {
-  const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    const load = () =>
-      fetch(url)
-        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`Couldn't load stats (${r.status})`))))
-        .then((d: T) => {
-          if (!alive) return;
-          setData(d);
-          setError(null);
-        })
-        .catch((e: Error) => alive && setError(e.message));
-    load();
-    const timer = setInterval(load, 15_000);
-    window.addEventListener("focus", load);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-      window.removeEventListener("focus", load);
-    };
-  }, [url]);
-  return { data, error };
+export const agentStats = (agentId: string): Resource => ({ key: `/api/stats?agent=${agentId}`, topic: `stats:agent:${agentId}` });
+
+/** Changes arrive as events; this slow refresh only covers a stream that is down. */
+const SAFETY_REFRESH_MS = 120_000;
+
+function useStats<T>(resource: Resource) {
+  return useCached<T>(resource, { refreshMs: SAFETY_REFRESH_MS });
 }
 
 function Section({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
@@ -367,17 +352,45 @@ function Empty({ who }: { who: string }) {
   );
 }
 
-function Status({ error }: { error: string | null }) {
-  return <p className="mt-6 text-center text-[13px] text-muted">{error ?? "Loading stats…"}</p>;
+function Status({ error }: { error: string }) {
+  return <p className="mt-6 text-center text-[13px] text-muted">Couldn&apos;t load stats ({error})</p>;
+}
+
+const KPI_LABELS = ["Spend", "Tokens", "Cache hit", "Accepted", "Avg reply", "Failures"];
+
+/** Only the first-ever load shows this; after that the cache always has numbers to paint. */
+function StatsSkeleton() {
+  const bar = "animate-pulse bg-[#f0f0f0]";
+  return (
+    <div aria-busy="true" aria-label="Loading stats">
+      <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {KPI_LABELS.map((label, i) => (
+          <div key={label} className="rounded-2xl bg-white px-3.5 py-3 shadow-[0_0_0_1px_rgba(0,0,0,0.05)]">
+            <div className="text-[12.5px] text-muted">{label}</div>
+            <div className={`mt-1.5 h-[22px] w-16 rounded-md ${bar}`} style={{ animationDelay: `${i * 90}ms` }} />
+            <div className={`mt-1.5 h-3 w-24 rounded-full ${bar}`} style={{ animationDelay: `${i * 90}ms` }} />
+          </div>
+        ))}
+      </div>
+      <div className="mt-6 rounded-2xl bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,0.05)]">
+        <div className="flex h-[120px] items-end gap-3 border-b border-[#ececec] px-2">
+          {[46, 70, 38, 88, 60, 76, 52].map((h, i) => (
+            <span key={i} className={`flex-1 rounded-t-[4px] ${bar}`} style={{ height: `${h}%`, animationDelay: `${i * 90}ms` }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function TeamPerformance({ teamId, onOpenAgent }: { teamId: string; onOpenAgent: (id: string) => void }) {
   const team = useOrg().teamsById[teamId];
   // Launched teams exist only in the browser, so they name their members.
-  const { data, error } = useStats<TeamReport>(
-    `/api/stats?team=${teamId}${team.launched ? `&agents=${team.agents.map((a) => a.id).join(",")}` : ""}`,
-  );
-  if (!data) return <Status error={error} />;
+  const { data, error } = useStats<TeamReport>({
+    key: `/api/stats?team=${teamId}${team.launched ? `&agents=${team.agents.map((a) => a.id).join(",")}` : ""}`,
+    topic: `stats:team:${teamId}`,
+  });
+  if (!data) return error ? <Status error={error} /> : <StatsSkeleton />;
   const active = data.agents.some((a) => a.calls > 0);
   return (
     <div>
@@ -429,8 +442,8 @@ export function TeamPerformance({ teamId, onOpenAgent }: { teamId: string; onOpe
 }
 
 export function AgentPerformance({ agentId }: { agentId: string }) {
-  const { data, error } = useStats<AgentReport>(`/api/stats?agent=${agentId}`);
-  if (!data) return <Status error={error} />;
+  const { data, error } = useStats<AgentReport>(agentStats(agentId));
+  if (!data) return error ? <Status error={error} /> : <StatsSkeleton />;
   const agent = AGENTS[agentId];
   const signals = data.calls > 0 || ORDERS.some((o) => data.orders[o.key] > 0);
   return (
