@@ -11,6 +11,7 @@
  *   rules              a privacy or tool rule was saved or removed
  *   skills             the skill library changed (skills/index.json or a vendored file)
  *   org                a team, DM project or agent was created (the setup flow's launch)
+ *   approvals          an agent asked the owner to approve a tool call, or the owner decided one (runtime/approvals.ts)
  *   config             never sent: code and .env.local change only with a restart, and a client
  *                      revalidates what it shows when its stream reconnects
  */
@@ -32,6 +33,7 @@ export const TOPICS = {
   rules: "rules",
   skills: "skills",
   org: "org",
+  approvals: "approvals",
 };
 
 export class Bus {

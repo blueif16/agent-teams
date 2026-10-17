@@ -1,5 +1,5 @@
 /*
- * The runtime's tables (research D §10): projects, agents, project_members, threads, runs and inbox, in
+ * The runtime's tables (research D §10): projects, agents, project_members, threads, runs, inbox and approvals, in
  * <DATA_DIR>/runtime.db. Checkpoints live in their own file (checkpointer.ts); the ledger stays JSONL.
  *
  * node:sqlite, built into Node 24 and typed by @types/node: better-sqlite3 is here only as the checkpointer's
@@ -126,6 +126,36 @@ export interface InboxRow<P = unknown> {
   deliveredAt: string | null;
 }
 
+export type ApprovalState = "pending" | "approved" | "declined";
+
+/** A tool call waiting on the owner (R6): the gate (approvals.ts) creates it, POST /api/approvals/[id] decides it. */
+export interface ApprovalRow {
+  /** `ap_` + a ulid. */
+  id: string;
+  threadId: string;
+  /** The run that asked. */
+  runId: string | null;
+  agentId: string;
+  projectId: string;
+  tool: string;
+  /** The model's tool call id; one approval per call. */
+  toolCallId: string;
+  args: Record<string, unknown>;
+  /** "Research (deep, ~$0.10)". */
+  title: string;
+  detail: string;
+  /** Estimated cost in USD at list price, when the tool knows it. */
+  estUsd: number | null;
+  state: ApprovalState;
+  createdAt: string;
+  decidedAt: string | null;
+  /** The owner's note with the decision. */
+  note: string | null;
+}
+
+export type NewApproval = Pick<ApprovalRow, "threadId" | "agentId" | "projectId" | "tool" | "toolCallId" | "args" | "title" | "detail"> &
+  Partial<Pick<ApprovalRow, "runId" | "estUsd">>;
+
 export type NewProject = Pick<ProjectRow, "kind" | "name"> & Partial<Omit<ProjectRow, "kind" | "name" | "createdAt" | "closedAt">>;
 export type NewAgent = Pick<AgentRow, "id" | "name" | "archetype"> & Partial<Pick<AgentRow, "modelTier" | "config" | "status" | "seededFromAgentId">>;
 export type NewMember = Pick<ProjectMemberRow, "projectId" | "agentId"> & Partial<Pick<ProjectMemberRow, "role" | "qualifications">>;
@@ -236,6 +266,30 @@ const MIGRATIONS: ((db: DatabaseSync, now: string) => void)[] = [
   (db) => {
     db.exec("ALTER TABLE projects ADD COLUMN budget_usd REAL");
   },
+  // 3: approvals (R6), one per gated tool call.
+  (db) => {
+    db.exec(`
+      CREATE TABLE approvals (
+        id TEXT PRIMARY KEY,
+        thread_id TEXT NOT NULL REFERENCES threads(id),
+        run_id TEXT REFERENCES runs(id),
+        agent_id TEXT NOT NULL REFERENCES agents(id),
+        project_id TEXT NOT NULL REFERENCES projects(id),
+        tool TEXT NOT NULL,
+        tool_call_id TEXT NOT NULL,
+        args_json TEXT NOT NULL DEFAULT '{}',
+        title TEXT NOT NULL,
+        detail TEXT NOT NULL DEFAULT '',
+        est_usd REAL,
+        state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'approved', 'declined')),
+        created_at TEXT NOT NULL,
+        decided_at TEXT,
+        note TEXT,
+        UNIQUE (thread_id, tool_call_id)
+      );
+      CREATE INDEX approvals_pending ON approvals (thread_id) WHERE state = 'pending';
+    `);
+  },
 ];
 
 // ---------------------------------------------------------------------------------------------- rows
@@ -317,6 +371,24 @@ const toInbox = <P>(r: Raw): InboxRow<P> => ({
   createdAt: String(r.created_at),
   deliveredRunId: str(r.delivered_run_id),
   deliveredAt: str(r.delivered_at),
+});
+
+const toApproval = (r: Raw): ApprovalRow => ({
+  id: String(r.id),
+  threadId: String(r.thread_id),
+  runId: str(r.run_id),
+  agentId: String(r.agent_id),
+  projectId: String(r.project_id),
+  tool: String(r.tool),
+  toolCallId: String(r.tool_call_id),
+  args: json<Record<string, unknown>>(r.args_json, {}),
+  title: String(r.title),
+  detail: String(r.detail),
+  estUsd: r.est_usd == null ? null : Number(r.est_usd),
+  state: r.state as ApprovalState,
+  createdAt: String(r.created_at),
+  decidedAt: str(r.decided_at),
+  note: str(r.note),
 });
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -516,6 +588,40 @@ export class RuntimeDb {
         this.sql.prepare(`UPDATE inbox SET delivered_run_id = ?, delivered_at = ? WHERE id IN (${placeholders(ids.length)})`).run(runId, at, ...ids);
         return items.map((i) => ({ ...i, deliveredRunId: runId, deliveredAt: at }));
       }),
+  };
+
+  readonly approvals = {
+    /**
+     * The approval for this tool call, created pending unless it exists. The gate runs again when a run resumes, so
+     * asking twice for one call returns the first row (`created` false) instead of a second card.
+     */
+    ask: (a: NewApproval): { approval: ApprovalRow; created: boolean } => {
+      const { changes } = this.sql
+        .prepare(
+          `INSERT INTO approvals (id, thread_id, run_id, agent_id, project_id, tool, tool_call_id, args_json, title, detail, est_usd, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (thread_id, tool_call_id) DO NOTHING`,
+        )
+        .run(`ap_${ulid()}`, a.threadId, a.runId ?? null, a.agentId, a.projectId, a.tool, a.toolCallId, JSON.stringify(a.args), a.title, a.detail, a.estUsd ?? null, new Date().toISOString());
+      const approval = this.one(toApproval, "SELECT * FROM approvals WHERE thread_id = ? AND tool_call_id = ?", a.threadId, a.toolCallId)!;
+      return { approval, created: Number(changes) > 0 };
+    },
+    get: (id: string) => this.one(toApproval, "SELECT * FROM approvals WHERE id = ?", id),
+    /** Pending approvals, oldest first, on one thread or across a project. */
+    pending: (filter: { thread?: string; project?: string } = {}): ApprovalRow[] =>
+      (
+        this.sql
+          .prepare(
+            "SELECT * FROM approvals WHERE state = 'pending' AND (:thread IS NULL OR thread_id = :thread) AND (:project IS NULL OR project_id = :project) ORDER BY created_at, rowid",
+          )
+          .all({ thread: filter.thread ?? null, project: filter.project ?? null }) as Raw[]
+      ).map(toApproval),
+    /** Decides a pending approval: the decided row, or undefined when there is none pending with that id. */
+    decide: (id: string, state: Exclude<ApprovalState, "pending">, note?: string): ApprovalRow | undefined => {
+      const { changes } = this.sql
+        .prepare("UPDATE approvals SET state = ?, decided_at = ?, note = ? WHERE id = ? AND state = 'pending'")
+        .run(state, new Date().toISOString(), note?.trim() || null, id);
+      return Number(changes) > 0 ? this.approvals.get(id) : undefined;
+    },
   };
 }
 

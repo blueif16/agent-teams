@@ -6,10 +6,13 @@
  *   now    the one-line "what it's doing" ("Reading brief.md"), from tool starts or a tool's own writer
  *   plan   the todo list after write_todos
  *   tool   a tool call starting, ending or failing
- *   done   the run finished; `text` is its final answer
- *   error  the run failed
+ *   done     the run finished; `text` is its final answer (or, when it stopped to wait on an approval, its text so far)
+ *   error    the run failed
+ *   approval a gated tool call asked the owner, or the owner decided (approvals.ts); `run` is the run that asked
  * Every event carries its run id.
  */
+import type { ApprovalRow } from "./db";
+
 export type TodoStatus = "pending" | "in_progress" | "completed";
 
 export type ThreadEvent =
@@ -18,7 +21,8 @@ export type ThreadEvent =
   | { type: "plan"; run: string; todos: { content: string; status: TodoStatus }[] }
   | { type: "tool"; run: string; phase: "start" | "end" | "error"; id: string; name: string; input?: unknown; output?: string }
   | { type: "done"; run: string; text: string }
-  | { type: "error"; run: string; message: string };
+  | { type: "error"; run: string; message: string }
+  | { type: "approval"; run: string; approval: ApprovalRow };
 
 export type ThreadEventType = ThreadEvent["type"];
 
