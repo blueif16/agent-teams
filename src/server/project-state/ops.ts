@@ -24,8 +24,8 @@ import {
   refreshReady,
   StateError,
 } from "./rules";
-import { Charter, Dag, isOpen, LIMITS, OpenItems, OWNER_ID, PM, Roster, type ProjectState, type Status, type Task } from "./schema";
-import { commitFiles, FILES, journalPath, loadSnapshot, statePath, withProject, writerVault } from "./store";
+import { Charter, Dag, isOpen, LIMITS, OpenItems, OWNER_ID, PM, Roster, type ProjectState, type ReportStatus, type Status, type Task } from "./schema";
+import { commitFiles, FILES, journalPath, loadSnapshot, reportNumbers, reportPath, statePath, withProject, writerVault } from "./store";
 
 export interface StateDeps {
   /** Clock; default the real one. */
@@ -567,5 +567,98 @@ export function addMember(pid: string, m: MemberInput, deps: StateDeps = {}) {
         pmNote: null,
       });
     return { touched: ["roster"], subject: `staff ${m.agentId}`, journal: `runtime: ${m.agentId} on the team as ${clip(m.role, 60)}`, result: {} };
+  });
+}
+
+// -------------------------------------------------------------------------------------------- the worker
+
+/** A `<state_delta>` line for the lead's tail (F §4.1 layout item 7). */
+export interface StateDelta {
+  projectId: string;
+  rev: number;
+  taskId: string;
+  line: string;
+}
+
+export interface ReportArgs {
+  taskId: string;
+  status: ReportStatus;
+  summary: string;
+  evidence: string[];
+  blocker?: { text: string; on?: string };
+}
+
+const REPORT_TO: Record<ReportStatus, Status> = { progress: "in_progress", blocked: "blocked", review: "review", done: "done" };
+const MEMBER_STATE = { progress: "working", blocked: "blocked", review: "idle", done: "idle" } as const;
+
+/**
+ * A worker's report (F §3.1, §4.6): the task's status, blocker, evidence and lastReport, the worker's roster entry,
+ * the full report file and the journal line, in one commit. Returns the `<state_delta>` line for the lead.
+ */
+export function report(pid: string, worker: string, a: ReportArgs, deps: StateDeps = {}) {
+  return mutate(pid, agentAuthor(worker), "report", "report", deps, async (s, ctx) => {
+    const t = findTask(s.dag, a.taskId);
+    if (t.owner !== worker)
+      throw new StateError("not_owner", `${t.id} is ${t.owner ? `owned by ${t.owner}` : "unassigned"}, not you. Report only on tasks assigned to you; ask the lead if this one should be.`);
+    const m = s.roster.members.find((x) => x.agentId === worker);
+    if (!m) throw new StateError("unknown_owner", `You (${worker}) aren't on this project's roster.`);
+    const from = t.status;
+    const to = REPORT_TO[a.status];
+    // A report on a task that is ready or blocked starts (or resumes) it on the way.
+    if (to !== from) {
+      if (to !== "in_progress" && (from === "ready" || from === "blocked")) {
+        checkMove(t.id, from, "in_progress");
+        checkMove(t.id, "in_progress", to);
+      } else checkMove(t.id, from, to);
+    }
+    if (a.status === "blocked" && !a.blocker)
+      throw new StateError("blocker_required", "A blocked report needs a blocker: what you wait on, and the question or task id if there is one.");
+    if (a.blocker) checkBlockerOn(s, a.blocker.on);
+    const evidence = uniq(a.evidence);
+    t.evidence = uniq([...t.evidence, ...evidence]);
+    const since = from === "blocked" && t.blocker ? t.blocker.since : ctx.at;
+    t.blocker = a.status === "blocked" && a.blocker ? { text: clean(a.blocker.text), ...(a.blocker.on ? { on: a.blocker.on } : {}), since } : null;
+    if (from === "review" && to === "in_progress") t.reopened += 1;
+    t.status = to;
+    if (to === "done") checkDone(t);
+    checkBlocked(t);
+
+    const n = Math.max(0, ...(await reportNumbers(await writerVault(), pid, t.id))) + 1;
+    const ref = reportPath(pid, t.id, n);
+    t.lastReport = { at: ctx.at, by: worker, status: a.status, summary: clip(a.summary, 300), ref };
+    t.rev = ctx.rev;
+    t.updated = ctx.at;
+
+    m.state = MEMBER_STATE[a.status];
+    m.lastCheckIn = ctx.at;
+    m.lastReport = clip(`${t.id} ${a.summary}`, 300);
+    m.blockers = m.blockers.filter((b) => b.task !== t.id);
+    if (t.blocker) m.blockers.push({ text: t.blocker.text, ...(t.blocker.on ? { on: t.blocker.on } : {}), task: t.id });
+
+    const body = [
+      `# ${t.id} report ${String(n).padStart(2, "0")} · ${a.status}`,
+      "",
+      `- Task: ${t.id} ${t.title}`,
+      `- By: ${worker}`,
+      `- At: ${ctx.at}`,
+      `- Rev: ${ctx.rev}`,
+      ...(evidence.length ? [`- Evidence: ${evidence.join(", ")}`] : []),
+      ...(t.blocker ? [`- Blocker: ${t.blocker.text}${t.blocker.on ? ` (on ${t.blocker.on})` : ""}`] : []),
+      "",
+      a.summary.trim(),
+      "",
+    ].join("\n");
+
+    const line = `${t.id} ${a.status} (${worker}): "${clip(a.summary, 120)}"${t.blocker?.on ? ` · on ${t.blocker.on}` : ""} · report ${ref}`;
+    const delta: StateDelta = { projectId: pid, rev: ctx.rev, taskId: t.id, line: `<state_delta rev="${ctx.rev}">${line}</state_delta>` };
+    return {
+      touched: ["dag", "roster"],
+      subject: from === to ? `${t.id} report by ${worker}` : `${t.id} ${from} -> ${to} (report by ${worker})`,
+      task: t.id,
+      trailers: { Evidence: evidence.length ? evidence.join(", ") : undefined },
+      extra: [{ path: ref, content: body }],
+      journal: line,
+      result: { ref, delta },
+    };
   });
 }

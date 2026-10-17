@@ -1,14 +1,19 @@
 import { CHARTS_NOTE, withChartSummaries } from "./charts";
-import { AGENTS, TEAMS_BY_ID } from "./data";
-import type { Message } from "./types";
+import type { Agent, Message, Team } from "./types";
+
+/** How a prompt looks agents and teams up: the server passes its directory (src/server/directory.ts). */
+export interface PromptDirectory {
+  agent(id: string): Agent | undefined;
+  team(id: string): Team | undefined;
+}
 
 export interface Turn {
   from: string;
   text: string;
 }
 
-function describeMessage(m: Message): string | null {
-  const name = (id: string) => (id === "you" ? "You" : (AGENTS[id]?.name ?? id));
+function describeMessage(m: Message, dir: PromptDirectory): string | null {
+  const name = (id: string) => (id === "you" ? "You" : (dir.agent(id)?.name ?? id));
   switch (m.kind) {
     case "text":
       return `${name(m.from)}: ${withChartSummaries(m.text)}`;
@@ -19,7 +24,7 @@ function describeMessage(m: Message): string | null {
     case "approval":
       return `${name(m.from)} asked for approval: ${m.title} (${m.state})`;
     case "proposal":
-      return `${name(m.from)} proposed the "${m.project.name}" project (${m.state})`;
+      return m.proposal ? `${name(m.from)} proposed options for the "${m.proposal.name}" project (${m.state})` : null;
     case "status":
       return null;
   }
@@ -32,18 +37,19 @@ function describeMessage(m: Message): string | null {
 export function systemPrompt(
   agentId: string,
   mode: "channel" | "dm",
-  files?: { soul: string; memory: string },
-  project?: ProjectContext,
+  files: { soul: string; memory: string } | undefined,
+  project: ProjectContext | undefined,
+  dir: PromptDirectory,
 ): string {
-  if (project) return projectPrompt(agentId, mode, project, files);
-  const agent = AGENTS[agentId];
-  const team = TEAMS_BY_ID[agent.teamId];
-  const lead = AGENTS[team.leadId];
+  if (project) return projectPrompt(agentId, mode, project, files, dir);
+  const agent = dir.agent(agentId)!;
+  const team = dir.team(agent.teamId)!;
+  const lead = dir.agent(team.leadId) ?? agent;
   const teammates = team.agents
     .filter((a) => a.id !== agentId)
     .map((a) => `- ${a.name} (${a.role})`)
     .join("\n");
-  const log = team.messages.map(describeMessage).filter(Boolean).join("\n");
+  const log = team.messages.map((m) => describeMessage(m, dir)).filter(Boolean).join("\n");
 
   const home = homeFiles(files);
 
@@ -87,18 +93,21 @@ export interface ProjectContext {
   spec: string;
 }
 
-function projectPrompt(agentId: string, mode: "channel" | "dm", p: ProjectContext, files?: { soul: string; memory: string }): string {
-  const agent = AGENTS[agentId];
+function projectPrompt(agentId: string, mode: "channel" | "dm", p: ProjectContext, files: { soul: string; memory: string } | undefined, dir: PromptDirectory): string {
+  const agent = dir.agent(agentId)!;
   const mine = p.members.find((m) => m.id === agentId);
   const others = p.members
-    .filter((m) => m.id !== agentId && AGENTS[m.id])
-    .map((m) => `- ${AGENTS[m.id].name} (${AGENTS[m.id].role}): ${m.assignment}`)
+    .filter((m) => m.id !== agentId)
+    .flatMap((m) => {
+      const a = dir.agent(m.id);
+      return a ? [`- ${a.name} (${a.role}): ${m.assignment}`] : [];
+    })
     .join("\n");
   return `You are ${agent.name}, ${agent.role}. Mira, the CEO, picked you for a new project team, "${p.name}" (#${p.channel}).
 Personality: ${agent.brief}
 ${homeFiles(files)}
 Project goal: ${p.goal}
-Project lead: ${AGENTS[p.leadId]?.name ?? p.leadId}${p.leadId === agentId ? " (you)" : ""}
+Project lead: ${dir.agent(p.leadId)?.name ?? p.leadId}${p.leadId === agentId ? " (you)" : ""}
 Your assignment: ${mine?.assignment ?? "Support the lead"}
 Teammates on this project:
 ${others || "- none"}
@@ -112,14 +121,14 @@ ${STYLE}`;
 }
 
 /** Map the visible conversation into chat turns from this agent's point of view. */
-export function toChatMessages(agentId: string, history: Turn[]) {
+export function toChatMessages(agentId: string, history: Turn[], dir: PromptDirectory) {
   const out: { role: "user" | "assistant"; content: string }[] = [];
   for (const turn of history) {
     const role = turn.from === agentId ? "assistant" : "user";
     const content =
       role === "assistant" || turn.from === "you"
         ? turn.text
-        : `[${AGENTS[turn.from]?.name ?? turn.from}] ${turn.text}`;
+        : `[${dir.agent(turn.from)?.name ?? turn.from}] ${turn.text}`;
     const prev = out[out.length - 1];
     if (prev && prev.role === role) prev.content += `\n\n${content}`;
     else out.push({ role, content });

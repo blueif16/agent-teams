@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { ChartColumn, Check, CircleHelp, Fingerprint, Gavel, Hash, List, Loader, Network, Pause, Pin, Play, Puzzle, ScrollText, Shield, Users } from "lucide-react";
 import { motion } from "motion/react";
-import { AGENTS, CHIEF_ID } from "@/lib/data";
+import { CHIEF_ID } from "@/lib/data";
 import type { AgentStatus, PlanStep } from "@/lib/types";
 import { Mascot } from "./Mascot";
 import { IdentityTab, Markdown } from "./Identity";
@@ -110,13 +110,14 @@ export function AgentPanel({
   onNotify: (text: string) => void;
 }) {
   const org = useOrg();
-  const a = AGENTS[agentId];
-  const team = org.teamsById[a.teamId];
-  const chief = a.id === CHIEF_ID;
-  const isLead = team.leadId === a.id && !chief;
+  const a = org.agents[agentId];
+  const team = org.teamsById[a?.teamId] ?? org.teamsById.company;
+  const chief = a?.id === CHIEF_ID;
+  const isLead = !!a && team.leadId === a.id && !chief;
   // Projects the chief staffed this agent on, besides its home team.
-  const projects = org.teams.filter((t) => t.launched && t.agents.some((x) => x.id === a.id));
+  const projects = a ? org.teams.filter((t) => t.id !== team.id && t.launched && t.agents.some((x) => x.id === a.id)) : [];
   const [tab, setTab] = useState<"overview" | "performance" | "rules" | "skills" | "identity">("overview");
+  if (!a) return <p className="px-5 pt-10 text-center text-[13.5px] text-muted">This agent isn&apos;t in the company any more.</p>;
 
   return (
     <div className="mx-auto max-w-[560px] px-5 pb-10 pt-8">
@@ -195,8 +196,7 @@ export function AgentPanel({
       )}
       {tab === "skills" && (
         <TabBody tab={tab}>
-          {/* Compositions aren't stored yet, so no agent has skills; this reads them once they are. */}
-          <AgentSkillsTab name={a.name} skillIds={[]} onOpenLibrary={onOpenSkills} />
+          <AgentSkillsTab agentId={a.id} name={a.name} onOpenLibrary={onOpenSkills} />
         </TabBody>
       )}
       {tab === "identity" && (

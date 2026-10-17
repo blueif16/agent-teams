@@ -7,5 +7,5 @@ export * from "./format";
 export * from "./schema";
 export { journalPath, readState, reportPath, statePath } from "./store";
 export { StateError, type StateErrorCode } from "./rules";
-export { addMember, type Dispatch, type DispatchRequest, type MemberInput, type StateDeps } from "./ops";
-export { leadTools, type LeadDeps } from "./tools";
+export { addMember, type Dispatch, type DispatchRequest, type MemberInput, type StateDelta, type StateDeps } from "./ops";
+export { leadTools, takeDeltas, workerTools, type LeadDeps, type WorkerDeps } from "./tools";

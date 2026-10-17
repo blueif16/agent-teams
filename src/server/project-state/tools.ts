@@ -1,6 +1,6 @@
 /*
- * The lead's state tools as LangChain tools (F §9.2). Exported, not registered: the runtime builder adds them to the
- * agents and wires `dispatch`.
+ * The lead's state tools and the worker's `report` as LangChain tools (F §9.2). Exported, not registered: the runtime
+ * builder adds them to the agents and wires `dispatch` and `notifyLead`.
  *
  * Every result is one JSON line. Success: `{id?, rev, recite}`, where recite restates the plan at the tail (F §3.1).
  * A refusal: `{error, message, rev, recite}` with nothing written, so the model can fix the call and retry.
@@ -17,16 +17,18 @@ import {
   noteOwnerPref,
   raiseItem,
   recordDecision,
+  report,
   resolveItem,
   setCharter,
   updateMember,
   updateTask,
   type Applied,
   type Dispatch,
+  type StateDelta,
   type StateDeps,
 } from "./ops";
 import { StateError } from "./rules";
-import { AgentId, DecisionId, IsoDate, ItemId, ProjectId, Ref, STATUSES, TASK_KINDS, TaskId } from "./schema";
+import { AgentId, DecisionId, IsoDate, ItemId, ProjectId, Ref, REPORT_STATUSES, STATUSES, TASK_KINDS, TaskId } from "./schema";
 import { OutsideEditError } from "./store";
 
 export interface LeadDeps extends StateDeps {
@@ -203,4 +205,61 @@ export function leadTools(projectId: string, agentId: string, deps: LeadDeps = {
   });
 
   return [addTaskTool, updateTaskTool, assignTaskTool, recordDecisionTool, raiseItemTool, resolveItemTool, noteOwnerPrefTool, updateMemberTool, logProgressTool, setCharterTool];
+}
+
+export interface WorkerDeps extends StateDeps {
+  /** Appends a report's `<state_delta>` line to the lead's thread. Without it (or if it throws), the line waits in takeDeltas(). */
+  notifyLead?: (delta: StateDelta) => void | Promise<void>;
+}
+
+const pending = new Map<string, StateDelta[]>();
+
+/** Deltas no notifyLead took, oldest first; taking them clears them. */
+export function takeDeltas(projectId: string): StateDelta[] {
+  const out = pending.get(projectId) ?? [];
+  pending.delete(projectId);
+  return out;
+}
+
+async function deliver(delta: StateDelta, notify: WorkerDeps["notifyLead"]) {
+  if (notify) {
+    try {
+      await notify(delta);
+      return;
+    } catch (e) {
+      console.warn(`[project-state] couldn't hand ${delta.projectId} r${delta.rev} to the lead; queued:`, (e as Error).message);
+    }
+  }
+  pending.set(delta.projectId, [...(pending.get(delta.projectId) ?? []), delta]);
+}
+
+export function workerTools(projectId: string, agentId: string, deps: WorkerDeps = {}) {
+  const pid = ProjectId.parse(projectId);
+  const worker = AgentId.parse(agentId);
+
+  const reportTool = tool(
+    (a) =>
+      respond(async () => {
+        const out = await report(pid, worker, a, deps);
+        await deliver(out.result.delta, deps.notifyLead);
+        return { ...out, result: {} };
+      }),
+    {
+      name: "report",
+      description:
+        "Report on a task assigned to you; your lead sees every report. status: progress (still working), blocked (give blocker: what you wait on, " +
+        "and on: the question or task id if there is one), review (ready for the lead to check), done (finished: evidence must name the files or " +
+        "refs that prove it). summary: what you did and what is left, plainly; the first 300 characters show on the plan. " +
+        "Returns {rev, recite}. On {error} nothing was recorded: fix what the message says and call again.",
+      schema: z.strictObject({
+        taskId: TaskId,
+        status: z.enum(REPORT_STATUSES),
+        summary: text(4000, "What you did and what is left."),
+        evidence: z.array(Ref).max(20).describe("Files or refs that show the work (file:<path> or a path). Empty only for progress or blocked."),
+        blocker: blocker.optional(),
+      }),
+    },
+  );
+
+  return [reportTool];
 }

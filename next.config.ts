@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/**": ["./agents/**/*", "./skills/**/*"],
   },
+  // The agent runtime's packages load with Node's require, unbundled: langsmith's sandbox client (pulled in by
+  // deepagents) imports the optional `ws` package, which isn't installed and which Turbopack can't resolve.
+  serverExternalPackages: ["deepagents", "langsmith"],
   env: {
     AGENTS_BUILT_AT: new Date().toISOString(),
   },

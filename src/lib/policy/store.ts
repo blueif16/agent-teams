@@ -1,5 +1,5 @@
 /*
- * Owner, compiler and approval rules (grants included), persisted to .data/policy/rules.json and merged after the
+ * Owner, compiler and approval rules (grants included), persisted to <DATA_DIR>/policy/rules.json and merged after the
  * defaults. Every rule is validated against policy/v1 on the way in and on the way out: a corrupt or invalid file
  * throws instead of silently dropping rules, because a dropped deny relaxes. Defaults and locked rules can't be deleted.
  * On Vercel the disk is read-only except /tmp, so the file lives there (like the ledger). Every write announces the
@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import * as z from "zod";
 import { getServerCache } from "@/server/cache";
+import { dataDir } from "@/server/paths";
 import { TOPICS, type Bus } from "@/server/cache/bus";
 import { DEFAULT_RULE_IDS, DEFAULT_RULES } from "./defaults";
 import { issueLines, newRuleId, RuleSchema } from "./schema";
@@ -29,7 +30,7 @@ export type RemoveResult = { ok: true } | { ok: false; reason: "default" | "lock
 
 export function defaultPolicyDir(): string {
   if (process.env.POLICY_DIR) return process.env.POLICY_DIR;
-  return process.env.VERCEL ? path.join(tmpdir(), "agent-teams", "policy") : path.join(process.cwd(), ".data", "policy");
+  return process.env.VERCEL ? path.join(tmpdir(), "agent-teams", "policy") : path.join(dataDir(), "policy");
 }
 
 const FileSchema = z.object({ version: z.literal("policy/v1"), rules: z.array(RuleSchema) });

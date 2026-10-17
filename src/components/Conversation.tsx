@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { CornerDownRight, Hand } from "lucide-react";
-import { AGENTS, CHIEF_ID } from "@/lib/data";
+import { CornerDownRight, Hand, X } from "lucide-react";
+import { CHIEF_ID } from "@/lib/data";
 import type { OrderKey } from "@/lib/orders";
 import { CHIEF_SHORTCUTS } from "@/lib/project";
 import type { Agent, AgentStatus, Message } from "@/lib/types";
 import { Mascot } from "./Mascot";
-import { POP, RichText, StatusDot } from "./ui";
+import { POP, RichText, SPRING, StatusDot } from "./ui";
 import { Composer } from "./Composer";
 import { ActionMenu, HoverBar, ReactionChips, type MenuTarget, type Reaction } from "./MessageActions";
 import { Markdown } from "./Markdown";
 import { ChartBlock } from "./Charts";
 import { splitCharts, trimPartialFence, withChartSummaries } from "@/lib/charts";
-import { ProposalCard } from "./Chief";
+import { LaunchCard } from "./Chief";
 import { useOrg } from "./org";
 import type { View } from "./AgentTeams";
 
@@ -50,7 +51,8 @@ export function Conversation({
   onMessageAgent,
   onOpenChannel,
   onLaunchProject,
-  onReviseProject,
+  onEditProposal,
+  onRequestChanges,
 }: {
   view: View;
   messages: Message[];
@@ -61,16 +63,18 @@ export function Conversation({
   prefill: { text: string; nonce: number } | null;
   reactions: Record<string, Reaction[]>;
   handlers: MessageHandlers;
-  onSend: (text: string) => void;
+  onSend: (text: string, images?: string[]) => void;
   onDecide: (id: string, d: "approved" | "declined") => void;
   onOpenAgent: (id: string) => void;
   onOpenTeam: (id: string) => void;
   onMessageAgent: (id: string) => void;
   onOpenChannel: (teamId: string) => void;
   onLaunchProject: (msgId: string) => void;
-  onReviseProject: () => void;
+  onEditProposal: (msgId: string, update: (m: Extract<Message, { kind: "proposal" }>) => Extract<Message, { kind: "proposal" }>) => void;
+  /** "Request changes" on the option cards: sent to Mira as a normal message. */
+  onRequestChanges: (text: string) => void;
 }) {
-  const { teamsById } = useOrg();
+  const { teamsById, agents } = useOrg();
   const scroller = useRef<HTMLDivElement>(null);
   const mounted = useRef(false);
   // Messages present on mount render still; anything newer animates in.
@@ -83,20 +87,22 @@ export function Conversation({
   const [menu, setMenu] = useState<MenuTarget | null>(null);
 
   const channel = view.kind === "channel";
-  const team = channel ? teamsById[view.teamId] : teamsById[AGENTS[view.agentId].teamId];
-  const dmAgent = view.kind === "dm" ? AGENTS[view.agentId] : null;
+  const dmAgent = view.kind === "dm" ? agents[view.agentId] : null;
+  const team = (channel ? teamsById[view.teamId] : teamsById[dmAgent?.teamId ?? ""]) ?? teamsById.company;
   const last = messages[messages.length - 1];
   const lastLen = last?.kind === "text" ? last.text.length : 0;
+  // Mira's option cards arrive taller than the shimmer line they replace: bring them, and Launch, into view.
+  const cardsArrived = last?.kind === "proposal" && last.state === "ready";
 
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 240;
-    if (!mounted.current || nearBottom) {
+    if (!mounted.current || nearBottom || cardsArrived) {
       el.scrollTo({ top: el.scrollHeight, behavior: mounted.current ? "smooth" : "auto" });
     }
     mounted.current = true;
-  }, [messages.length, lastLen, typingAgentId]);
+  }, [messages.length, lastLen, typingAgentId, cardsArrived]);
 
   const active = team.agents.filter((a) => status[a.id] === "working").length;
   const needs = team.agents.filter((a) => status[a.id] === "needs-you").length;
@@ -178,9 +184,9 @@ export function Conversation({
     if (m.kind === "status") {
       node = <p className="my-4 text-center text-[12.5px] text-muted">{m.text}</p>;
     } else if (m.kind === "handoff") {
-      const from = AGENTS[m.from];
-      const to = AGENTS[m.to];
-      node = (
+      const from = agents[m.from];
+      const to = agents[m.to];
+      node = !from || !to ? null : (
         <div className="my-4 flex flex-col items-center gap-1 text-center">
           <span className="flex items-center gap-1.5 text-[12.5px] text-muted">
             {m.byYou ? (
@@ -200,18 +206,24 @@ export function Conversation({
     } else if (m.kind === "text" && m.from === "you") {
       node = (
         <div className={`flex justify-end ${first ? "mt-5" : "mt-1.5"}`}>
-          <div className="group/msg relative max-w-[min(520px,85%)]">
-            <div className="rounded-[20px] bg-accent px-4 py-2.5 text-[15px] leading-[22px] text-white">
-              <RichText text={m.text} />
-            </div>
+          <div className="group/msg relative flex max-w-[min(520px,85%)] flex-col items-end gap-1.5">
+            {m.images?.length ? <SentImages ids={m.images} /> : null}
+            {m.text && (
+              <div className="rounded-[20px] bg-accent px-4 py-2.5 text-[15px] leading-[22px] text-white">
+                <RichText text={m.text} />
+              </div>
+            )}
             <span className="pointer-events-none absolute bottom-1.5 right-full mr-2 whitespace-nowrap text-[11.5px] text-muted opacity-0 transition-opacity group-hover/msg:opacity-100">
               {m.at}
             </span>
           </div>
         </div>
       );
+    } else if (!agents[author!]) {
+      // An author the org doesn't know (yet): nothing to draw.
+      node = null;
     } else {
-      const agent = AGENTS[author!];
+      const agent = agents[author!];
       const msgReactions = reactions[m.id] ?? [];
       const lastReaction = msgReactions[msgReactions.length - 1];
       const acked = lastReaction && !initialReactions.has(`${m.id}:${lastReaction.order}`);
@@ -229,7 +241,15 @@ export function Conversation({
           />
         );
       } else if (m.kind === "proposal") {
-        body = <ProposalCard m={m} onLaunch={() => onLaunchProject(m.id)} onRevise={onReviseProject} onOpenChannel={onOpenChannel} />;
+        body = (
+          <LaunchCard
+            m={m}
+            onEdit={(update) => onEditProposal(m.id, update)}
+            onLaunch={() => onLaunchProject(m.id)}
+            onRequestChanges={onRequestChanges}
+            onOpen={() => m.launched && (m.launched.channel ? onOpenChannel(m.launched.projectId) : onMessageAgent(m.launched.leadId))}
+          />
+        );
       } else {
         // Text takes reactions and quick actions.
         body = (
@@ -320,9 +340,9 @@ export function Conversation({
     );
   });
 
-  const typingAgent = typingAgentId ? AGENTS[typingAgentId] : null;
+  const typingAgent = typingAgentId ? (agents[typingAgentId] ?? null) : null;
   const mentionable: Agent[] = channel ? team.agents : [];
-  const menuAgent = menu ? AGENTS[menu.agentId] : null;
+  const menuAgent = menu ? (agents[menu.agentId] ?? null) : null;
 
   return (
     <section className="relative flex min-w-0 flex-1 flex-col" aria-label={channel ? `#${team.channel}` : dmAgent!.name}>
@@ -439,6 +459,84 @@ export function Conversation({
         )}
       </AnimatePresence>
     </section>
+  );
+}
+
+/** Images you sent, as 14 px rounded thumbnails; a click opens them in a lightbox. */
+function SentImages({ ids }: { ids: string[] }) {
+  const [open, setOpen] = useState<{ id: string; origin: string } | null>(null);
+  const single = ids.length === 1;
+  return (
+    <>
+      <div className="flex flex-wrap justify-end gap-1.5">
+        {ids.map((id) => (
+          <button
+            key={id}
+            type="button"
+            aria-label="Open image"
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              setOpen({ id, origin: `${r.left + r.width / 2}px ${r.top + r.height / 2}px` });
+            }}
+            className="tap block overflow-hidden rounded-[14px] bg-bubble shadow-[0_0_0_1px_rgba(0,0,0,0.06)] transition-shadow hover:shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_4px_14px_rgba(0,0,0,0.1)]"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- served as-is from /api/uploads */}
+            <img
+              src={`/api/uploads/${id}`}
+              alt="Image you sent"
+              className={single ? "block h-[200px] w-auto max-w-full object-cover" : "block size-[100px] object-cover sm:size-[120px]"}
+            />
+          </button>
+        ))}
+      </div>
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>{open && <Lightbox key={open.id} src={`/api/uploads/${open.id}`} origin={open.origin} onClose={() => setOpen(null)} />}</AnimatePresence>,
+          document.body,
+        )}
+    </>
+  );
+}
+
+/** A full-screen view of one image that grows out of its thumbnail. Esc, the backdrop or × closes it. */
+function Lightbox({ src, origin, onClose }: { src: string; origin: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Image" className="fixed inset-0 z-[60]" onClick={onClose}>
+      <motion.div className="absolute inset-0 bg-black/75" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} />
+      {/* Full-viewport layer, so the thumbnail's viewport position is its transform origin. */}
+      <motion.div
+        className="absolute inset-0 grid place-items-center p-6 sm:p-12"
+        style={{ transformOrigin: origin }}
+        initial={{ opacity: 0, scale: 0.25 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.25, transition: { duration: 0.16 } }}
+        transition={SPRING}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- served as-is from /api/uploads */}
+        <img src={src} alt="Image you sent, full size" className="max-h-full max-w-full rounded-[18px] object-contain shadow-[0_20px_60px_rgba(0,0,0,0.35)]" />
+      </motion.div>
+      <motion.button
+        type="button"
+        aria-label="Close image"
+        autoFocus
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute right-4 top-4"
+      >
+        <span className="tap grid size-9 place-items-center rounded-full bg-white/15 text-white hover:bg-white/25">
+          <X className="size-5" strokeWidth={2} />
+        </span>
+      </motion.button>
+    </div>
   );
 }
 
