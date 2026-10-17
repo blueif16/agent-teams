@@ -428,14 +428,15 @@ describe("a miss in replay", () => {
   });
 
   it("diffs against an entry for the same model, even when another model's is closer", async () => {
+    // model-a's entry differs in two lines (system, user); model-b's only in the model line.
     const rec = await recordAll(
-      [chat("Draft the launch plan", undefined, "model-a"), chat("Draft the pricing page", undefined, "model-b")],
+      [chat("Draft the launch plan", "You are Kai.", "model-a"), chat("Draft the pricing page", "You are Mira.", "model-b")],
       [text("a"), text("b")],
     );
     const [a] = rec.entries();
 
     const play = createCassette({ file, mode: "replay", upstream: offline });
-    const body = (await (await post(play.fetch, chat("Draft the pricing page", undefined, "model-a"))).json()) as MissBody;
+    const body = (await (await post(play.fetch, chat("Draft the pricing page", "You are Mira.", "model-a"))).json()) as MissBody;
 
     expect(body.closest).toEqual({ key: a.key, n: 1 });
   });
