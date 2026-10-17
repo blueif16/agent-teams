@@ -1,7 +1,8 @@
 # Team setup, end to end (design v1, DRAFT)
 
 How a team goes from "I want X" to experts working on it, and the runtime, memory, prompts and privacy rules
-underneath. Every line marked **PROPOSED** waits on the owner; everything else is decided (see `DECISIONS.md`).
+underneath. Decisions Q1–Q13 were accepted by the owner on 2026-10-17 as defaults; they can change later and are
+tracked in `DECISIONS.md`.
 Evidence lives in `docs/research/` (A dots/Muse · B prompt patterns · C similar systems · D Deep Agents runtime ·
 E privacy · F orchestrator memory); cited as `[D §7]`.
 
@@ -39,22 +40,22 @@ E privacy · F orchestrator memory); cited as `[D §7]`.
   a selector that may answer **"none fits"** → create the missing expert → save it to the library. GAIA: no library
   18.2 → agent library 29.1 → agent + tool libraries 40.6.
 - **Staffing check** before the card: no two roles with the same qualifications, every qualification covered.
-- **PROPOSED Q1 · PM is the lead for the whole project.** It writes the plan, assigns, accepts work against the
+- **Q1 (decided) · PM is the lead for the whole project.** It writes the plan, assigns, accepts work against the
   qualifications it wrote, and records decisions. It never relays: experts post directly, owner DMs go straight to
   experts [A, C: every studied product keeps one persistent coordinator].
-- **PROPOSED Q2 · Gates.** One launch card (step 6). During the project: new hires, budget at 80% (warn) and 100%
+- **Q2 (decided) · Gates.** One launch card (step 6). During the project: new hires, budget at 80% (warn) and 100%
   (pause), scope changes, and tool calls in tiers T4–T6 (§6). Small tasks: no card.
-- **PROPOSED Q3 · Rehiring keeps the identity.** Same agent (name, mascot, record, career memory), a **fresh thread
+- **Q3 (decided) · Rehiring keeps the identity.** Same agent (name, mascot, record, career memory), a **fresh thread
   per project** (`a:{agent}:p:{project}` [D §1]) with project-scoped memory seeded from a filtered subset. At most
   2 live projects per agent. Lessons cross projects only through gated dreaming [A: cross-task carry-over was the
   failure OpenAI measured; C §3].
-- **PROPOSED Q4 · Expert config** = archetype · brief (objective, deliverables, success criteria, non-goals,
+- **Q4 (decided) · Expert config** = archetype · brief (objective, deliverables, success criteria, non-goals,
   escalate-to) · tools and skills (small list) · model tier · budget (USD + share of the per-model TPM) · autonomy
   per tool tier · wake policy · memory scope + seed · reporting line. Persona is **tone only**: personas alone add no
   accuracy and irrelevant persona detail can cost up to ~30 points [C §2].
-- **PROPOSED Q5 · Triage.** Mira decides with an explicit checklist (independent parts? > 1 domain? > ~1 day?),
+- **Q5 (decided) · Triage.** Mira decides with an explicit checklist (independent parts? > 1 domain? > ~1 day?),
   defaults to solo, says which she chose; the owner flips it with one tap; a solo expert may ask to upgrade.
-- **PROPOSED Q6 · Start small.** At most 3 experts at launch; the PM asks to hire more later (a gate) [C: Paperclip
+- **Q6 (decided) · Start small.** At most 3 experts at launch; the PM asks to hire more later (a gate) [C: Paperclip
   users hired 11, 4 were useful].
 
 ## 2. Agents: identity, files, threads
@@ -63,7 +64,7 @@ E privacy · F orchestrator memory); cited as `[D §7]`.
   section (existing `INHERENT` in `src/lib/agent-files.ts`) and a SKILL.md for step-by-step procedure, so briefs stay
   short [B 4].
 - **Home files** (`agents/<id>/`, editable in the profile): `SOUL.md` (Inherent + per-project section + 📌 standing
-  instructions) and `MEMORY.md` (Mistakes, Best approaches). **PROPOSED Q7:** drop MEMORY.md's "Done" section for a
+  instructions) and `MEMORY.md` (Mistakes, Best approaches). **Q7 (decided):** drop MEMORY.md's "Done" section for a
   **Track record** line computed by code from the ledger; four products keep task progress out of memory [B 5].
   Memory lines are facts, not commands, and tagged stated / observed / inferred with a source [B 10].
 - **Freshness:** our own `HomeFiles` middleware reads SOUL/MEMORY every call; the stock `memory` option freezes
@@ -119,10 +120,10 @@ writes a ledger row (endpoint, tier, list price, latency) so search spend shows 
 - **HR** uses the same pipeline to look for a better skill before replacing a weak agent.
 - **Privacy:** search and research are tier T3 (public read egress): queries are scanned before they leave, and
   results come back labelled `untrusted` (§6).
-- **PROPOSED Q12 · Engineers' code-docs lookups** stay on You.com by default, or add Exa for that one archetype
-  (You.com 55% vs Exa 83% on an independent coding-docs benchmark).
-- **PROPOSED Q13 · Mira's daily news check** per active project (one research call per project per day, ~$0.36 per
-  team per day, estimated).
+- **Q12 (decided) · Engineers stay on You.com** like everyone else (the owner's default). Revisit with our own eval
+  if their docs lookups underperform: an independent coding-docs benchmark has You.com at 55% vs Exa at 83%.
+- **Q13 (decided) · Mira's daily news check** is on: one research call per active project per day (~$0.36 per team
+  per day, estimated).
 
 ## 4. The lead's memory and compaction [F]
 
@@ -155,7 +156,7 @@ writes a ledger row (endpoint, tier, list price, latency) so search spend shows 
     saved first; **SOUL.md never edited**; heartbeat transcripts never used as input.
   - Compaction vs dreaming: compaction is per thread and writes only the opener + state facts; dreaming is per agent
     and writes MEMORY.md; at project close it reads the DAG and decisions log.
-  - **PROPOSED Q8:** dreams auto-apply with an undo and a diff in the profile; edits to cross-project memory or a
+  - **Q8 (decided):** dreams auto-apply with an undo and a diff in the profile; edits to cross-project memory or a
     talent profile ask the owner.
 - **Heartbeat** (Mira only, timer) [A clone 1–2, B 7]: a read-only child reads a code-computed diff of the company
   and proposes; Mira decides. Speaks only on a listed trigger (meaningful change, completion, failure, an owner
@@ -189,8 +190,13 @@ writes a ledger row (endpoint, tier, list price, latency) so search spend shows 
   / shadow; click → spans, what the model saw, the rule) · V2 approval cards with grant scope (once / project /
   30 days), red blocked rows, "Recently blocked" · V3 data-flow Sankey (class → agent → sink; trifecta badge) ·
   V4 rules page (NL box, proposal + dry run, rules, grants with revoke, per-agent "what I can do") [E §7].
-- **PROPOSED Q9–Q11** (from E §11): LangSmith keeps tracing with the anonymizer on (vs metadata only) · PII
-  tokenized before Crusoe by default or secrets only · which Jev tool/rules the owner uses today.
+- **Q9 (decided):** LangSmith keeps tracing, with the secret anonymizer on.
+- **Q10 (decided):** secrets are tokenized before Crusoe by default; PII only where a rule says so.
+- **Q11 (decided):** the owner has no existing Jev rules. We design our own baseline from E §4.3 and add TypeSafe Jev
+  as a hosted detector next to the local pack (`TYPESAFE_API_KEY` in `.env.local`).
+- **Where the owner sees it:** a **Rules** tab next to Performance in the agent and team panels: rules in one-line
+  read-backs with outcome chips, the per-agent "what I can do" sheet, and the natural-language box.
+- Contract shared by the engine, routes and UI: `src/lib/policy/types.ts`.
 
 ## 7. Prompts [B §3]
 

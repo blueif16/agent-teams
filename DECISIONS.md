@@ -27,6 +27,24 @@ A fixed set. Nothing outside it is called.
 - NemoClaw (Nemo Cloud) is optional, only for running agent code in a sandbox.
 - LangChain throws on a 429 with no retry header, so every agent gets retry with backoff before its fallback.
 
+## Team setup (accepted 2026-10-17 as defaults; change any line here when it changes)
+
+Details and evidence: `docs/design/team-setup.md`.
+- Q1 The PM leads the project for its whole life. It never passes messages on: experts post directly, and your DMs go straight to them.
+- Q2 One launch card. After launch, gates only for new hires, budget (warn at 80%, pause at 100%), scope changes, and sending, spending or other irreversible actions.
+- Q3 A rehired expert keeps its identity and gets a fresh thread per project, with at most 2 live projects. Lessons cross projects only through dreaming.
+- Q4 Expert config: archetype, brief, a few tools and skills, model tier, budget, autonomy per tool tier, wake policy, memory scope. Persona sets tone only.
+- Q5 Mira triages with a checklist and defaults to one expert; you can flip it with one tap.
+- Q6 At most 3 experts at launch.
+- Q7 MEMORY.md has no "Done" section; a Track record line comes from the ledger.
+- Q8 Dream edits apply automatically, with undo and a diff; edits to cross-project memory ask first.
+- Q9 LangSmith stays on, with the secret anonymizer.
+- Q10 Secrets are tokenized before Crusoe by default; personal data only where a rule says so.
+- Q11 No existing Jev rules: we design our own baseline, and TypeSafe Jev is a hosted detector next to the local detector pack.
+- Q12 Engineers use You.com like everyone else; revisit if their docs lookups underperform.
+- Q13 Mira runs one research call per active project per day for news.
+- Privacy rules live in a Rules tab next to Performance.
+
 ## Records and stats
 
 - **Ledger:** `.data/ledger.jsonl` is the source of truth for performance. It records:
