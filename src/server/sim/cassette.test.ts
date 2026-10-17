@@ -408,9 +408,11 @@ describe("a miss in replay", () => {
     expect(body.key).not.toBe(recorded.key);
     expect(body.n).toBe(1);
     expect(body.closest).toEqual({ key: recorded.key, n: 1 });
-    expect(body.diff).toContain('- "content": "Draft the launch plan"');
-    expect(body.diff).toContain('+ "content": "Draft the pricing page"');
-    expect(body.diff).toHaveLength(2); // only the lines that differ
+    // Only the lines that differ: the recorded one, then this request's.
+    expect(body.diff).toEqual([
+      expect.stringMatching(/^- "content": "Draft the launch plan"/),
+      expect.stringMatching(/^\+ "content": "Draft the pricing page"/),
+    ]);
   });
 
   it("lists the miss in misses() and never calls the upstream", async () => {
