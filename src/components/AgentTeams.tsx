@@ -9,13 +9,15 @@ import { launchPlanOf, parseProject, PROJECT_FENCE, START_PROJECT, visibleText, 
 import { withChartSummaries } from "@/lib/charts";
 import { cache, prefetch, useCached, type Resource } from "@/lib/client-cache";
 import { sendToThread } from "@/lib/thread-client";
+import { inFlight, useRuns } from "@/lib/live-runs";
+import { agentOf, replyId as replyIdOf, threadOf, transcriptOf, viewMessages, type LiveReply, type SavedPage, type SavedRow } from "@/lib/transcript";
 import type { Agent, AgentStatus, Message, OrgPayload, OrgSnapshot, PlanStep, Team } from "@/lib/types";
 import { ChiefMenu } from "./Chief";
 import { identityOf } from "./Identity";
 import { agentStats } from "./Performance";
 import { rulesOf } from "./Rules";
 import { Mascot } from "./Mascot";
-import { OrgContext, orgResource, useOrgSource } from "./org";
+import { OrgContext, orgResource, useOrgSource, type Org } from "./org";
 import { IconButton, Toast } from "./ui";
 import { Rail, type SideMode } from "./Rail";
 import { archetypeList, skillLibrary } from "./Skills";
@@ -37,8 +39,27 @@ const plain = (text: string) => text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
 const PANEL = { type: "spring", stiffness: 380, damping: 38 } as const;
 
 const CHIEF_VIEW: View = { kind: "dm", agentId: CHIEF_ID };
-/** Her DM's thread on the runtime (src/server/runtime/db.ts seeds it). */
-const MIRA_THREAD = `a:${CHIEF_ID}:p:dm`;
+/** Her DM's project on the runtime, with its one thread (src/server/runtime/db.ts seeds both). */
+const MIRA_PROJECT = "dm";
+
+/**
+ * The runtime project a view shows, if it has one: Mira's DM, a solo expert's DM project, or a launched channel.
+ * Its conversation is the project's saved transcript (every member thread merged) plus what's live; a view
+ * without one (a DM with a channel member) still lives on this page only.
+ */
+function projectOfView(v: View, org: Org): string | null {
+  const isChannel = (id: string) => org.teams.some((t) => t.id === id);
+  if (v.kind === "channel") return org.teamsById[v.teamId]?.launched && isChannel(v.teamId) ? v.teamId : null;
+  if (v.agentId === CHIEF_ID) return MIRA_PROJECT;
+  const home = org.agents[v.agentId]?.teamId;
+  return home && home !== HQ.id && org.teamsById[home]?.launched && !isChannel(home) ? home : null;
+}
+
+/** The threads whose transcripts make up a project's view: every member's on a channel, the one agent's on a DM. */
+function threadsOfView(v: View, project: string, org: Org): string[] {
+  if (v.kind === "dm") return [threadOf(v.agentId, project)];
+  return (org.teamsById[project]?.agents ?? []).map((a) => threadOf(a.id, project));
+}
 
 /**
  * GET /api/chat says whether CRUSOE_API_KEY is set: server config, not chat state. It changes only with a
@@ -133,6 +154,8 @@ export function AgentTeams() {
   });
   // The org: the constants plus the runtime db's teams and agents, refreshed on the `org` topic.
   const org = useOrgSource();
+  // Every agent run the page has heard of (GET /api/runs): live replies, who's working and their "now" lines.
+  const runs = useRuns();
   // One source for what each agent is doing: every mascot, chip and "now" line reads these.
   const [status, setStatus] = useState<Record<string, AgentStatus>>(() =>
     Object.fromEntries(Object.keys(AGENTS).map((id) => [id, id === CHIEF_ID ? "working" : "idle"])),
@@ -156,11 +179,18 @@ export function AgentTeams() {
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   // Agents the db added start idle until something says otherwise.
-  const statusAll = useMemo(() => {
+  // An agent with a run in flight is working, on that run's "now" line; after its done, back to what it was.
+  const [statusAll, doingAll] = useMemo(() => {
     const s = { ...status };
+    const d = { ...doing };
     for (const id of Object.keys(org.agents)) s[id] ??= "idle";
-    return s;
-  }, [status, org.agents]);
+    for (const r of inFlight(runs)) {
+      const id = agentOf(r.thread);
+      s[id] = "working";
+      d[id] = r.now ?? "Thinking";
+    }
+    return [s, d];
+  }, [status, doing, org.agents, runs]);
   const [chiefOpen, setChiefOpen] = useState(false);
   const [chiefNote, setChiefNote] = useState<string | null>(null);
   const [chiefUnread, setChiefUnread] = useState(false);
@@ -171,10 +201,14 @@ export function AgentTeams() {
   teamsRef.current = org.teamsById;
   const agentsRef = useRef(org.agents);
   agentsRef.current = org.agents;
+  const orgRef = useRef(org);
+  orgRef.current = org;
+  // What each view showed last (saved, local and live merged), for the history a model call carries.
+  const shownRef = useRef<Record<string, Message[]>>({});
   const statusRef = useRef(statusAll);
   statusRef.current = statusAll;
-  const doingRef = useRef(doing);
-  doingRef.current = doing;
+  const doingRef = useRef(doingAll);
+  doingRef.current = doingAll;
   const viewRef = useRef(view);
   viewRef.current = view;
 
@@ -337,6 +371,9 @@ export function AgentTeams() {
       teamId = team.id;
     }
     const chief = agentId === CHIEF_ID;
+    // A view on the runtime (Mira's DM, a solo expert's, a launched channel): the message goes to the agent's thread.
+    const where = projectOfView(target, orgRef.current);
+    const thread = where ? threadOf(agentId, where) : undefined;
     // A launched team exists only here, so its goal, members and spec ride along.
     const launched = target.kind === "channel" ? teamsRef.current[teamId] : undefined;
     const project = launched?.launched && {
@@ -351,13 +388,14 @@ export function AgentTeams() {
 
     const images = opts.images?.length ? opts.images : undefined;
     const userMsg: Message = { id: uid(), kind: "text", from: "you", at: now(), text, images };
-    const history = toHistory([...(convosRef.current[key] ?? []), userMsg]);
+    const history = toHistory([...(shownRef.current[key] ?? convosRef.current[key] ?? []), userMsg]);
 
     const shown = opts.shown === undefined ? userMsg : opts.shown;
     if (shown) setConvos((c) => ({ ...c, [key]: [...(c[key] ?? []), shown] }));
     setTyping((t) => ({ ...t, [key]: agentId }));
 
-    const replyId = uid();
+    // A run's answer is `run:<id>` (src/lib/transcript.ts), so its saved row takes this bubble's place.
+    let replyId = uid();
     let started = false;
     let traceId: string | undefined;
     // The chief's option cards: a placeholder (a shimmer line) from the moment her fence starts streaming.
@@ -371,7 +409,10 @@ export function AgentTeams() {
       if (!started) {
         started = true;
         setTyping((t) => ({ ...t, [key]: null }));
-        setConvos((c) => ({ ...c, [key]: [...(c[key] ?? []), reply] }));
+        setConvos((c) => {
+          const msgs = c[key] ?? [];
+          return { ...c, [key]: msgs.some((m) => m.id === replyId) ? msgs.map((m) => (m.id === replyId ? reply : m)) : [...msgs, reply] };
+        });
       } else {
         setConvos((c) => ({ ...c, [key]: c[key].map((m) => (m.id === replyId ? reply : m)) }));
       }
@@ -382,16 +423,20 @@ export function AgentTeams() {
     };
     try {
       let acc = "";
-      if (chief && target.kind === "dm" && !opts.order && !images) {
-        // Mira's DM runs on her persistent agent (src/server/runtime): her thread keeps the conversation,
-        // so no history rides along; the reply and her "now" line stream from the run. A message with
-        // images still goes through /api/chat until the runtime takes uploads.
-        acc = await sendToThread(MIRA_THREAD, text, {
-          text: show,
-          now: (line) => setActivity(CHIEF_ID, "working", line),
-        });
+      if (thread && !opts.order && !images) {
+        // The agent's persistent thread (src/server/runtime) keeps the conversation, so no history rides along.
+        // The reply streams from its run (src/lib/live-runs.ts, which also drives its "now" line), and both
+        // sides land in the transcript. A message with images still goes through /api/chat, which saves it too.
+        const reply = await sendToThread(thread, text, { accepted: (runId) => (replyId = replyIdOf(runId)), text: show }, { ref: userMsg.id });
+        // Delivered into a run already going: that run's answer covers it, wherever it's drawn.
+        if (reply.delivered === "inbox") return;
+        if (reply.lost) {
+          // It ended while the stream was down: the saved row has the whole answer.
+          setConvos((c) => ({ ...c, [key]: (c[key] ?? []).filter((m) => m.id !== replyId) }));
+          return;
+        }
+        acc = reply.text;
         show(acc);
-        setActivity(CHIEF_ID, "working", "Watching the company");
       } else acc = await streamChat();
       if (!started) throw new Error(`${agentsRef.current[agentId]?.name ?? agentId} returned an empty reply. Try again, or pick a different model.`);
       if (chief && cardId) {
@@ -422,6 +467,8 @@ export function AgentTeams() {
           order: opts.order,
           org: chief ? snapshot() : undefined,
           project: project || undefined,
+          // Saved to the agent's thread, when the view has one: this message now, the reply as it ends.
+          record: thread && !opts.order ? { thread, text, ref: userMsg.id, replyRef: replyId } : undefined,
         }),
       });
       if (!res.ok || !res.body) {
@@ -440,7 +487,7 @@ export function AgentTeams() {
       }
       return acc;
     }
-  }, [snapshot, setActivity, planCard, dropCard]);
+  }, [snapshot, planCard, dropCard]);
 
   // The chief speaks up on her own, like dots' dreamer: a quiet check-in that stays silent unless
   // something is worth your attention. Once shortly after load, then every 20 minutes while visible.
@@ -451,7 +498,7 @@ export function AgentTeams() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentId: CHIEF_ID, mode: "dm", history: toHistory(convosRef.current[key] ?? []), org: snapshot(), heartbeat: true }),
+        body: JSON.stringify({ agentId: CHIEF_ID, mode: "dm", history: toHistory(shownRef.current[key] ?? convosRef.current[key] ?? []), org: snapshot(), heartbeat: true }),
       });
       if (!res.ok) return;
       const text = (await res.text()).trim();
@@ -535,7 +582,33 @@ export function AgentTeams() {
   };
 
   const key = convKey(view);
-  const messages = convos[key] ?? [];
+  // A runtime view draws its saved transcript (cached, re-read on `messages:project:<id>`), this page's local
+  // messages, and replies still streaming; older pages load on demand, never dropped.
+  const where = projectOfView(view, org);
+  const latest = useCached<SavedPage>(transcriptOf(where ?? MIRA_PROJECT));
+  const [older, setOlder] = useState<Record<string, SavedPage>>({});
+  const saved = where ? latest.data : undefined;
+  const earlierPage = where ? older[where] : undefined;
+  const rows = useMemo(() => {
+    const byId = new Map<number, SavedRow>();
+    for (const r of [...(earlierPage?.messages ?? []), ...(saved?.messages ?? [])]) byId.set(r.id, r);
+    return [...byId.values()].sort((a, b) => a.id - b.id);
+  }, [earlierPage, saved]);
+  const viewThreads = useMemo(() => (where ? threadsOfView(view, where, org) : []), [view, where, org]);
+  const replies = useMemo<LiveReply[]>(() => Object.values(runs).filter((r) => !r.error && !r.lost), [runs]);
+  const local = convos[key];
+  const messages = useMemo(() => (where ? viewMessages(rows, local ?? [], replies, viewThreads) : (local ?? [])), [where, rows, local, replies, viewThreads]);
+  shownRef.current[key] = messages;
+  // Someone on the view with a run that hasn't said anything yet is typing.
+  const quiet = inFlight(runs).find((r) => viewThreads.includes(r.thread) && !r.text.trim());
+  const typingAgentId = typing[key] ?? (quiet ? agentOf(quiet.thread) : null);
+  const loadEarlier = async (project: string, before: number) => {
+    const page = transcriptOf(project, before);
+    await prefetch(page);
+    const data = cache.snapshot<SavedPage>(page.key).data;
+    if (data) setOlder((o) => ({ ...o, [project]: { messages: [...data.messages, ...(o[project]?.messages ?? [])], more: data.more } }));
+  };
+  const hasEarlier = where ? (earlierPage ? earlierPage.more : Boolean(saved?.more)) : false;
 
   // Quick actions on agent messages. Reactions are orders the agent acts on.
   const handlers: MessageHandlers = {
@@ -617,7 +690,7 @@ export function AgentTeams() {
     <WorkspaceBody
       tab={shownTab}
       status={statusAll}
-      doing={doing}
+      doing={doingAll}
       memories={memories}
       plans={plans}
       onNotify={notify}
@@ -701,7 +774,7 @@ export function AgentTeams() {
                 view={view}
                 unread={unread}
                 status={statusAll}
-                doing={doing}
+                doing={doingAll}
                 dmIds={dmIds}
                 convos={convos}
                 pending={pending}
@@ -766,9 +839,10 @@ export function AgentTeams() {
               key={key}
               view={view}
               messages={messages}
-              typingAgentId={typing[key] ?? null}
+              typingAgentId={typingAgentId}
+              onLoadEarlier={hasEarlier && where && rows[0] ? () => void loadEarlier(where, rows[0].id) : undefined}
               status={statusAll}
-              doing={doing}
+              doing={doingAll}
               prefill={prefill?.key === key ? prefill : null}
               reactions={reactions}
               handlers={handlers}
