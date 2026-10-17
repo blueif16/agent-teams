@@ -602,6 +602,8 @@ export function AgentTeams() {
 
   const workspace = workspaceOpen && tabs.length > 0;
   const shownTab = tabs.find((t) => t.id === activeTab) ?? tabs[tabs.length - 1];
+  // A full-size Plan or Decisions tab gets the room a graph needs; the tab strip above follows the pane.
+  const paneWidth = shownTab?.type === "plan" || shownTab?.type === "decisions" ? "w-[66%] max-w-[1240px]" : "w-[44%] max-w-[820px]";
   const tabsEl = (
     <WorkspaceTabs
       tabs={tabs}
@@ -633,6 +635,7 @@ export function AgentTeams() {
         setActiveTab(id);
       }}
       onCloseTab={closeTab}
+      onOpenTab={openTab}
     />
   );
 
@@ -746,7 +749,7 @@ export function AgentTeams() {
               {workspace && wide && (
                 <motion.div
                   key="tabs"
-                  className="flex h-full w-[44%] max-w-[820px] min-w-[420px]"
+                  className={`flex h-full min-w-[420px] ${paneWidth}`}
                   initial={{ opacity: 0, x: 24 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 24 }}
@@ -783,7 +786,7 @@ export function AgentTeams() {
               {workspace && wide && (
                 <motion.section
                   key="workspace"
-                  className="flex w-[44%] max-w-[820px] min-w-[420px] flex-col border-l border-line bg-pane"
+                  className={`flex min-w-[420px] flex-col border-l border-line bg-pane ${paneWidth}`}
                   initial={{ opacity: 0, x: 40 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 40 }}

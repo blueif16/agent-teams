@@ -92,4 +92,22 @@ describe("the app's one change stream", () => {
 
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith(skillLibrary.key));
   });
+
+  it("carries a state:<pid> announcement to the state views' resource, and no other project's", async () => {
+    const { cache } = await import("@/lib/client-cache");
+    const { projectState } = await import("@/components/state/resource");
+    const { getServerCache } = await import("@/server/cache");
+    const { TOPICS } = await import("@/server/cache/bus");
+    const mine = projectState("p_42", "juno");
+    expect(mine.topic).toBe(TOPICS.state("p_42"));
+    cache.subscribe(mine.key, () => {}, mine.topic);
+    await RouteEventSource.last!.connected;
+    fetchMock.mockClear();
+
+    getServerCache().bus.emit(TOPICS.state("p_7"));
+    getServerCache().bus.emit(TOPICS.state("p_42"));
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith(mine.key));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
