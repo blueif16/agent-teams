@@ -235,8 +235,13 @@ export const REGISTRY: readonly ToolDef[] = [
   },
   {
     id: "find_skill", name: "Find skill", description: "Searches the skill library to staff a role; a miss searches the web.",
-    kind: "action", mechanism: "call", tier: "T3", archetypes: ["lead"], status: "planned", origin: "build",
+    kind: "action", mechanism: "call", tier: "T3", archetypes: ["lead", "chief"], status: "planned", origin: "build",
     calls: ["find_skill"],
+  },
+  {
+    id: "search_skills", name: "Search skills", description: "Ranks the local skill library for a need; no network, no cost.",
+    kind: "action", mechanism: "call", tier: "T0", archetypes: ["lead", "chief"], status: "planned", origin: "build",
+    calls: ["search_skills"],
   },
   {
     id: "plan", name: "Plan", description: "The project's task graph with owners, status and blockers.",
