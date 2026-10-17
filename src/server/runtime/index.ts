@@ -10,6 +10,7 @@ import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { BaseCheckpointSaver } from "@langchain/langgraph";
 import { HQ } from "@/lib/data";
 import { MODELS } from "@/lib/models";
+import { modelFetch } from "@/server/sim/model-fetch";
 import { openCheckpointer } from "./checkpointer";
 import { getRuntimeDb, type AgentRow, type ProjectRow, type RuntimeDb } from "./db";
 import { ThreadEvents } from "./events";
@@ -142,7 +143,8 @@ const G = globalThis as { __agentTeamsRuntime?: Runtime };
 
 /** The app's runtime, on <DATA_DIR>/runtime.db and checkpoints.db. */
 export function getRuntime(): Runtime {
-  return (G.__agentTeamsRuntime ??= new Runtime());
+  // modelFetch is the global fetch unless CASSETTE is set (test mode records or replays model calls).
+  return (G.__agentTeamsRuntime ??= new Runtime({ fetch: modelFetch() }));
 }
 
 /** Replace the app's runtime (a test's, on its own db and fake model); null resets to the default. */
