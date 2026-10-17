@@ -6,8 +6,10 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
+// The extension lets a plain `node` load this file (the default-path test runs it in a fresh process).
+import { dataDir } from "../paths.ts";
 
-export function openCheckpointer(file = path.join(process.cwd(), ".data", "checkpoints.db")): SqliteSaver {
+export function openCheckpointer(file = path.join(dataDir(), "checkpoints.db")): SqliteSaver {
   mkdirSync(path.dirname(file), { recursive: true });
   return SqliteSaver.fromConnString(file);
 }

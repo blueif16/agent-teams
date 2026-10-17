@@ -63,6 +63,47 @@ describe("the seed", () => {
   });
 });
 
+describe("projects", () => {
+  it("list() returns the seeded dm project, with and without filters", () => {
+    const db = openAt();
+    db.projects.create({ id: "launch", kind: "team", name: "Launch", status: "proposed" });
+    expect(db.projects.list().map((p) => p.id)).toEqual(["dm", "launch"]);
+    expect(db.projects.list({ kind: "dm" }).map((p) => p.id)).toEqual(["dm"]);
+    expect(db.projects.list({ status: "proposed" }).map((p) => p.id)).toEqual(["launch"]);
+    expect(db.projects.list({ status: "active", kind: "team" })).toEqual([]);
+  });
+
+  it("stores a budget, and keeps null for none", () => {
+    const db = openAt();
+    expect(db.projects.create({ id: "launch", kind: "team", name: "Launch", budgetUsd: 12.5 }).budgetUsd).toBe(12.5);
+    expect(db.projects.get("dm")?.budgetUsd).toBeNull();
+  });
+});
+
+describe("agents", () => {
+  it("update() changes the config and status and leaves the rest", () => {
+    const db = openAt();
+    db.agents.create({ id: "pip", name: "Pip", archetype: "writer", config: { budgetUsd: 2 } });
+    const composition = {
+      id: "c1",
+      archetype: "writer" as const,
+      skills: ["copy-editing"],
+      role: "Launch copywriter",
+      qualifications: ["copywriting"],
+      source: "orchestrator" as const,
+      createdAt: "2026-10-17",
+    };
+    const updated = db.agents.update("pip", { config: { composition }, status: "working" });
+    expect(updated).toMatchObject({ id: "pip", name: "Pip", archetype: "writer", status: "working", config: { composition } });
+    expect(db.agents.get("pip")?.config).toEqual({ composition });
+    expect(db.agents.update("pip", { status: "idle" })?.config).toEqual({ composition });
+  });
+
+  it("update() of an unknown agent returns undefined", () => {
+    expect(openAt().agents.update("ghost", { status: "idle" })).toBeUndefined();
+  });
+});
+
 describe("threads", () => {
   it("refuses a thread for an agent that doesn't exist", () => {
     const db = openAt();

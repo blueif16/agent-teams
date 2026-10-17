@@ -1,5 +1,5 @@
 /*
- * The vault: one git repo under every agent-facing file (G §2), at .data/vault/
+ * The vault: one git repo under every agent-facing file (G §2), at <DATA_DIR>/vault/
  * by default and never pushed. All writes go through one FIFO queue per repo,
  * so commits never interleave; each write can carry the blob sha its writer
  * read, and a stale one is rejected (an owner edit beats a racing dream).
@@ -14,6 +14,7 @@ import path from "node:path";
 import type { DiffHunk, DiffSegment, FileDiff, FileHistory, VaultAuthor, VaultCommit, VaultSource, VaultWriteManyRequest, VaultWriteRequest } from "@/lib/vault/types";
 import { getServerCache } from "@/server/cache";
 import { TOPICS } from "@/server/cache/bus";
+import { dataDir } from "@/server/paths";
 
 export interface ScrubResult {
   text: string;
@@ -25,7 +26,7 @@ export type Scrub = (text: string) => string | ScrubResult | Promise<string | Sc
 export type CommitHook = (path: string, content: string, commit: VaultCommit) => void | Promise<void>;
 
 export interface VaultOptions {
-  /** Repo directory; created and `git init`ed on first write. Default `.data/vault` under the cwd. */
+  /** Repo directory; created and `git init`ed on first write. Default `<DATA_DIR>/vault`. */
   dir?: string;
   scrub?: Scrub;
   onCommit?: CommitHook;
@@ -255,7 +256,7 @@ export class Vault {
   private ready?: Promise<void>;
 
   constructor(opts: VaultOptions = {}) {
-    this.dir = path.resolve(opts.dir ?? path.join(process.cwd(), ".data", "vault"));
+    this.dir = path.resolve(opts.dir ?? path.join(dataDir(), "vault"));
     this.scrub = opts.scrub;
     this.onCommit = opts.onCommit;
     this.gitBin = opts.git;
@@ -590,7 +591,7 @@ export const announceCommit: CommitHook = (p) => {
   if (agent) getServerCache().bus.emit(TOPICS.files(agent));
 };
 
-/** The app's vault: `$VAULT_DIR`, else `.data/vault`. Every route and writer shares it. */
+/** The app's vault: `$VAULT_DIR`, else `<DATA_DIR>/vault`. Every route and writer shares it. */
 export function getVault(): Vault {
   return (G.__agentTeamsVault ??= new Vault({ dir: process.env.VAULT_DIR || undefined, onCommit: announceCommit }));
 }
