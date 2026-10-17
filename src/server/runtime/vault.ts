@@ -63,6 +63,9 @@ const CONFIG = [
   "-c", "core.autocrlf=false",
   "-c", "core.quotepath=false",
   "-c", "core.fsmonitor=false",
+  // git's default (addIfDifferentNeighbor) silently drops a trailer identical to the one before it.
+  "-c", "trailer.ifexists=add",
+  "-c", "trailer.where=end",
 ];
 
 let resolvedGit: Promise<string> | undefined;
@@ -160,7 +163,82 @@ function defaultSubject(p: string, source: VaultSource): string {
   return `${typeOf(p)}(${agentOf(p) ?? "vault"}): ${SUMMARY[source](path.posix.basename(p))}`;
 }
 
+/** G §3: `<type>(<scope>): <summary>`, one line, from a template. Model text belongs in files only. */
+const SUBJECT = /^(memory|soul|state|skill|agent|company|restore|forget|sweep)\([A-Za-z0-9_.*,-]+\): [^\n\r]{1,100}$/;
+function checkSubject(s: string): string {
+  if (!SUBJECT.test(s) || CONTROL.test(s)) throw new Error(`Bad subject "${s.slice(0, 80)}": write "<type>(<scope>): <summary>" on one line`);
+  return s;
+}
+
 const SOURCES = new Set<VaultSource>(["seed", "owner", "pin", "dream", "tool", "report", "inherit", "restore"]);
+const RESERVED = new Set(["change", "vault-schema", "source"]);
+const TRAILER_KEY = /^[A-Za-z][A-Za-z0-9-]*$/;
+// Control characters would break the trailer block and our parse.
+const CONTROL = /[\x00-\x1f\x7f]/;
+
+/** A writer's trailers as ordered pairs; anything git couldn't round-trip is refused up front. */
+function trailerPairs(input: VaultWriteRequest["trailers"]): [string, string][] {
+  const out: [string, string][] = [];
+  for (const [key, v] of Object.entries(input ?? {})) {
+    if (v === undefined) continue;
+    if (!TRAILER_KEY.test(key)) throw new Error(`Bad trailer key "${key}"`);
+    if (RESERVED.has(key.toLowerCase())) throw new Error(`The vault writes the ${key} trailer itself`);
+    for (const raw of Array.isArray(v) ? v : [v]) {
+      const value = raw.trim();
+      if (!value || CONTROL.test(raw)) throw new Error(`Bad value for trailer ${key}: one non-empty line`);
+      out.push([key, value]);
+    }
+  }
+  return out;
+}
+
+// %x1e starts a commit, %x1f separates fields, %x1d separates trailers, %x1c splits key from value.
+const LOG_FORMAT = "%x1e%H%x1f%aI%x1f%an%x1f%ae%x1f%s%x1f%(trailers:only,unfold,separator=%x1d,key_value_separator=%x1c)%x1f";
+
+function parseAuthor(name: string, email: string): VaultAuthor {
+  const at = email.lastIndexOf("@");
+  const local = at > 0 ? email.slice(0, at) : email;
+  const domain = at > 0 ? email.slice(at + 1) : "";
+  if (domain === "agents.agent-teams.local") return { kind: "agent", id: local, name };
+  if (domain === "system.agent-teams.local") return { kind: "system", id: local, name };
+  // The owner, including hand commits made in the vault with a real address.
+  return { kind: "owner", id: local || "owner", name };
+}
+
+/** Parses `git log --format=LOG_FORMAT --numstat` output, newest first. */
+function parseLog(out: string): VaultCommit[] {
+  return out
+    .split("\x1e")
+    .filter((chunk) => chunk.trim())
+    .map((chunk) => {
+      const [sha, at, name, email, subject, rawTrailers, numstat = ""] = chunk.split("\x1f");
+      const trailers: Record<string, string[]> = {};
+      for (const t of rawTrailers.split("\x1d")) {
+        const cut = t.indexOf("\x1c");
+        if (cut <= 0) continue;
+        (trailers[t.slice(0, cut)] ??= []).push(t.slice(cut + 1));
+      }
+      const stats = { added: 0, removed: 0 };
+      for (const line of numstat.split("\n")) {
+        const m = /^(\d+|-)\t(\d+|-)\t/.exec(line);
+        if (!m) continue;
+        stats.added += m[1] === "-" ? 0 : Number(m[1]);
+        stats.removed += m[2] === "-" ? 0 : Number(m[2]);
+      }
+      const source = trailers.Source?.[0] as VaultSource | undefined;
+      return {
+        change: trailers.Change?.[0] ?? sha,
+        sha,
+        at: new Date(at).toISOString(),
+        author: parseAuthor(name, email),
+        subject,
+        // A commit without a known Source was made by hand in the vault, i.e. by the owner.
+        source: source && SOURCES.has(source) ? source : "owner",
+        trailers,
+        stats,
+      };
+    });
+}
 
 // ------------------------------------------------------------------------------------------- vault
 
@@ -182,10 +260,18 @@ export class Vault {
   }
 
   /** Writes one file and commits it. Resolves to the commit, or null when the content didn't change. */
-  write(req: VaultWriteRequest): Promise<VaultCommit | null> {
-    checkPath(req.path);
+  async write(req: VaultWriteRequest): Promise<VaultCommit | null> {
     if (!SOURCES.has(req.source)) throw new Error(`Bad source "${req.source}"`);
-    return this.enqueue(() => this.writeNow(req));
+    const job: Job = {
+      files: [{ path: checkPath(req.path), content: req.content }],
+      author: req.author,
+      source: req.source,
+      subject: checkSubject(req.subject ?? defaultSubject(req.path, req.source)),
+      trailers: trailerPairs(req.trailers),
+      expect: req.expectedBlob === undefined ? [] : [{ path: req.path, blob: req.expectedBlob }],
+    };
+    authorLine(req.author);
+    return this.enqueue(() => this.commitNow(job));
   }
 
   /** Blob sha of the file as it is on disk now, or null if there's no such file. */
@@ -195,8 +281,12 @@ export class Vault {
     return (await this.git(["hash-object", "--", p])).stdout.trim();
   }
 
+  /** Every commit that touched the file, newest first, with trailers parsed by git. */
   async history(p: string): Promise<FileHistory> {
-    return { path: p, blob: null, commits: [] };
+    checkPath(p);
+    if (!(await this.hasCommits())) return { path: p, blob: null, commits: [] };
+    const out = await this.git(["log", "--no-renames", "--numstat", `--format=${LOG_FORMAT}`, "HEAD", "--", p]);
+    return { path: p, blob: await this.blob(p), commits: parseLog(out.stdout) };
   }
 
   async diff(p: string, from: string | null, to: string): Promise<FileDiff> {
@@ -243,61 +333,71 @@ export class Vault {
     return this.ready;
   }
 
-  private async writeNow(req: VaultWriteRequest): Promise<VaultCommit | null> {
+  private async hasCommits(): Promise<boolean> {
+    if (!existsSync(path.join(this.dir, ".git"))) return false;
+    return (await this.git(["rev-parse", "--verify", "-q", "HEAD"], { ok: [0, 1, 128] })).code === 0;
+  }
+
+  /** One job = one commit (G §2.3): check expectations, write each file atomically, commit, report. */
+  private async commitNow(job: Job): Promise<VaultCommit | null> {
     await this.init();
-    const abs = path.join(this.dir, req.path);
-    if (req.expectedBlob !== undefined) {
-      const actual = await this.blob(req.path);
-      if (actual !== req.expectedBlob) throw new VaultConflictError(req.path, req.expectedBlob, actual);
+    for (const e of job.expect) {
+      const actual = await this.blob(e.path);
+      if (actual !== e.blob) throw new VaultConflictError(e.path, e.blob, actual);
     }
 
-    const before = existsSync(abs) ? await readFile(abs) : null;
-    await mkdir(path.dirname(abs), { recursive: true });
-    const tmp = `${abs}.${process.pid}.${Date.now().toString(36)}.tmp`;
-    await writeFile(tmp, req.content);
-    await rename(tmp, abs);
-
+    const paths = job.files.map((f) => f.path);
+    const before = new Map<string, Buffer | null>();
     try {
-      await this.git(["add", "--", req.path]);
-      const staged = await this.git(["diff", "--cached", "--quiet", "--", req.path], { ok: [0, 1] });
+      for (const f of job.files) {
+        const abs = path.join(this.dir, f.path);
+        before.set(f.path, existsSync(abs) ? await readFile(abs) : null);
+        await mkdir(path.dirname(abs), { recursive: true });
+        const tmp = `${abs}.${process.pid}.${Date.now().toString(36)}.tmp`;
+        await writeFile(tmp, f.content);
+        await rename(tmp, abs);
+      }
+      await this.git(["add", "--", ...paths]);
+      const staged = await this.git(["diff", "--cached", "--quiet", "--", ...paths], { ok: [0, 1] });
       if (staged.code === 0) return null;
 
-      const change = changeId();
-      const subject = req.subject ?? defaultSubject(req.path, req.source);
-      const agent = agentOf(req.path);
+      const agents = [...new Set(paths.map(agentOf).filter((a): a is string => !!a))];
+      const own = job.trailers.some(([k]) => k.toLowerCase() === "agent");
       const trailers: [string, string][] = [
-        ["Change", change],
+        ["Change", changeId()],
         ["Vault-Schema", "1"],
-        ["Source", req.source],
-        ...(agent ? ([["Agent", agent]] as [string, string][]) : []),
+        ["Source", job.source],
+        ...(own ? [] : agents.map((a): [string, string] => ["Agent", a])),
+        ...job.trailers,
       ];
       await this.git(
         [
-          "commit", "-q", "--no-verify", "-F", "-", `--author=${authorLine(req.author)}`,
+          "commit", "-q", "--no-verify", "-F", "-", `--author=${authorLine(job.author)}`,
           ...trailers.flatMap(([k, v]) => ["--trailer", `${k}: ${v}`]),
-          "--", req.path,
+          "--", ...paths,
         ],
-        { input: `${subject}\n` },
+        { input: `${job.subject}\n` },
       );
-      const sha = (await this.git(["rev-parse", "HEAD"])).stdout.trim();
-      const trailerMap: Record<string, string[]> = {};
-      for (const [k, v] of trailers) (trailerMap[k] ??= []).push(v);
-      return {
-        change,
-        sha,
-        at: new Date().toISOString(),
-        author: req.author,
-        subject,
-        source: req.source,
-        trailers: trailerMap,
-        stats: { added: 0, removed: 0 },
-      };
+      const out = await this.git(["log", "-1", "--no-renames", "--numstat", `--format=${LOG_FORMAT}`, "HEAD", "--", ...paths]);
+      return parseLog(out.stdout)[0];
     } catch (e) {
-      // Leave the working tree as HEAD had it: agents read these files directly.
-      await this.git(["reset", "-q", "--", req.path], { ok: [0, 1, 128] }).catch(() => undefined);
-      if (before) await writeFile(abs, before);
-      else await unlink(abs).catch(() => undefined);
+      // Put the working tree back as HEAD has it: agents read these files directly.
+      await this.git(["reset", "-q", "--", ...paths], { ok: [0, 1, 128] }).catch(() => undefined);
+      for (const [p, bytes] of before) {
+        const abs = path.join(this.dir, p);
+        if (bytes) await writeFile(abs, bytes);
+        else await unlink(abs).catch(() => undefined);
+      }
       throw e;
     }
   }
+}
+
+interface Job {
+  files: { path: string; content: string }[];
+  author: VaultAuthor;
+  source: VaultSource;
+  subject: string;
+  trailers: [string, string][];
+  expect: { path: string; blob: string | null }[];
 }
