@@ -236,6 +236,8 @@ export interface Explanation {
   decision: Decision;
   /** What each enforced rule (and the default) asked for. */
   contributions: Contribution[];
+  /** The grant that lifted the ask, if one did. */
+  liftedBy: string | null;
 }
 
 const spanKey = (s: { path: string; start: number; end: number; label: Label }) => `${s.path}\u0000${s.start}\u0000${s.end}\u0000${s.label}`;
@@ -293,6 +295,7 @@ export function explain(e: PolicyEvent, rules: Rule[], grants: GrantRule[], now:
   if (!toolMatched) contributions.push({ ruleId: null, outcome: tierOf(e.tool)?.effect ?? "ask", locked: false });
 
   let effect = contributions.reduce<Outcome>((acc, c) => strictest(acc, c.outcome), "allow");
+  let liftedBy: string | null = null;
 
   // A grant lifts every ask when none of them is locked; whatever else applied (a rewrite) still applies.
   if (effect === "ask" && !contributions.some((c) => c.outcome === "ask" && c.locked)) {
@@ -303,6 +306,7 @@ export function explain(e: PolicyEvent, rules: Rule[], grants: GrantRule[], now:
     const used = candidates.find((g) => g.mode !== "shadow");
     if (used) {
       fired.add(used.id);
+      liftedBy = used.id;
       effect = contributions.filter((c) => c.outcome !== "ask").reduce<Outcome>((acc, c) => strictest(acc, c.outcome), "allow");
     }
   }
@@ -311,6 +315,7 @@ export function explain(e: PolicyEvent, rules: Rule[], grants: GrantRule[], now:
   return {
     decision: { effect, transforms: [...rewrites.values()].sort(compareTransforms), firedRuleIds: [...fired].sort(), labels },
     contributions,
+    liftedBy,
   };
 }
 
