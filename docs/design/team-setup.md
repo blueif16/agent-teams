@@ -221,15 +221,37 @@ writes a ledger row (endpoint, tier, list price, latency) so search spend shows 
 - **Approval cards** from the `approvals` table (resume via `POST /api/approvals/[id]`), with grant scope.
 - **Tool-call strip** (V1), **data flows** (V3), **rules page** (V4); dream diffs in the agent profile.
 
-## 8b. Versioning and lineage (requirement; design pending research G)
+## 8b. Versioning and lineage [G]
 
-- **Every agent-facing file is versioned with git underneath:** SOUL.md, MEMORY.md, notes, skills, the lead's state
-  files and Mira's company files. The owner can open any file's history, see who changed it, when and why, read the
-  diff, and restore.
-- **Inheritance is visible:** a new agent built from past agents keeps provenance for each skill version and memory
-  item it inherited, shown as a lineage graph (ancestors, descendants, what came from whom).
-- Open until `docs/research/G-versioning-lineage.md` lands: one vault repo vs per agent, library, commit trailers,
-  the lineage schema, and how "forget" works when history is permanent (secrets must be scrubbed before commit).
+Requirement (owner, 2026-10-17): every agent-facing file is versioned with git underneath, its history and diffs are
+viewable, and a new agent's inheritance from past agents is visible as a graph.
+
+- **One vault repo** at `.data/vault/` (separate from the app repo, never pushed): `agents/<id>/{agent.json, SOUL.md,
+  MEMORY.md, notes.md, PROFILE.md, projects/, skills/}`, `skills/<archetype>/`, `projects/<pid>/state/*`,
+  `company/*`. Per-agent repos or branches would break cross-agent inheritance, atomic multi-file commits and one-pass
+  indexing.
+- **git CLI** behind a small typed wrapper (`src/server/runtime/vault.ts`): 25 ms per commit, 18 ms for one file's
+  history at 350 commits with git's commit-graph index; native trailers and the rewrite tooling "erase" needs.
+  `isomorphic-git` is a documented fallback only.
+- **One writer queue**; each write carries the file's expected blob hash (owner edits win over a racing dream).
+  One commit per dream, per state-tool call or `report`, per owner save or 📌; notes once per run.
+- **Commits** are authored by the actor; code writes the subject and **trailers**: `Change` (stable id that survives
+  rewrites), `Source`, `Agent`, `Project`, `Run`, `Dream`, `Tool`/`Task`/`Rev`, `Op`, `Evidence`, `Seeded-From`,
+  `Derived-From`, `Held-Back`, `Skill`, `Approved-By`, `Restores`/`Reverts`, `Forget`, `Labels`, `Redacted`.
+- **Inheritance** = copy with per-item provenance in one "seed" commit (no git fork): project-scoped items filtered
+  (the owner can opt them in on the launch card), near-duplicates across parents merged with both parents named,
+  contradictions kept, size caps applied, everything left out recorded as `Held-Back`. Archetype skills track latest
+  by default and can be pinned; inherited skills are copied and evolve separately.
+- **Lineage index** (derived, rebuilt from `git log`): `vault_commits`, `vault_files`, `lineage_nodes`,
+  `lineage_edges` with Graphiti's four timestamps; edges `seeded_from`, `derived_from`, `supersedes`, `evidence_of`,
+  `produced_by`, `used_skill`, `version_of`, `in_project`, `held_back`. The `memories` table becomes derived too.
+- **Privacy:** the writer scrubs secrets before anything touches the vault (a fourth enforcement point). **Forget**
+  (default, reversible) removes the item and masks it in history views; **Erase from history** (irreversible) runs
+  `git filter-repo`, gc and a reindex, then lists other places the text lives (checkpoints; LangSmith traces).
+- **Views:** a History tab on every file (source chips, word diffs annotated per op, Restore as a new commit); a
+  per-item timeline; a Lineage tab (generation columns, inherited vs held-back items, skill pins, an "as of" slider);
+  a "learned 2 · View diff · Undo" chip for dreams; "Based on" on the launch card and profile.
+- Needs `git-filter-repo` (python3 + `brew install git-filter-repo`) only for Erase.
 
 ## 9. Build order
 
@@ -243,6 +265,7 @@ Tracks run in parallel where they don't share files; each step ships with a test
 | **P privacy** [E §10] | P1 detector pack + false-positive tests · P2 Crusoe + LangSmith scrub · P3 policy engine (a deny never relaxes) · P4 tool gate + approvals · P5 taint · P6 project boundary · P7 NL compiler (eval) · P8 UI |
 | **S setup flow** | S1 Mira triage + `project` card v2 · S2 PM brief/source/staff tools + agent library · S3 provisioning (`POST /api/projects`) + kickoff |
 | **W web tools** [§3b] | W1 `web_search` + `fetch_page` (You.com) as default tools, with ledger rows · W2 `research` + `answer` tools, researcher `you-research` skill, SSE → "now" line · W3 `find_skill` pipeline + skill library (library hit, deep research, vetting, approval, store) |
+| **V vault** [G §9] | V1 writer + queue + trailers (25 concurrent writes → 25 clean commits) · V2 scrub + forget/erase (no secret anywhere in history; change ids survive) · V3 writers wired (dream, state tools, owner edits, 📌) · V4 lineage index (full rebuild = incremental) · V5 seeding from parents (filter, merge, Held-Back, pins) · V6 History + Lineage UI |
 | **U UI** | U1 Plan/team panels from state files · U2 approval cards from the runtime · U3 tool-call strip · U4 rules page |
 
 Order of dependence: R1–R4 → R5–R7 → M and S; P1–P3 can start any time; P4 after R6; U follows the step it renders.
