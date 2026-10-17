@@ -32,8 +32,9 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { cache, useCached, type Resource } from "@/lib/client-cache";
 import { AGENTS } from "@/lib/data";
-import type { Access, CompileResult, DataGuard, DetectorSummary, Permission, Rule, RuleConflict, RulesResponse } from "@/lib/policy/types";
+import type { Access, CompileResult, DataGuard, DetectorSummary, Permission, Rule, RuleConflict, RulesResponse, SaveRulesResponse } from "@/lib/policy/types";
 import { POP, SPRING } from "./ui";
 
 /*
@@ -118,40 +119,20 @@ function Pill({ state, small = false }: { state: State; small?: boolean }) {
   );
 }
 
-/** Fetches the rules now, every 15s, and when the window regains focus; `reload` refetches at once. */
-function useRules(url: string) {
-  // `fresh` holds the ids that arrived since the previous load, so new rows can pop in.
-  const [state, setState] = useState<{ data: RulesResponse | null; fresh: ReadonlySet<string> }>({ data: null, fresh: new Set() });
-  const [error, setError] = useState<string | null>(null);
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    let alive = true;
-    const load = () =>
-      fetch(url)
-        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`The server answered ${r.status}`))))
-        .then((d: RulesResponse) => {
-          if (!alive) return;
-          setState((s) => {
-            const before = s.data ? new Set(s.data.rules.map((r) => r.id)) : null;
-            return { data: d, fresh: new Set(before ? d.rules.filter((r) => !before.has(r.id)).map((r) => r.id) : []) };
-          });
-          setError(null);
-        })
-        .catch((e: Error) => alive && setError(e instanceof TypeError ? "The app server didn't answer" : e.message));
-    load();
-    const timer = setInterval(load, 15_000);
-    window.addEventListener("focus", load);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-      window.removeEventListener("focus", load);
-    };
-  }, [url, tick]);
-  const reload = useCallback(() => {
-    setError(null);
-    setTick((t) => t + 1);
-  }, []);
-  return { ...state, error, reload };
+/** GET /api/rules for an agent's panel or a team's. Saves and deletes announce the `rules` topic, which refetches it. */
+export const rulesOf = ({ agentId, projectId }: { agentId?: string; projectId?: string }): Resource => ({
+  key: `/api/rules?${agentId ? `agent=${encodeURIComponent(agentId)}` : `project=${encodeURIComponent(projectId ?? "")}`}`,
+  topic: "rules",
+});
+
+/** The rule ids that arrived since the snapshot this view showed before, so new rows pop in (none on first paint). */
+function useArrivals(data: RulesResponse | undefined): ReadonlySet<string> {
+  const [seen, setSeen] = useState<{ data: RulesResponse | undefined; fresh: ReadonlySet<string> }>({ data, fresh: new Set() });
+  if (seen.data !== data) {
+    const before = seen.data ? new Set(seen.data.rules.map((r) => r.id)) : null;
+    setSeen({ data, fresh: new Set(before && data ? data.rules.filter((r) => !before.has(r.id)).map((r) => r.id) : []) });
+  }
+  return seen.fresh;
 }
 
 function Section({ title, children, className = "mt-6" }: { title?: string; children: ReactNode; className?: string }) {
@@ -231,12 +212,10 @@ interface Removal {
 }
 
 /** One confirm open at a time across the tab; `where` keeps a row's remove and its Your-rules trash apart. */
-function useRemoval(onRemoved: () => void) {
+function useRemoval(onRemoved: (id: string) => void) {
   const [confirm, setConfirm] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Removed rules leave at once, before the refetch lands.
-  const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
   const cancel = useCallback(() => {
     setConfirm(null);
     setError(null);
@@ -247,9 +226,8 @@ function useRemoval(onRemoved: () => void) {
     try {
       const res = await fetch(`/api/rules/${encodeURIComponent(id)}`, { method: "DELETE" });
       if (!res.ok) throw await failure(res, "Couldn't remove it");
-      setGone((g) => new Set(g).add(id));
       setConfirm(null);
-      onRemoved();
+      onRemoved(id);
     } catch (e) {
       setError(reason(e));
     } finally {
@@ -270,7 +248,7 @@ function useRemoval(onRemoved: () => void) {
       onConfirm: () => void remove(id),
     };
   };
-  return { gone, removal };
+  return removal;
 }
 
 // ---------- rows ----------
@@ -739,7 +717,8 @@ function RuleComposer({
   agentId?: string;
   projectId?: string;
   existing: Record<string, string>;
-  onSaved: (ids: string[], mode: SaveMode) => void;
+  /** The rules as saved (final ids), each with its read-back when the compile gave one per rule. */
+  onSaved: (rules: Rule[], readBack: Record<string, string>, mode: SaveMode) => void;
 }) {
   const [text, setText] = useState("");
   const [result, setResult] = useState<CompileResult | null>(null);
@@ -795,7 +774,10 @@ function RuleComposer({
         body: JSON.stringify({ rules: result.rules, mode }),
       });
       if (!res.ok) throw await failure(res, "Couldn't save the rule");
-      onSaved(result.rules.map((r) => r.id), mode);
+      // The store keeps the order, so each saved rule lines up with its proposed read-back.
+      const { rules } = (await res.json()) as SaveRulesResponse;
+      const aligned = rules.length === result.readBack.length;
+      onSaved(rules, aligned ? Object.fromEntries(rules.map((r, i) => [r.id, result.readBack[i]])) : {}, mode);
       setResult(null);
       setText("");
     } catch (e) {
@@ -867,7 +849,7 @@ function RuleComposer({
   );
 }
 
-function LoadState({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+function LoadState({ error, onRetry }: { error: string | undefined; onRetry: () => void }) {
   if (!error) return <p className="mt-6 text-center text-[13px] text-muted">Loading permissions…</p>;
   return (
     <p className="mt-6 text-center text-[13px] text-ink-2">
@@ -881,30 +863,34 @@ function LoadState({ error, onRetry }: { error: string | null; onRetry: () => vo
 
 /** The Permissions tab: `agentId` for an agent's panel, `projectId` for a team's (no capability list there yet). */
 export function RulesTab({ agentId, projectId, onNotify }: { agentId?: string; projectId?: string; onNotify: (text: string) => void }) {
-  const query = agentId ? `agent=${encodeURIComponent(agentId)}` : `project=${encodeURIComponent(projectId ?? "")}`;
-  const { data, fresh, error, reload } = useRules(`/api/rules?${query}`);
+  const resource = rulesOf({ agentId, projectId });
+  // Cached: switching tabs or panels paints the last snapshot at once; the `rules` topic refetches it after a write.
+  const { data, error } = useCached<RulesResponse>(resource);
+  const fresh = useArrivals(data);
   const [saved, setSaved] = useState<ReadonlySet<string>>(new Set());
   // One row open at a time keeps the tab short.
   const [open, setOpen] = useState<string | null>(null);
   const toggle = (key: string) => setOpen((o) => (o === key ? null : key));
-  const { gone, removal } = useRemoval(() => {
-    reload();
+  // Writes show at once in the cached copy; the topic refetch then brings the recomputed permissions.
+  const edit = (update: (d: RulesResponse) => RulesResponse) => cache.mutate<RulesResponse>(resource.key, (d) => d && update(d));
+  const removal = useRemoval((id) => {
+    edit((d) => ({ ...d, rules: d.rules.filter((r) => r.id !== id) }));
     onNotify("Rule removed");
   });
-  if (!data) return <LoadState error={error} onRetry={reload} />;
+  if (!data) return <LoadState error={error} onRetry={() => void cache.revalidate(resource.key)} />;
 
   const byId = new Map(data.rules.map((r) => [r.id, r]));
-  const yours = data.rules.filter((r) => ownedByYou(r) && !gone.has(r.id));
+  const yours = data.rules.filter(ownedByYou);
   return (
     <div>
       <RuleComposer
         agentId={agentId}
         projectId={projectId}
         existing={data.readBack}
-        onSaved={(ids, mode) => {
-          setSaved(new Set(ids));
-          reload();
-          onNotify(`Saved ${plural(ids.length, "rule")}${mode === "shadow" ? ", log only" : ""}`);
+        onSaved={(rules, readBack, mode) => {
+          setSaved(new Set(rules.map((r) => r.id)));
+          edit((d) => ({ ...d, rules: [...d.rules, ...rules], readBack: { ...d.readBack, ...readBack } }));
+          onNotify(`Saved ${plural(rules.length, "rule")}${mode === "shadow" ? ", log only" : ""}`);
         }}
       />
       {agentId && data.permissions && (
