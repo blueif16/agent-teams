@@ -60,8 +60,9 @@ body {
   outline-offset: 2px;
 }
 
-/* The composer pill draws its own focus ring. */
-#composer:focus-visible {
+/* The composer pill and the rule box draw their own focus ring. */
+#composer:focus-visible,
+.own-focus:focus-visible {
   outline: none;
 }
 

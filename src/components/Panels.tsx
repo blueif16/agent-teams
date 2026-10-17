@@ -180,7 +180,7 @@ export function AgentPanel({
       )}
       {tab === "rules" && (
         <TabBody tab={tab}>
-          <RulesTab agentId={a.id} />
+          <RulesTab agentId={a.id} onNotify={onNotify} />
         </TabBody>
       )}
       {tab === "identity" && (
@@ -247,12 +247,14 @@ export function TeamPanel({
   doing,
   onOpenAgent,
   onOpenChannel,
+  onNotify,
 }: {
   teamId: string;
   status: Record<string, AgentStatus>;
   doing: Record<string, string>;
   onOpenAgent: (id: string) => void;
   onOpenChannel: (teamId: string) => void;
+  onNotify: (text: string) => void;
 }) {
   const t = useOrg().teamsById[teamId];
   const [tab, setTab] = useState<"overview" | "performance" | "rules">("overview");
@@ -308,7 +310,7 @@ export function TeamPanel({
       )}
       {tab === "rules" && (
         <TabBody tab={tab}>
-          <RulesTab projectId={t.id} />
+          <RulesTab projectId={t.id} onNotify={onNotify} />
         </TabBody>
       )}
       {tab === "overview" && (

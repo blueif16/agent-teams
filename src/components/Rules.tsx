@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Lock, Quote } from "lucide-react";
+import { ArrowUp, Info, Loader, Lock, Quote, TriangleAlert } from "lucide-react";
 import { AGENTS } from "@/lib/data";
-import type { DetectorSummary, Outcome, Rule, RuleKind, RulesResponse, Scope } from "@/lib/policy/types";
+import type { CompileResult, DetectorSummary, Outcome, Rule, RuleConflict, RuleKind, RulesResponse, Scope } from "@/lib/policy/types";
 import { useOrg } from "./org";
 import { POP } from "./ui";
 
@@ -165,8 +165,15 @@ function scopeChips(scope: Scope, channel: (projectId: string) => string): { lab
   return out;
 }
 
-function RuleRow({ rule, sentence, fresh }: { rule: Rule; sentence: string; fresh: boolean }) {
+function RuleRow({ rule, sentence, fresh, reveal }: { rule: Rule; sentence: string; fresh: boolean; reveal: boolean }) {
   const org = useOrg();
+  const ref = useRef<HTMLLIElement>(null);
+  // A rule you just saved scrolls into view, so you see it pop in.
+  useEffect(() => {
+    if (!reveal) return;
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    ref.current?.scrollIntoView({ block: "nearest", behavior: calm ? "auto" : "smooth" });
+  }, [reveal]);
   const outcome = outcomeOf(rule);
   const shadow = rule.mode === "shadow";
   const scopes = scopeChips(rule.scope, (p) => org.teamsById[p]?.channel ?? p);
@@ -189,6 +196,7 @@ function RuleRow({ rule, sentence, fresh }: { rule: Rule; sentence: string; fres
   );
   return (
     <motion.li
+      ref={ref}
       initial={fresh ? { opacity: 0, y: 12, scale: 0.97 } : false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, height: 0, transition: { duration: 0.18 } }}
@@ -226,7 +234,7 @@ function RuleRow({ rule, sentence, fresh }: { rule: Rule; sentence: string; fres
   );
 }
 
-function RulesList({ data, fresh }: { data: RulesResponse; fresh: ReadonlySet<string> }) {
+function RulesList({ data, fresh, saved }: { data: RulesResponse; fresh: ReadonlySet<string>; saved: ReadonlySet<string> }) {
   if (data.rules.length === 0)
     return (
       <div className="mt-6 rounded-2xl bg-white px-4 py-6 text-center shadow-[0_0_0_1px_rgba(0,0,0,0.05)]">
@@ -246,7 +254,7 @@ function RulesList({ data, fresh }: { data: RulesResponse; fresh: ReadonlySet<st
             <ul>
               <AnimatePresence initial={false}>
                 {rules.map((r) => (
-                  <RuleRow key={r.id} rule={r} sentence={data.readBack[r.id] ?? r.reason ?? `A ${r.kind} rule`} fresh={fresh.has(r.id)} />
+                  <RuleRow key={r.id} rule={r} sentence={data.readBack[r.id] ?? r.reason ?? `A ${r.kind} rule`} fresh={fresh.has(r.id)} reveal={fresh.has(r.id) && saved.has(r.id)} />
                 ))}
               </AnimatePresence>
             </ul>
@@ -287,6 +295,322 @@ function Capabilities({ name, data }: { name: string; data: RulesResponse }) {
   );
 }
 
+const CONFLICT_LABEL: Record<RuleConflict["kind"], string> = {
+  shadowed: "Already covered",
+  tightens: "Tightens",
+  revokes_grant: "Revokes a grant",
+  duplicate: "Duplicate",
+};
+
+type SaveMode = "enforce" | "shadow";
+
+/** The server's own `{ error }` message when it sent one, else a plain fallback. */
+async function failure(res: Response, fallback: string) {
+  const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
+  return new Error(typeof body?.error === "string" ? body.error : `${fallback} (${res.status})`);
+}
+const reason = (e: unknown) => (e instanceof TypeError ? "The app server didn't answer" : (e as Error).message);
+const asSentence = (s: string) => (/[.!?]$/.test(s.trim()) ? s.trim() : `${s.trim()}.`);
+
+const btn = "tap rounded-full px-3.5 py-1.5 text-[13.5px] font-medium";
+
+function Proposal({
+  result,
+  round,
+  busy,
+  picked,
+  error,
+  existing,
+  onAnswer,
+  onSave,
+  onCancel,
+}: {
+  result: CompileResult;
+  round: number;
+  busy: "compile" | SaveMode | null;
+  picked: string | null;
+  error: string | null;
+  /** Read-backs of the rules already in force, for the conflict lines. */
+  existing: Record<string, string>;
+  onAnswer: (q: string, option: string) => void;
+  onSave: (mode: SaveMode) => void;
+  onCancel: () => void;
+}) {
+  const n = result.rules.length;
+  // readBack is a list, not keyed by id; when it lines up with the rules, each line gets its rule's chip.
+  const aligned = n === result.readBack.length;
+  const d = result.dryRun;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -6, scale: 0.97, transition: { duration: 0.14 } }}
+      transition={POP}
+      style={{ transformOrigin: "top center" }}
+      className="mt-2 rounded-[20px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_8px_24px_rgba(0,0,0,0.06)]"
+    >
+      <div className="flex items-center gap-2">
+        <h3 className="text-[13px] font-medium text-muted">{n === 0 ? "Nothing new to add" : n === 1 ? "Proposed rule" : `Proposed rules (${n})`}</h3>
+        {busy === "compile" && (
+          <span className="inline-flex items-center gap-1 text-[12px] text-muted">
+            <Loader className="size-3 animate-spin motion-reduce:animate-none" />
+            Updating…
+          </span>
+        )}
+      </div>
+      {/* Keyed per compile so a recompiled proposal pops in. */}
+      <motion.div
+        key={round}
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: busy === "compile" ? 0.55 : 1, y: 0 }}
+        transition={POP}
+      >
+        <ul className="mt-2 space-y-1.5">
+          {result.readBack.map((line, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <span className="min-w-0 flex-1 text-[14.5px] leading-[21px]">{line}</span>
+              {aligned && (
+                <span className="mt-0.5 flex">
+                  <OutcomeChip {...outcomeOf(result.rules[i])} />
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+
+        {result.questions.map((q) => (
+          <div key={q.q} className="mt-3">
+            <p className="text-[13.5px] font-medium leading-[19px]">{q.q}</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {q.options.map((o) => {
+                const on = picked === `${q.q}\n${o}`;
+                return (
+                  <button
+                    key={o}
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => onAnswer(q.q, o)}
+                    className={`tap rounded-full px-3 py-1 text-[13px] ${on ? "bg-accent text-white" : "bg-bubble hover:bg-black/[0.08] disabled:opacity-60"}`}
+                  >
+                    {o}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        {result.assumptions.length > 0 && (
+          <ul className="mt-3 space-y-0.5">
+            {result.assumptions.map((a) => (
+              <li key={a} className="flex gap-1.5 text-[12.5px] leading-[18px] text-ink-2">
+                <Info className="mt-[3px] size-3 shrink-0 text-muted" />
+                <span>Assumed: {a}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {result.conflicts.map((c) => (
+          <div key={`${c.kind}-${c.ruleId}-${c.otherRuleId}`} className="mt-3 flex gap-2 rounded-xl bg-caution-wash px-3 py-2 text-[13px] leading-[18px]">
+            <TriangleAlert className="mt-px size-3.5 shrink-0 text-caution" />
+            <span className="min-w-0 flex-1">
+              <span className="font-medium text-caution">{CONFLICT_LABEL[c.kind]}</span> · {c.note}
+              {existing[c.otherRuleId] && (
+                <span className="mt-0.5 block truncate text-[12px] text-ink-2" title={existing[c.otherRuleId]}>
+                  Existing rule: {existing[c.otherRuleId]}
+                </span>
+              )}
+            </span>
+          </div>
+        ))}
+
+        <div className="mt-3 border-t border-line pt-3 text-[13px] leading-[19px] text-ink-2">
+          {d ? (
+            <>
+              <p>If it had been on for the last {plural(d.total, "recorded call")}:</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <OutcomeChip label={`${d.block} blocked`} tone="danger" />
+                <OutcomeChip label={`${d.ask} asked`} tone="ask" />
+                <OutcomeChip label={`${d.redact} redacted`} tone="caution" />
+                <OutcomeChip label={`${d.allow} allowed`} tone="neutral" />
+              </div>
+            </>
+          ) : (
+            <p>No recorded tool calls yet, so there&apos;s nothing to test it on.</p>
+          )}
+        </div>
+      </motion.div>
+
+      {error && <p className="mt-3 text-[12.5px] text-danger">{error}</p>}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={n === 0 || busy !== null}
+          onClick={() => onSave("enforce")}
+          className={`${btn} bg-accent text-white hover:shadow-lg hover:shadow-accent/30 disabled:bg-accent-soft disabled:shadow-none`}
+        >
+          {busy === "enforce" ? "Saving…" : "Save"}
+        </button>
+        <button
+          type="button"
+          disabled={n === 0 || busy !== null}
+          onClick={() => onSave("shadow")}
+          title="Log what it would do, without enforcing it"
+          className={`${btn} bg-white ring-1 ring-black/10 hover:bg-bubble disabled:opacity-50`}
+        >
+          {busy === "shadow" ? "Saving…" : "Save as shadow"}
+        </button>
+        <button type="button" onClick={onCancel} disabled={busy === "enforce" || busy === "shadow"} className={`${btn} text-ink-2 hover:bg-bubble`}>
+          Cancel
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
+/** "Describe a rule…": compiles the sentence, shows the proposal, saves it. */
+function RuleComposer({
+  agentId,
+  projectId,
+  existing,
+  onSaved,
+}: {
+  agentId?: string;
+  projectId?: string;
+  existing: Record<string, string>;
+  onSaved: (ids: string[], mode: SaveMode) => void;
+}) {
+  const [text, setText] = useState("");
+  const [result, setResult] = useState<CompileResult | null>(null);
+  const [round, setRound] = useState(0);
+  const [busy, setBusy] = useState<"compile" | SaveMode | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  // Bumped by Cancel, so a compile that lands afterwards doesn't reopen the card.
+  const attempt = useRef(0);
+
+  const compile = async (sentence: string) => {
+    if (!sentence.trim() || busy) return;
+    const mine = ++attempt.current;
+    setBusy("compile");
+    setError(null);
+    try {
+      const res = await fetch("/api/rules/compile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: sentence.trim(), agent: agentId, project: projectId }),
+      });
+      if (!res.ok) throw await failure(res, "Couldn't turn that into a rule");
+      const r = (await res.json()) as CompileResult;
+      if (mine !== attempt.current) return;
+      setResult(r);
+      setRound((x) => x + 1);
+    } catch (e) {
+      if (mine === attempt.current) setError(reason(e));
+    } finally {
+      if (mine === attempt.current) {
+        setBusy(null);
+        setPicked(null);
+      }
+    }
+  };
+
+  // An answer joins the sentence, so the box shows exactly what was compiled.
+  const answer = (q: string, option: string) => {
+    const next = `${asSentence(text)} ${q.trim()} ${asSentence(option)}`;
+    setText(next);
+    setPicked(`${q}\n${option}`);
+    void compile(next);
+  };
+
+  const save = async (mode: SaveMode) => {
+    if (!result?.rules.length || busy) return;
+    setBusy(mode);
+    setError(null);
+    try {
+      const res = await fetch("/api/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rules: result.rules, mode }),
+      });
+      if (!res.ok) throw await failure(res, "Couldn't save the rule");
+      onSaved(result.rules.map((r) => r.id), mode);
+      setResult(null);
+      setText("");
+    } catch (e) {
+      setError(reason(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const cancel = () => {
+    attempt.current++;
+    setResult(null);
+    setBusy(null);
+    setPicked(null);
+    setError(null);
+  };
+
+  const canSend = text.trim().length > 0 && busy === null;
+  return (
+    <div className="mt-5">
+      <div className="flex items-end gap-1 rounded-[22px] border border-line bg-white py-1.5 pl-4 pr-1.5 shadow-[0_2px_10px_rgba(0,0,0,0.04)] transition-[border-color,box-shadow] focus-within:border-accent-soft focus-within:ring-3 focus-within:ring-accent/12">
+        <textarea
+          rows={1}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              void compile(text);
+            }
+          }}
+          placeholder="Describe a rule…"
+          aria-label="Describe a rule"
+          className="own-focus scroll-quiet field-sizing-content max-h-40 min-h-[34px] min-w-0 flex-1 resize-none bg-transparent py-[7px] text-[14.5px] leading-[20px] outline-none placeholder:text-muted"
+        />
+        <button
+          type="button"
+          aria-label="Turn into a rule"
+          title="Turn into a rule"
+          onClick={() => void compile(text)}
+          disabled={!canSend}
+          className={`tap grid size-[34px] shrink-0 place-items-center rounded-full text-white ${canSend ? "bg-accent hover:shadow-lg hover:shadow-accent/30" : "bg-accent-soft"}`}
+        >
+          {busy === "compile" ? (
+            <Loader className="size-[17px] animate-spin motion-reduce:animate-none" />
+          ) : (
+            <ArrowUp className="size-[18px]" strokeWidth={2.2} />
+          )}
+        </button>
+      </div>
+      {!result && (
+        <p className={`mt-1.5 px-4 text-[12.5px] leading-[18px] ${error ? "text-danger" : "text-muted"}`}>
+          {error ?? "Like “Never email Acme files to anyone outside acme.com.”"}
+        </p>
+      )}
+      <AnimatePresence initial={false}>
+        {result && (
+          <Proposal
+            key="proposal"
+            result={result}
+            round={round}
+            busy={busy}
+            picked={picked}
+            error={error}
+            existing={existing}
+            onAnswer={answer}
+            onSave={(m) => void save(m)}
+            onCancel={cancel}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function LoadState({ error, onRetry }: { error: string | null; onRetry: () => void }) {
   if (!error) return <p className="mt-6 text-center text-[13px] text-muted">Loading rules…</p>;
   return (
@@ -305,13 +629,24 @@ function LoadState({ error, onRetry }: { error: string | null; onRetry: () => vo
 }
 
 /** The Rules tab: `agentId` for an agent's panel, `projectId` for a team's. */
-export function RulesTab({ agentId, projectId }: { agentId?: string; projectId?: string }) {
+export function RulesTab({ agentId, projectId, onNotify }: { agentId?: string; projectId?: string; onNotify: (text: string) => void }) {
   const query = agentId ? `agent=${encodeURIComponent(agentId)}` : `project=${encodeURIComponent(projectId ?? "")}`;
   const { data, fresh, error, reload } = useRules(`/api/rules?${query}`);
+  const [saved, setSaved] = useState<ReadonlySet<string>>(new Set());
   if (!data) return <LoadState error={error} onRetry={reload} />;
   const locked = data.rules.filter((r) => r.locked).length;
   return (
     <div className="@container">
+      <RuleComposer
+        agentId={agentId}
+        projectId={projectId}
+        existing={data.readBack}
+        onSaved={(ids, mode) => {
+          setSaved(new Set(ids));
+          reload();
+          onNotify(`Saved ${plural(ids.length, "rule")}${mode === "shadow" ? " in shadow mode" : ""}`);
+        }}
+      />
       <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1.5 px-1">
         <span className="mr-1 text-[13px] text-ink-2">
           {plural(data.rules.length, "rule")} · {locked} locked
@@ -321,7 +656,7 @@ export function RulesTab({ agentId, projectId }: { agentId?: string; projectId?:
         ))}
       </div>
       {agentId && <Capabilities name={AGENTS[agentId]?.name ?? agentId} data={data} />}
-      <RulesList data={data} fresh={fresh} />
+      <RulesList data={data} fresh={fresh} saved={saved} />
     </div>
   );
 }
