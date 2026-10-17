@@ -194,3 +194,11 @@ export interface CompileResult {
   /** Replay over recorded calls; null when there is nothing recorded yet. */
   dryRun: { total: number; block: number; ask: number; redact: number; allow: number } | null;
 }
+
+/** POST /api/rules { rules, mode } → 201: the saved rules with their final ids. */
+export interface SaveRulesResponse {
+  rules: Rule[];
+}
+
+/** DELETE /api/rules/[id] → 200 { ok: true }, or 400 { error } for locked and default rules. */
+export type DeleteRuleResponse = { ok: true } | { error: string };
