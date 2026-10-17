@@ -117,8 +117,17 @@ export async function readUpload(id: string): Promise<{ bytes: Buffer; type: str
   }
 }
 
-// STUB (test-first).
+/**
+ * The model content parts for one message's uploads, as base64 data: URLs (Crusoe can't reach this machine).
+ * Throws on more than 4 ids or an id that isn't a stored upload.
+ */
 export async function imageParts(ids: string[]): Promise<ImagePart[]> {
-  void ids;
-  return [];
+  if (ids.length > MAX_IMAGES_PER_MESSAGE) throw new Error(`A message can carry at most ${MAX_IMAGES_PER_MESSAGE} images.`);
+  return Promise.all(
+    ids.map(async (id) => {
+      const file = await readUpload(id);
+      if (!file) throw new Error(`Unknown image "${String(id).slice(0, 80)}".`);
+      return { type: "image_url", image_url: { url: `data:${file.type};base64,${file.bytes.toString("base64")}` } } as const;
+    }),
+  );
 }
