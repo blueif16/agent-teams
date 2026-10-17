@@ -117,6 +117,11 @@ Details and evidence: `docs/design/team-setup.md`.
 ## Product
 
 - No demo data since 2026-10-17: no seed teams, agents, artifacts or scripted messages. Plan and approvals are empty shells for the runtime to fill.
+- Everything is cached (owner requirement, 2026-10-17). Nothing the owner has seen once shows a loading screen again, and static data (skill library, archetypes, tool registry, rules and detectors) is cached too:
+  - **Server:** read once into memory; a file watcher or the writer invalidates it and announces a topic on the bus.
+  - **Client:** every GET a component makes goes through `useCached`/`prefetch` (`src/lib/client-cache.ts`), which is stale-while-revalidate and kept in `sessionStorage`. It refreshes on SSE topics from `/api/events`, never on a polling timer.
+  - **Writes:** POST/DELETE stay plain `fetch`, and the server announces the change.
+  - A test keeps every component GET on the cache.
 - Reactions are orders: 👍 go, 👀 dig in, 🔁 redo, ✋ hold, 📌 remember.
 - The UI copies OpenAI dots and Meta Muse, and every click gets feedback.
 - A mascot always opens that agent; only `#channel` opens the team panel.
