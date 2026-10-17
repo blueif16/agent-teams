@@ -36,6 +36,7 @@ function roster(org: OrgSnapshot, events: LedgerEvent[]): string {
 }
 
 function teams(org: OrgSnapshot): string {
+  if (!org.teams.length) return "No teams yet.";
   return org.teams
     .map((t) => {
       const lead = AGENTS[t.leadId]?.name ?? t.leadId;

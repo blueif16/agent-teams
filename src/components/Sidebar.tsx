@@ -141,6 +141,7 @@ export function Sidebar({
             </label>
 
             <Section title="Teams" count={org.teams.length}>
+              {org.teams.length === 0 && <p className="px-2 py-1 text-[13px] text-muted">No teams yet. Ask {CHIEF.name} to start a project.</p>}
               {teams.map((t) => {
                 const v: View = { kind: "channel", teamId: t.id };
                 const working = t.agents.filter((a) => status[a.id] === "working" || status[a.id] === "needs-you");
@@ -227,6 +228,7 @@ export function Sidebar({
               })}
             </Section>
             <Section title="Handoffs">
+              {handoffs.length === 0 && <p className="px-2 py-1 text-[13px] text-muted">No handoffs yet.</p>}
               {handoffs.map(({ key, msg }) => (
                 <Row key={msg.id} onClick={() => goKey(key)}>
                   <span className="flex shrink-0 -space-x-1.5 self-start pt-0.5">

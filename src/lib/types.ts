@@ -126,7 +126,6 @@ export interface Team {
   leadId: string;
   agents: Agent[];
   messages: Message[];
-  unread: number;
   /** Teams the chief launched at runtime: their spec and each member's assignment. */
   launched?: { spec: string; due?: string; assignments: Record<string, string> };
 }

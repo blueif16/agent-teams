@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { ArrowLeft, ArrowRight, Columns2, Hash, ListChecks, SquarePen } from "lucide-react";
-import { AGENTS, CHIEF, CHIEF_ID, DMS, HQ, TEAMS, TEAMS_BY_ID } from "@/lib/data";
+import { AGENTS, CHIEF, CHIEF_ID, HQ, TEAMS, TEAMS_BY_ID } from "@/lib/data";
 import { excerpt, orderText, ORDERS_BY_KEY, type OrderKey } from "@/lib/orders";
 import { parseProject, PROJECT_FENCE, START_PROJECT, visibleText } from "@/lib/project";
 import { withChartSummaries } from "@/lib/charts";
@@ -71,7 +71,7 @@ export function AgentTeams() {
   const wide = useMedia("(min-width: 1024px)", true);
   const medium = useMedia("(min-width: 768px)", true);
 
-  const [view, setView] = useState<View>({ kind: "channel", teamId: "aster-launch" });
+  const [view, setView] = useState<View>(CHIEF_VIEW);
   const [past, setPast] = useState<View[]>([]);
   const [future, setFuture] = useState<View[]>([]);
   const [side, setSide] = useState<SideMode>("home");
@@ -92,7 +92,6 @@ export function AgentTeams() {
   const [convos, setConvos] = useState<Record<string, Message[]>>(() => {
     const c: Record<string, Message[]> = {};
     for (const t of TEAMS) c[`team:${t.id}`] = t.messages;
-    for (const [id, msgs] of Object.entries(DMS)) c[`dm:${id}`] = msgs;
     return c;
   });
   // One source for what each agent is doing: every mascot, chip and "now" line reads these.
@@ -107,16 +106,14 @@ export function AgentTeams() {
     if (now) setDoing((d) => ({ ...d, [agentId]: now }));
   }, []);
   const [typing, setTyping] = useState<Record<string, string | null>>({});
-  const [unread, setUnread] = useState<Record<string, number>>(() =>
-    Object.fromEntries(TEAMS.map((t) => [t.id, t.unread])),
-  );
+  const [unread, setUnread] = useState<Record<string, number>>({});
   const [reactions, setReactions] = useState<Record<string, Reaction[]>>({});
   const [memories, setMemories] = useState<Record<string, string[]>>({});
   const [live, setLive] = useState<boolean | null>(null);
   const [prefill, setPrefill] = useState<{ key: string; text: string; nonce: number } | null>(null);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  // Teams the chief launched; they live alongside the seed teams everywhere a team shows.
+  // Teams the chief launched; they show everywhere a team shows.
   const [extraTeams, setExtraTeams] = useState<Team[]>([]);
   const org = useMemo(() => {
     const teams = [...TEAMS, ...extraTeams];
@@ -410,7 +407,6 @@ export function AgentTeams() {
       leadId: lead.id,
       agents: members,
       messages: [],
-      unread: 0,
       launched: { spec: p.spec, due: p.due, assignments },
     };
     // send() below must see the team before React re-renders.

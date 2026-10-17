@@ -114,7 +114,7 @@ export function AgentPanel({
         <h2 className="mt-3 text-[22px] font-semibold tracking-[-0.01em]">{a.name}</h2>
         <p className="mt-0.5 text-[14px] text-ink-2">
           {chief ? (
-            `${a.role} over all ${org.teams.length} teams`
+            org.teams.length ? `${a.role} over all ${org.teams.length} teams` : `${a.role}, no teams yet`
           ) : (
             <>
               {a.role}
