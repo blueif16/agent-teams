@@ -7,7 +7,9 @@ import * as z from "zod";
 import { compileRegex } from "./engine";
 import type { Archetype, ArgConstraint, Rule } from "./types";
 
-export const ARCHETYPES = ["chief", "lead", "writer", "researcher", "analyst", "engineer", "coordinator"] as const satisfies readonly Archetype[];
+/** Keyed by Archetype so adding an archetype to the contract is a compile error here until it is listed. */
+const ARCHETYPE_KEYS: Record<Archetype, true> = { chief: true, lead: true, writer: true, researcher: true, analyst: true, engineer: true, coordinator: true };
+export const ARCHETYPES = Object.keys(ARCHETYPE_KEYS) as [Archetype, ...Archetype[]];
 export const RULE_ID = /^r_[a-z0-9]{6,}$/;
 
 /** A group with a quantifier inside that is itself repeated without bound, like (a+)+ or (x*)*. */
