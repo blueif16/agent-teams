@@ -27,6 +27,9 @@ export const TIERS: TierDefault[] = [
       "note_owner_pref",
       "update_member",
       "log_progress",
+      "set_charter",
+      // Mira's launch: the owner's "go" on the option card is the approval, so the tool gate doesn't ask again.
+      "start_team",
     ],
     effect: "allow",
   },
