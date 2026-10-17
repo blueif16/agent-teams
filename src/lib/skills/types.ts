@@ -1,10 +1,13 @@
 /*
- * The skill library and archetype templates (docs/design/team-setup.md §2, §3b).
+ * Archetypes, the skill library, and compositions built on them (docs/design/team-setup.md §2, §3b).
  *
  * The library is our curated marketplace: SKILL.md packages copied (when the license allows) under
  * `skills/library/<id>/`, indexed in `skills/index.json`. Orchestrators search it first; only a miss goes out to
- * You.com Research, and a vetted, approved pick is added back. An archetype template is a ready-to-use agent
- * definition (role + tools + default skills) with no memory; the PM instantiates experts from it.
+ * You.com Research, and a vetted, approved pick is added back.
+ *
+ * Archetypes and the skill library are the only primitives. A Composition (archetype + chosen skills) is built on
+ * top of them: the orchestrator composes one when staffing a role, or adapts one from the history of past
+ * compositions. Nothing ships a fixed "default skills per archetype".
  */
 import type { Archetype } from "../policy/types";
 
@@ -59,21 +62,38 @@ export interface SkillIndex {
   skills: SkillEntry[];
 }
 
-/** A ready-to-use agent definition: no memory, just its role, tools and default skills. */
-export interface ArchetypeTemplate {
+/** A primitive role: how this type of agent works and what it can use. No skills, no memory. */
+export interface ArchetypeDef {
   id: Archetype;
   name: string;
   /** One line, shown on the launch card. */
   summary: string;
   /** The Inherent section of SOUL.md: how this type does the job best. */
   inherent: string[];
-  /** Tool names it gets by default (policy tiers still apply). */
+  /** Tool names it gets (policy tiers still apply). */
   tools: string[];
   modelTier: "main" | "cheap" | "advisor" | "vision";
-  /** SkillEntry ids loaded into its /skills/ at hire. */
-  defaultSkills: string[];
   /** Words the PM's qualifications are matched against when staffing. */
   qualifications: string[];
+}
+
+/**
+ * An agent composition: an archetype plus the skills chosen for one role. Built on the primitives, never a
+ * primitive itself: composed by the orchestrator when staffing, or adapted from history.
+ */
+export interface Composition {
+  id: string;
+  archetype: Archetype;
+  /** SkillEntry ids loaded into the agent's /skills/ at hire. */
+  skills: string[];
+  /** The role it was composed for, e.g. "Onboarding UX designer". */
+  role: string;
+  qualifications: string[];
+  source: "orchestrator" | "history";
+  /** Past compositions this one was adapted from. */
+  basedOn?: string[];
+  /** ISO date. */
+  createdAt: string;
 }
 
 export interface SkillHit {
