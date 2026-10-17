@@ -2,12 +2,15 @@
  * Owner, compiler and approval rules (grants included), persisted to .data/policy/rules.json and merged after the
  * defaults. Every rule is validated against policy/v1 on the way in and on the way out: a corrupt or invalid file
  * throws instead of silently dropping rules, because a dropped deny relaxes. Defaults and locked rules can't be deleted.
- * On Vercel the disk is read-only except /tmp, so the file lives there (like the ledger).
+ * On Vercel the disk is read-only except /tmp, so the file lives there (like the ledger). Every write announces the
+ * `rules` topic on the server cache's bus, so open Permissions views refetch.
  */
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import * as z from "zod";
+import { getServerCache } from "@/server/cache";
+import { TOPICS, type Bus } from "@/server/cache/bus";
 import { DEFAULT_RULE_IDS, DEFAULT_RULES } from "./defaults";
 import { issueLines, newRuleId, RuleSchema } from "./schema";
 import type { Rule } from "./types";
@@ -42,8 +45,10 @@ function serialized<T>(dir: string, job: () => Promise<T>): Promise<T> {
   return next;
 }
 
-export function policyStore(dir: string = defaultPolicyDir()) {
+/** `bus` defaults to the server cache's (looked up at write time); tests pass their own. */
+export function policyStore(dir: string = defaultPolicyDir(), bus?: Bus) {
   const file = path.join(dir, "rules.json");
+  const announce = () => (bus ?? getServerCache().bus).emit(TOPICS.rules);
 
   async function stored(): Promise<Rule[]> {
     let raw: string;
@@ -91,6 +96,7 @@ export function policyStore(dir: string = defaultPolicyDir()) {
           return { ...r, id, mode: opts.mode } as Rule;
         });
         await write([...existing, ...saved]);
+        announce();
         return saved;
       });
     },
@@ -103,6 +109,7 @@ export function policyStore(dir: string = defaultPolicyDir()) {
         if (!rule) return { ok: false, reason: "not_found" };
         if (rule.locked) return { ok: false, reason: "locked" };
         await write(existing.filter((r) => r.id !== id));
+        announce();
         return { ok: true };
       });
     },

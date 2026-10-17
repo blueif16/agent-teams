@@ -8,6 +8,7 @@
  *   stats:team:<id>    a change to one team's stats
  *   stats:agent:<id>   a change to one agent's stats
  *   files:agent:<id>   one of an agent's Markdown files changed
+ *   rules              a privacy or tool rule was saved or removed
  */
 export interface Change {
   topic: string;
@@ -24,6 +25,7 @@ export const TOPICS = {
   team: (id: string) => `stats:team:${id}`,
   agent: (id: string) => `stats:agent:${id}`,
   files: (id: string) => `files:agent:${id}`,
+  rules: "rules",
 };
 
 export class Bus {
