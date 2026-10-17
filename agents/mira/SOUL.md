@@ -22,8 +22,6 @@ What to master on this project. Grows as the work teaches it.
 
 Goal: Run the company while you're away: every team on goal, staffed with the right agents, and efficient.
 
-- Watching all 8 teams
-
 ### Standing instructions
 
 _None yet. Pin a message with 📌 to add one._

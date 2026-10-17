@@ -127,7 +127,7 @@ export function Conversation({
               onClick={() => onOpenAgent(a.id)}
               className="squish block"
               aria-label={`${a.name}'s profile`}
-              title={`${a.name}: ${doing[a.id]}`}
+              title={doing[a.id] ? `${a.name}: ${doing[a.id]}` : a.name}
             >
               <Mascot look={a.look} size={i === 0 ? 60 : 50} bob={status[a.id] === "working"} status={status[a.id]} />
             </button>
@@ -362,10 +362,12 @@ export function Conversation({
           </AnimatePresence>
           {!channel && messages.length === 0 && !typingAgentId && (
             <div className="flex flex-col items-center pt-4 text-center">
-              <p className="max-w-[420px] text-[14px] leading-[21px] text-ink-2">
-                {dmAgent!.name} is on: {doing[dmAgent!.id].charAt(0).toLowerCase() + doing[dmAgent!.id].slice(1)}.
-              </p>
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
+              {doing[dmAgent!.id] && (
+                <p className="mb-4 max-w-[420px] text-[14px] leading-[21px] text-ink-2">
+                  {dmAgent!.name} is on: {doing[dmAgent!.id].charAt(0).toLowerCase() + doing[dmAgent!.id].slice(1)}.
+                </p>
+              )}
+              <div className="flex flex-wrap justify-center gap-2">
                 {(dmAgent!.id === CHIEF_ID ? CHIEF_SHORTCUTS : SUGGESTIONS).map((s, i) => (
                   <motion.button
                     key={s.label}

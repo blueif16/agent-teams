@@ -49,14 +49,6 @@ export interface Agent {
   /** Crusoe Managed Inference model ID used for live replies. */
   model: string;
   look: MascotLook;
-  status: AgentStatus;
-  /** One line: what the agent is doing right now. */
-  task: string;
-  progress: number;
-  elapsed: string;
-  steps: PlanStep[];
-  schedule?: string[];
-  subAgents?: number;
   /** Persona notes fed into the system prompt. */
   brief: string;
 }

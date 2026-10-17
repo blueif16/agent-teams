@@ -267,7 +267,7 @@ export function Sidebar({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13.5px] font-medium text-ink">{CHIEF.name}</span>
                   <span className="block truncate text-[12px] text-muted">
-                    CEO · {org.teams.length} teams · {doing[CHIEF_ID]}
+                    CEO · {org.teams.length} teams{doing[CHIEF_ID] ? ` · ${doing[CHIEF_ID]}` : ""}
                   </span>
                 </span>
               </Row>
@@ -288,7 +288,7 @@ export function Sidebar({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13.5px] text-ink">{a.name}</span>
-                      <span className="block truncate text-[12px] text-muted">{doing[a.id]}</span>
+                      {doing[a.id] && <span className="block truncate text-[12px] text-muted">{doing[a.id]}</span>}
                     </span>
                   </Row>
                 ))}

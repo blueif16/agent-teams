@@ -54,15 +54,6 @@ export const HQ: Team = team({
       role: "CEO",
       model: MAIN,
       look: { shape: "egg", color: "#2fb8a6", accessory: "crown", cheeks: true },
-      status: "working",
-      task: "Watching the company",
-      progress: 0.5,
-      elapsed: "since Mon",
-      steps: [
-        { label: "Morning review of every team", state: "done" },
-        { label: "Watch deadlines, spend and acceptance", state: "active" },
-        { label: "Weekly reorganization proposal", state: "todo" },
-      ],
       brief:
         "Calm, direct and numerate, like a good chief of staff. Leads with the answer, backs it with one number, and keeps the owner's time sacred. Proposes; never decides for the owner.",
     },

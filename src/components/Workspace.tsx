@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Columns2, Ellipsis, Hash, X } from "lucide-react";
 import { AGENTS } from "@/lib/data";
 import { useOrg } from "./org";
-import type { AgentStatus, Team } from "@/lib/types";
+import type { AgentStatus, PlanStep, Team } from "@/lib/types";
 import { Mascot } from "./Mascot";
 import { IconButton, SPRING } from "./ui";
 import { AgentPanel, TeamPanel } from "./Panels";
@@ -111,6 +111,7 @@ export function WorkspaceBody({
   status,
   doing,
   memories,
+  plans,
   onNotify,
   onOpenAgent,
   onMessage,
@@ -123,6 +124,7 @@ export function WorkspaceBody({
   status: Record<string, AgentStatus>;
   doing: Record<string, string>;
   memories: Record<string, string[]>;
+  plans: Record<string, PlanStep[]>;
   onNotify: (text: string) => void;
   onOpenAgent: (id: string) => void;
   onMessage: (agentId: string) => void;
@@ -192,6 +194,7 @@ export function WorkspaceBody({
             status={status[tab.agentId]}
             doing={doing[tab.agentId]}
             memories={memories[tab.agentId] ?? []}
+            plan={plans[tab.agentId] ?? []}
             onMessage={onMessage}
             onToggleRun={onToggleRun}
             onOpenChannel={onOpenChannel}

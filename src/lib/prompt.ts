@@ -26,7 +26,7 @@ function describeMessage(m: Message): string | null {
 }
 
 /**
- * Stable system prompt per agent: persona, team, plan, and the channel log.
+ * Stable system prompt per agent: persona, team, and the channel log.
  * Kept byte-identical between turns so Crusoe's prefix cache can hit.
  */
 export function systemPrompt(
@@ -41,9 +41,8 @@ export function systemPrompt(
   const lead = AGENTS[team.leadId];
   const teammates = team.agents
     .filter((a) => a.id !== agentId)
-    .map((a) => `- ${a.name} (${a.role}): ${a.task}`)
+    .map((a) => `- ${a.name} (${a.role})`)
     .join("\n");
-  const plan = agent.steps.map((s) => `- [${s.state}] ${s.label}`).join("\n");
   const log = team.messages.map(describeMessage).filter(Boolean).join("\n");
 
   const home = homeFiles(files);
@@ -56,10 +55,6 @@ Team lead: ${lead.name}${lead.id === agentId ? " (you)" : ""}
 Teammates:
 ${teammates}
 
-Your current task: ${agent.task} (${Math.round(agent.progress * 100)}% done, running ${agent.elapsed})
-Your plan:
-${plan}
-${agent.schedule?.length ? `Scheduled: ${agent.schedule.join("; ")}\n` : ""}
 Recent #${team.channel} log:
 ${log}
 

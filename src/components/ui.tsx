@@ -60,14 +60,6 @@ export function StatusChip({ status }: { status: AgentStatus }) {
   );
 }
 
-export function Progress({ value, className = "" }: { value: number; className?: string }) {
-  return (
-    <div className={`h-1 overflow-hidden rounded-full bg-[#ebebeb] ${className}`}>
-      <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${Math.round(value * 100)}%` }} />
-    </div>
-  );
-}
-
 export function IconButton({
   label,
   onClick,

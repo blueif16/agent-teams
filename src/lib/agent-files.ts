@@ -117,8 +117,6 @@ What to master on this project. Grows as the work teaches it.
 
 Goal: ${team.goal}
 
-- ${agent.task}
-
 ### Standing instructions
 
 _None yet. Pin a message with 📌 to add one._
@@ -126,14 +124,13 @@ _None yet. Pin a message with 📌 to add one._
 }
 
 function memoryTemplate(agent: Agent): string {
-  const done = agent.steps.filter((s) => s.state === "done").map((s) => `${today()} · ${s.label}`);
   return `# ${agent.name}'s memory
 
 What ${agent.name} has done, what went wrong, and what works. Newest first.
 
 ## Done
 
-${done.length ? bullets(done.reverse()) : "_Nothing yet._"}
+_Nothing yet._
 
 ## Mistakes
 

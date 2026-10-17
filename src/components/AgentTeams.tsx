@@ -7,7 +7,7 @@ import { AGENTS, CHIEF, CHIEF_ID, HQ, TEAMS, TEAMS_BY_ID } from "@/lib/data";
 import { excerpt, orderText, ORDERS_BY_KEY, type OrderKey } from "@/lib/orders";
 import { parseProject, PROJECT_FENCE, START_PROJECT, visibleText } from "@/lib/project";
 import { withChartSummaries } from "@/lib/charts";
-import type { AgentStatus, Message, OrgSnapshot, Team } from "@/lib/types";
+import type { AgentStatus, Message, OrgSnapshot, PlanStep, Team } from "@/lib/types";
 import { ChiefMenu } from "./Chief";
 import { Mascot } from "./Mascot";
 import { OrgContext } from "./org";
@@ -96,10 +96,10 @@ export function AgentTeams() {
   });
   // One source for what each agent is doing: every mascot, chip and "now" line reads these.
   const [status, setStatus] = useState<Record<string, AgentStatus>>(() =>
-    Object.fromEntries(Object.values(AGENTS).map((a) => [a.id, a.status])),
+    Object.fromEntries(Object.keys(AGENTS).map((id) => [id, id === CHIEF_ID ? "working" : "idle"])),
   );
   const [doing, setDoing] = useState<Record<string, string>>(() =>
-    Object.fromEntries(Object.values(AGENTS).map((a) => [a.id, a.task])),
+    Object.fromEntries(Object.keys(AGENTS).map((id) => [id, id === CHIEF_ID ? "Watching the company" : ""])),
   );
   const setActivity = useCallback((agentId: string, s: AgentStatus, now?: string) => {
     setStatus((st) => ({ ...st, [agentId]: s }));
@@ -109,6 +109,7 @@ export function AgentTeams() {
   const [unread, setUnread] = useState<Record<string, number>>({});
   const [reactions, setReactions] = useState<Record<string, Reaction[]>>({});
   const [memories, setMemories] = useState<Record<string, string[]>>({});
+  const [plans] = useState<Record<string, PlanStep[]>>({});
   const [live, setLive] = useState<boolean | null>(null);
   const [prefill, setPrefill] = useState<{ key: string; text: string; nonce: number } | null>(null);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
@@ -513,6 +514,7 @@ export function AgentTeams() {
       status={status}
       doing={doing}
       memories={memories}
+      plans={plans}
       onNotify={notify}
       onOpenAgent={openAgent}
       onMessage={(agentId) => navigate({ kind: "dm", agentId })}

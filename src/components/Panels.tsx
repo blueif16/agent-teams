@@ -2,13 +2,13 @@ import { Fragment, useState, type ReactNode } from "react";
 import { ChartColumn, Check, Fingerprint, Hash, List, Loader, Pause, Pin, Play } from "lucide-react";
 import { motion } from "motion/react";
 import { AGENTS, CHIEF_ID } from "@/lib/data";
-import type { AgentStatus } from "@/lib/types";
+import type { AgentStatus, PlanStep } from "@/lib/types";
 import { Mascot } from "./Mascot";
 import { IdentityTab, Markdown } from "./Identity";
 import { useOrg } from "./org";
 import { formatDue } from "@/lib/project";
 import { AgentPerformance, TeamPerformance } from "./Performance";
-import { Progress, SPRING, StatusChip } from "./ui";
+import { SPRING, StatusChip } from "./ui";
 
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -81,6 +81,7 @@ export function AgentPanel({
   status,
   doing,
   memories,
+  plan,
   onMessage,
   onToggleRun,
   onOpenChannel,
@@ -91,6 +92,8 @@ export function AgentPanel({
   /** The agent's "now" line, shared with the chat. */
   doing: string;
   memories: string[];
+  /** The agent's plan steps; empty until its runtime writes them. */
+  plan: PlanStep[];
   onMessage: (id: string) => void;
   onToggleRun: (id: string) => void;
   onOpenChannel: (teamId: string) => void;
@@ -180,22 +183,18 @@ export function AgentPanel({
       )}
       {tab === "overview" && (
         <TabBody tab={tab}>
-          <Group title="Now">
-            <div className="px-4 py-3.5">
-              <p className="text-[15px] leading-[22px]">{doing}</p>
-              <Progress value={a.progress} className="mt-3" />
-              <div className="mt-2 flex justify-between text-[12.5px] text-muted">
-                <span>
-                  {Math.round(a.progress * 100)}% of plan, running {a.elapsed}
-                </span>
-                {a.subAgents ? <span>{a.subAgents} sub-agents</span> : null}
-              </div>
-            </div>
-          </Group>
+          {doing && (
+            <Group title="Now">
+              <p className="px-4 py-3.5 text-[15px] leading-[22px]">{doing}</p>
+            </Group>
+          )}
 
           <Group title="Plan">
+            {plan.length === 0 && (
+              <p className="px-4 py-3 text-[14px] leading-[20px] text-muted">No plan yet. It shows here once {a.name} starts working.</p>
+            )}
             <ol>
-              {a.steps.map((s, i) => (
+              {plan.map((s, i) => (
                 <li key={i} className="flex items-start gap-3 border-t border-line px-4 py-2.5 first:border-t-0">
                   {s.state === "done" ? (
                     <span className="mt-0.5 grid size-[18px] shrink-0 place-items-center rounded-full bg-accent text-white">
@@ -249,8 +248,6 @@ export function TeamPanel({
   onOpenChannel: (teamId: string) => void;
 }) {
   const t = useOrg().teamsById[teamId];
-  // A launched team starts from zero; seed teams average their agents' plans.
-  const progress = t.launched ? 0 : t.agents.reduce((s, a) => s + a.progress, 0) / t.agents.length;
   const [tab, setTab] = useState<"overview" | "performance">("overview");
 
   return (
@@ -265,7 +262,7 @@ export function TeamPanel({
               onClick={() => onOpenAgent(a.id)}
               className="squish relative block"
               aria-label={`${a.name}'s profile`}
-              title={`${a.name}: ${doing[a.id]}`}
+              title={doing[a.id] ? `${a.name}: ${doing[a.id]}` : a.name}
             >
               <Mascot look={a.look} size={i === 0 ? 72 : 58} bob={status[a.id] === "working"} status={status[a.id]} />
             </button>
@@ -311,13 +308,6 @@ export function TeamPanel({
             </Group>
           )}
 
-          <Group title="Team progress">
-            <div className="px-4 py-3.5">
-              <Progress value={progress} />
-              <p className="mt-2 text-[12.5px] text-muted">{Math.round(progress * 100)}% across {t.agents.length} agents</p>
-            </div>
-          </Group>
-
           <Group title="Agents">
             {t.agents.map((a) => (
               <button
@@ -337,8 +327,7 @@ export function TeamPanel({
                       {t.leadId === a.id ? ", lead" : ""}
                     </span>
                   </span>
-                  <span className="mt-0.5 block text-[13.5px] leading-[19px] text-ink-2">{doing[a.id]}</span>
-                  {!t.launched && <Progress value={a.progress} className="mt-2" />}
+                  {doing[a.id] && <span className="mt-0.5 block text-[13.5px] leading-[19px] text-ink-2">{doing[a.id]}</span>}
                 </span>
                 <StatusChip status={status[a.id]} />
               </button>
