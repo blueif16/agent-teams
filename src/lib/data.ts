@@ -22,6 +22,8 @@ export const CAST: Record<AgentType, MascotLook> = {
   coordinator: { shape: "heart", color: "#f58fb4", accessory: "flower", rig: "pip" },
   analyst: { shape: "blob", color: "#9b7cf2", accessory: "glasses", rig: "ledger" },
   engineer: { shape: "pixel", color: "#ff8a3d", accessory: "headphones", rig: "pixel" },
+  // No rig of its own yet: Pip's character at 48 px and up, its own color and sprout below.
+  designer: { shape: "heart", color: "#3cc4d9", accessory: "sprout", rig: "pip" },
 };
 
 function team(

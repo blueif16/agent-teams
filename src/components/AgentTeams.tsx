@@ -219,6 +219,7 @@ export function AgentTeams() {
 
   const openAgent = useCallback((agentId: string) => openTab({ id: `agent:${agentId}`, type: "agent", agentId }), [openTab]);
   const openTeam = useCallback((teamId: string) => openTab({ id: `team:${teamId}`, type: "team", teamId }), [openTab]);
+  const openSkills = useCallback(() => openTab({ id: "skills", type: "skills" }), [openTab]);
 
   const closeTab = (id: string) => {
     setTabs((ts) => {
@@ -508,6 +509,7 @@ export function AgentTeams() {
   );
 
   const workspace = workspaceOpen && tabs.length > 0;
+  const shownTab = tabs.find((t) => t.id === activeTab) ?? tabs[tabs.length - 1];
   const tabsEl = (
     <WorkspaceTabs
       tabs={tabs}
@@ -519,7 +521,7 @@ export function AgentTeams() {
   );
   const bodyEl = (
     <WorkspaceBody
-      tab={tabs.find((t) => t.id === activeTab) ?? tabs[tabs.length - 1]}
+      tab={shownTab}
       status={status}
       doing={doing}
       memories={memories}
@@ -533,6 +535,7 @@ export function AgentTeams() {
         setStatus((s) => ({ ...s, [agentId]: resuming ? "working" : "idle" }));
         notify(`${AGENTS[agentId].name} ${resuming ? "is back to work" : "is paused"}`);
       }}
+      onOpenSkills={openSkills}
       onCloseOthers={(id) => {
         setTabs((ts) => ts.filter((t) => t.id === id));
         setActiveTab(id);
@@ -554,6 +557,7 @@ export function AgentTeams() {
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           needsYou={pending.length}
+          skills={{ active: workspace && shownTab?.type === "skills", onClick: openSkills }}
           chief={{
             open: chiefOpen,
             unread: chiefUnread,

@@ -32,7 +32,7 @@ export interface MascotLook {
 
 /** One Rive character per agent type (built in /home/ran/rive/felipe-rig, rive/cast.py). */
 export type MascotRig = "felipe" | "alfred" | "dottie" | "pip" | "ledger" | "pixel";
-export type AgentType = "lead" | "writer" | "researcher" | "coordinator" | "analyst" | "engineer";
+export type AgentType = "lead" | "writer" | "researcher" | "coordinator" | "analyst" | "engineer" | "designer";
 
 export type AgentStatus = "working" | "needs-you" | "idle" | "done";
 
