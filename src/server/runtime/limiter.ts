@@ -7,8 +7,14 @@
  * puts more than the limit into any 60 s span, so it stays under the cap
  * whether Crusoe resets on a fixed minute or a rolling one.
  */
+import { AsyncLocalStorage } from "node:async_hooks";
 
+/**
+ * Who waits first (D §7): `interactive` (an owner message or DM) ahead of `work`
+ * (assignments, callbacks) ahead of `background` (heartbeats, dreams).
+ */
 export type Lane = "interactive" | "work" | "background";
+const RANK: Record<Lane, number> = { interactive: 0, work: 1, background: 2 };
 
 export type LimiterOptions = {
   /** Requests per minute per model. Crusoe without a payment method: 30. */
@@ -62,12 +68,30 @@ export class Limiter {
   /**
    * Wait until `model` has room for one more request of `estTokens`, then count it.
    * A request estimated above the whole TPM limit is counted as the limit, so it
-   * goes once the bucket is empty instead of waiting forever.
+   * goes once the bucket is empty instead of waiting forever. If `signal` aborts
+   * first, the request leaves the queue and the promise rejects with its reason.
    */
-  acquire(model: string, estTokens: number, lane: Lane = "work"): Promise<Reservation> {
+  acquire(model: string, estTokens: number, lane: Lane = "work", signal?: AbortSignal | null): Promise<Reservation> {
     const b = this.bucket(model);
-    return new Promise((resolve) => {
-      b.waiters.push({ lane, tokens: Math.min(estTokens, this.tpm), resolve });
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) return reject(signal.reason);
+      const onAbort = () => {
+        b.waiters.splice(b.waiters.indexOf(w), 1);
+        reject(signal!.reason);
+        this.pump(b); // whoever was behind it may fit now
+      };
+      const w: Waiter = {
+        lane,
+        tokens: Math.min(estTokens, this.tpm),
+        resolve: (r) => {
+          signal?.removeEventListener("abort", onAbort);
+          resolve(r);
+        },
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+      // Behind every waiter of the same or a higher lane, ahead of any lower one.
+      const at = b.waiters.findIndex((x) => RANK[x.lane] > RANK[lane]);
+      b.waiters.splice(at === -1 ? b.waiters.length : at, 0, w);
       this.pump(b);
     });
   }
@@ -97,6 +121,21 @@ export class Limiter {
     this.pump(b);
   }
 
+  /**
+   * At least half of `model`'s requests and tokens are free this minute. Background
+   * work only runs then (D §7); the scheduler asks before starting a heartbeat or dream.
+   */
+  hasHeadroom(model: string): boolean {
+    const b = this.bucket(model);
+    this.prune(b, Date.now());
+    return this.headroom(b);
+  }
+
+  private headroom(b: Bucket): boolean {
+    const used = this.used(b);
+    return this.rpm - used.requests >= this.rpm / 2 && this.tpm - used.tokens >= this.tpm / 2;
+  }
+
   private bucket(model: string): Bucket {
     let b = this.buckets.get(model);
     if (!b) this.buckets.set(model, (b = { log: [], waiters: [] }));
@@ -118,16 +157,21 @@ export class Limiter {
     return { requests, tokens };
   }
 
-  private fits(b: Bucket, tokens: number): boolean {
+  private fits(b: Bucket, w: Waiter): boolean {
     const used = this.used(b);
-    return used.requests + 1 <= this.rpm && used.tokens + tokens <= this.tpm;
+    if (w.lane === "background" && !this.headroom(b)) return false;
+    return used.requests + 1 <= this.rpm && used.tokens + w.tokens <= this.tpm;
   }
 
-  /** Admit waiters in order while they fit; otherwise wake up when the oldest entry leaves the window. */
+  /**
+   * Admit waiters in queue order while the first one fits; otherwise wake up when the
+   * oldest entry leaves the window. Nobody gets past a waiter that doesn't fit, so a
+   * small background call can't take room a bigger foreground call is waiting for.
+   */
   private pump(b: Bucket) {
     const now = Date.now();
     this.prune(b, now);
-    while (b.waiters.length && this.fits(b, b.waiters[0].tokens)) {
+    while (b.waiters.length && this.fits(b, b.waiters[0])) {
       const w = b.waiters.shift()!;
       const entry = { at: now, requests: 1, tokens: w.tokens };
       b.log.push(entry);
@@ -158,6 +202,13 @@ function header(headers: Headers, name: string): number | undefined {
  */
 function gap(left: number, remaining: number | undefined): number {
   return remaining !== undefined && remaining < left ? left - remaining : 0;
+}
+
+const laneStore = new AsyncLocalStorage<Lane>();
+
+/** Run `fn` with every model call inside it (through limitFetch) in `lane`. The run executor sets this. */
+export function withLane<T>(lane: Lane, fn: () => T): T {
+  return laneStore.run(lane, fn);
 }
 
 /** The one limiter per process (D §7), kept on globalThis so dev-server module reloads don't make a second one. */
@@ -199,7 +250,8 @@ async function usageOf(res: Response): Promise<Usage | undefined> {
 export function limitFetch(baseFetch: typeof fetch = fetch, limiter: Limiter = getLimiter()): typeof fetch {
   return async (input, init) => {
     const body = typeof init?.body === "string" ? init.body : "";
-    const reservation = await limiter.acquire(modelOf(body), Math.ceil(body.length / 4));
+    const lane = laneStore.getStore() ?? "work";
+    const reservation = await limiter.acquire(modelOf(body), Math.ceil(body.length / 4), lane, init?.signal);
     const res = await baseFetch(input, init);
     limiter.observe(reservation, res, await usageOf(res));
     return res;

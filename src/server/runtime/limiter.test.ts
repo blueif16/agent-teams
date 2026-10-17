@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MODELS } from "@/lib/models";
-import { Limiter, limitFetch } from "./limiter";
+import { Limiter, limitFetch, withLane } from "./limiter";
 
 const MAIN = MODELS.main;
 const ADVISOR = MODELS.advisor;
@@ -42,6 +42,13 @@ function completion(model: string, { usage = SMALL_USAGE, headers = ROOMY }: { u
     usage,
   };
   return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json", ...headers } });
+}
+
+/** limitFetch over a fake Crusoe whose responses come from `respond`, counting what reached it. */
+function crusoe(limiter: Limiter, respond: (n: number) => Response) {
+  const reached = { n: 0 };
+  const f = limitFetch(async () => respond(++reached.n), limiter);
+  return { f, reached };
 }
 
 /** Watch a promise without awaiting it, so a test can ask "has it resolved yet?". */
@@ -100,6 +107,51 @@ describe("Limiter buckets", () => {
   });
 });
 
+describe("lanes", () => {
+  it("does not let a background request jump ahead of a waiting foreground request, even when only the background one fits", async () => {
+    const limiter = new Limiter({ tpm: 100_000 });
+    await limiter.acquire(MAIN, 60_000, "interactive"); // t = 0
+    await vi.advanceTimersByTimeAsync(10_000);
+    await limiter.acquire(MAIN, 38_000, "work"); // t = 10 s: 2K left
+
+    const dream = track(limiter.acquire(MAIN, 5_000, "background")); // queued first
+    const ownerReply = track(limiter.acquire(MAIN, 80_000, "interactive"));
+
+    await vi.advanceTimersByTimeAsync(55_000); // t = 65 s: the 60K left, 62K free, the 5K would fit
+    expect(ownerReply.done).toBe(false);
+    expect(dream.done).toBe(false);
+    await vi.advanceTimersByTimeAsync(5_000); // t = 70 s: everything free
+    expect(ownerReply.done).toBe(true);
+  });
+
+  it("holds a background request (lane set with withLane) while the model's tokens are under half free, as hasHeadroom() reports", async () => {
+    const limiter = new Limiter({ tpm: 10_000 });
+    const { f, reached } = crusoe(limiter, () => completion(MAIN));
+    expect(limiter.hasHeadroom(MAIN)).toBe(true);
+    await limiter.acquire(MAIN, 6_000, "work"); // 4K of 10K free
+    expect(limiter.hasHeadroom(MAIN)).toBe(false);
+
+    const heartbeat = track(withLane("background", () => f(URL, post(MAIN, 100))));
+    const assignment = track(f(URL, post(MAIN, 100))); // same size, default lane
+    await vi.advanceTimersByTimeAsync(0);
+    expect(assignment.done).toBe(true);
+    expect(heartbeat.done).toBe(false);
+    expect(reached.n).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(60_000); // the 6K leaves the window
+    expect(heartbeat.done).toBe(true);
+    expect(limiter.hasHeadroom(MAIN)).toBe(true);
+  });
+
+  it("counts requests too: hasHeadroom() turns false once more than half the minute's requests are used", async () => {
+    const limiter = new Limiter(); // 30 RPM
+    for (let i = 0; i < 15; i++) await limiter.acquire(MAIN, 10);
+    expect(limiter.hasHeadroom(MAIN)).toBe(true); // 15 of 30 left: exactly half
+    await limiter.acquire(MAIN, 10);
+    expect(limiter.hasHeadroom(MAIN)).toBe(false);
+  });
+});
+
 describe("limitFetch", () => {
   it("waits on the limiter for the model named in the request body before calling the inner fetch", async () => {
     const sent: string[] = [];
@@ -136,6 +188,34 @@ describe("limitFetch", () => {
     expect(calls[0][1]).toBe(init);
     expect(out).toBe(res);
     expect((await out.json()).choices[0].message.content).toBe("hi");
+  });
+
+  it("drops a request whose signal aborts while it waits: it rejects at once, never reaches Crusoe, and keeps no slot", async () => {
+    const { f, reached } = crusoe(new Limiter({ rpm: 1 }), () => completion(MAIN));
+    await f(URL, post(MAIN, 100));
+
+    const run = new AbortController(); // the run executor cancels this run
+    const cancelled = track(f(URL, { ...post(MAIN, 100), signal: run.signal }));
+    const after = track(f(URL, post(MAIN, 100)));
+    run.abort();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(cancelled.done).toBe(true);
+    expect((cancelled.error as Error).name).toBe("AbortError");
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(after.done).toBe(true);
+    expect(reached.n).toBe(2); // the first request and `after`, not the cancelled one
+  });
+
+  it("rejects a request whose signal is already aborted without counting it", async () => {
+    const limiter = new Limiter({ rpm: 1 });
+    const { f, reached } = crusoe(limiter, () => completion(MAIN));
+
+    await expect(f(URL, { ...post(MAIN, 100), signal: AbortSignal.abort() })).rejects.toMatchObject({ name: "AbortError" });
+    expect(reached.n).toBe(0);
+    const next = track(limiter.acquire(MAIN, 100));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(next.done).toBe(true); // the one slot is still free
   });
 
   it("still sends a request that has no JSON body, such as GET /v1/models", async () => {
@@ -175,13 +255,6 @@ describe("limitFetch", () => {
 });
 
 describe("calibration from responses", () => {
-  /** limitFetch over a fake Crusoe whose responses come from `respond`, counting what reached it. */
-  function crusoe(limiter: Limiter, respond: (n: number) => Response) {
-    const reached = { n: 0 };
-    const f = limitFetch(async () => respond(++reached.n), limiter);
-    return { f, reached };
-  }
-
   it("blocks the next request to a model after a response says x-ratelimit-remaining-requests: 0", async () => {
     // Another process (or a key shared elsewhere) spent the minute: locally only 1 of 30 is used.
     const headers = crusoeHeaders({ limitRequests: 30, remainingRequests: 0, limitTokens: 500_000, remainingTokens: 499_900 });
