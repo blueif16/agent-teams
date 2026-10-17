@@ -14,9 +14,10 @@ import type { Archetype } from "../policy/types";
 import type { SearchSkills, SkillHit } from "./types";
 import type { Research } from "./youcom";
 
-/** Top-hit score (weighted coverage, see search.ts) that counts as a library hit. On the fixture library, needs it
- * covers score 0.26–0.75 and needs it doesn't ≤ 0.15; calibrate again on the curated index. */
-export const LIBRARY_THRESHOLD = 0.2;
+/** Top-hit score (weighted coverage, see search.ts) that counts as a library hit. On the curated 55-skill index
+ * (2026-10-17), needs it covers score 0.326–0.775 and needs it doesn't ≤ 0.224; 0.28 sits in that gap. Recalibrate
+ * when the library grows (find.test.ts, "calibrated on the curated library"). */
+export const LIBRARY_THRESHOLD = 0.28;
 /** Below this, a publisher's "official" claim is flagged and not ranked as official. */
 export const OFFICIAL_MIN_STARS = 50;
 const MAX_CANDIDATES = 5;
