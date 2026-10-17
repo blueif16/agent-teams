@@ -199,10 +199,15 @@ describe("POST /api/projects", () => {
         expect(existsSync(path.join(vaultDir(), "agents", a.id, "skills", folder, "SKILL.md")), `${a.id} ${id}`).toBe(true);
       }
     }
-    const charter = await vault.history(`projects/${project.id}/state/charter.md`);
+    // The launch card's charter sits beside the state, not in it: state/charter.md is set_charter's, in its own format.
+    const charter = await vault.history(`projects/${project.id}/charter.md`);
     expect(charter.commits.map((c) => c.source)).toEqual(["seed"]);
-    expect(await vault.show(`projects/${project.id}/state/charter.md`)).toContain(PROPOSAL.goal);
-    expect(commitCount()).toBe(agents.length + 1);
+    expect(await vault.show(`projects/${project.id}/charter.md`)).toContain(PROPOSAL.goal);
+    // The PM's state tools can read the state, and every expert is on its roster (one staffing commit each).
+    const { readState } = await import("@/server/project-state");
+    const state = await readState(project.id);
+    expect(state.roster.members.map((m) => [m.agentId, m.archetype])).toEqual(agents.slice(1).map((a) => [a.id, a.archetype]));
+    expect(commitCount()).toBe(agents.length + 1 + (agents.length - 1));
 
     // The kickoff waits in the PM's inbox; nothing ran a model.
     const [kickoff] = d.inbox.pending(`a:${agents[0].id}:p:${project.id}`);
@@ -227,7 +232,9 @@ describe("POST /api/projects", () => {
   it("leaves no partial rows when provisioning fails half way", async () => {
     const launchPlan = await balancedPlan();
     const d = await db();
-    vi.spyOn(d.inbox, "add").mockImplementation(() => {
+    // A write late in the transaction, after the agents, project and first member are in (the kickoff itself comes
+    // after the vault seed, so the PM never wakes into a half-seeded project).
+    vi.spyOn(d.threads, "ensure").mockImplementation(() => {
       throw new Error("disk full");
     });
     const { status } = await launch({ plan: launchPlan, nonce: "nonce-0003" }).catch(() => ({ status: 500 }));
