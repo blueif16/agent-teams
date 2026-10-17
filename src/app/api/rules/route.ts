@@ -8,13 +8,15 @@ import { ARCHETYPES } from "@/lib/policy/schema";
 import { policyStore, RuleValidationError } from "@/lib/policy/store";
 import { TIERS } from "@/lib/policy/tiers";
 import type { Archetype, Rule, RulesResponse, Scope } from "@/lib/policy/types";
+import { fileRulesFor, filesFor, type FileZoneView } from "@/lib/policy/zones";
 
 /*
  * The privacy and tool rules (design §6) for the Rules tab. Nothing is enforced from here yet; this is the source of
  * truth the enforcement points will read.
  *   GET  /api/rules?agent=&project=   rules in force with read-backs, tiers, detectors and what the flow rules protect
  *                                     (`data`); with `agent`, what it can do per capability (`permissions`; an agent
- *                                     launched at runtime also needs &archetype=)
+ *                                     launched at runtime also needs &archetype=) and its Files section (`files`:
+ *                                     one row per zone, zones.ts)
  *   POST /api/rules { rules, mode }   save rules from a compile result, in enforce or shadow mode → 201 { rules }
  */
 
@@ -49,9 +51,15 @@ export async function GET(req: Request) {
 
   const rules = agentId || projectId ? all.filter((r) => canApply(r.scope, { agentId, archetype, projectId })) : all;
   const now = new Date();
-  const body: RulesResponse = { rules, readBack: readBackAll(rules), tiers: TIERS, detectors: listDetectors(), data: dataGuards(rules, now) };
-  // Relevance comes from the registry by archetype for now; resolveToolset(ArchetypeDef, composition) replaces it.
-  if (agentId && archetype) body.permissions = permissionsFor({ agentId, archetype, projectId: projectId ?? "" }, all, toolsetOf(archetype), now);
+  const body: RulesResponse & { files?: FileZoneView[] } = { rules, readBack: readBackAll(rules), tiers: TIERS, detectors: listDetectors(), data: dataGuards(rules, now) };
+  if (agentId && archetype) {
+    const agent = { agentId, archetype, projectId: projectId ?? "" };
+    // Task deliverables come from the PM's assignments once the runtime passes them; until then, the archetype's scope.
+    const deliverables: string[] = [];
+    // Relevance comes from the registry by archetype for now; resolveToolset(ArchetypeDef, composition) replaces it.
+    body.permissions = permissionsFor(agent, [...all, ...fileRulesFor(agent, all, deliverables, now)], toolsetOf(archetype), now);
+    body.files = filesFor(agent, all, deliverables, now);
+  }
   return Response.json(body);
 }
 
