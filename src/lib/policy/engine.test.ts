@@ -284,6 +284,15 @@ describe("decide: combining", () => {
     expect(d.transforms).toEqual([{ ...span, action: "redact" }]);
   });
 
+  it("an ask beats a tokenize", () => {
+    const ask = toolRule({ effect: "ask" });
+    const tokenize = flowRule({ labels: ["secret.*"], sinks: ["model:crusoe"], action: "tokenize" });
+    const span = { path: "prompt", start: 0, end: 4, label: "secret.aws" };
+    const d = decide(ev({ argSpans: [span], sinks: ["model:crusoe"] }), [ask, tokenize], [], NOW);
+    expect(d.effect).toBe("ask");
+    expect(d.transforms).toEqual([{ ...span, action: "tokenize" }]);
+  });
+
   it("most restrictive wins between two tool rules", () => {
     const allow = toolRule({ id: "r_tool01", effect: "allow" });
     const ask = toolRule({ id: "r_tool02", effect: "ask" });
@@ -389,6 +398,14 @@ describe("decide: grants", () => {
     const e = mail(["sam@acme.com"]);
     expect(decide(e, [askMail], [grant({ expiresAt: "2026-10-17T11:59:59Z" })], NOW).effect).toBe("ask");
     expect(decide(e, [askMail], [grant({ expiresAt: "2026-10-17T12:00:01Z" })], NOW).effect).toBe("allow");
+  });
+
+  it("reports the same grant whatever order two applicable grants come in", () => {
+    const a = grant({ id: "r_granta" });
+    const b = grant({ id: "r_grantb", grantScope: "always" });
+    const e = mail(["sam@acme.com"]);
+    expect(decide(e, [askMail], [b, a], NOW)).toEqual(decide(e, [askMail], [a, b], NOW));
+    expect(decide(e, [askMail], [b, a], NOW).firedRuleIds).toEqual(["r_granta", "r_mail01"]);
   });
 
   it("works when passed among the rules", () => {
