@@ -155,4 +155,12 @@ describe("dataGuards", () => {
     expect(g["Personal info"]).toMatchObject({ id: "pii", outcome: "hidden" });
     expect(g.codename).toMatchObject({ id: "codename", outcome: "ask" });
   });
+
+  it("ranks asking above hiding within a family", () => {
+    const own: Rule[] = [
+      { id: "r_pii001", kind: "flow", scope: {}, labels: ["pii.email"], sinks: ["web"], action: "tokenize", createdBy: "owner" },
+      { id: "r_pii002", kind: "flow", scope: {}, labels: ["pii.phone"], sinks: ["email"], action: "ask", createdBy: "owner" },
+    ];
+    expect(byLabel(own)["Personal info"]).toMatchObject({ outcome: "ask" });
+  });
 });
