@@ -1,5 +1,13 @@
 /* Test helpers for test mode's server side. Not imported by app code. */
+import type { RecordingInput } from "./recorder";
 import type { TapeHeaderInput } from "./tape";
+
+/** What the driver sends to start recording a trial: the header fields only it knows. */
+export function recordingInput(over: Partial<RecordingInput> = {}): RecordingInput {
+  const { kind, v, clock, tapeId, recordedAt, ...rest } = headerInput();
+  void [kind, v, clock, tapeId, recordedAt];
+  return { ...rest, ...over };
+}
 
 /** A tape header as a trial of the launch-kit scenario would open it. */
 export function headerInput(over: Partial<TapeHeaderInput> = {}): TapeHeaderInput {
