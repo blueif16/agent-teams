@@ -13,8 +13,8 @@ export interface ThreadReplyHandlers {
 
 type Ev = { type: string; run: string; text?: string; message?: string };
 
-/** Resolves with the run's final answer; rejects when the post or the run fails. */
-export function sendToThread(threadId: string, text: string, on: ThreadReplyHandlers): Promise<string> {
+/** Resolves with the run's final answer; rejects when the post or the run fails. `uploads`: ids from POST /api/uploads. */
+export function sendToThread(threadId: string, text: string, on: ThreadReplyHandlers, uploads?: string[]): Promise<string> {
   const base = `/api/threads/${encodeURIComponent(threadId)}`;
   return new Promise((resolve, reject) => {
     const source = new EventSource(`${base}/events`);
@@ -55,7 +55,7 @@ export function sendToThread(threadId: string, text: string, on: ThreadReplyHand
         const res = await fetch(`${base}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, uploads }),
         });
         const body = (await res.json().catch(() => ({}))) as { runId?: string; error?: string };
         if (!res.ok) return finish(new Error(body.error ?? `Request failed (${res.status})`));

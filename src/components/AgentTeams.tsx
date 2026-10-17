@@ -382,14 +382,13 @@ export function AgentTeams() {
     };
     try {
       let acc = "";
-      if (chief && target.kind === "dm" && !opts.order && !images) {
+      if (chief && target.kind === "dm" && !opts.order) {
         // Mira's DM runs on her persistent agent (src/server/runtime): her thread keeps the conversation,
-        // so no history rides along; the reply and her "now" line stream from the run. A message with
-        // images still goes through /api/chat until the runtime takes uploads.
+        // so no history rides along; the reply and her "now" line stream from the run. Attachments ride along.
         acc = await sendToThread(MIRA_THREAD, text, {
           text: show,
           now: (line) => setActivity(CHIEF_ID, "working", line),
-        });
+        }, images);
         show(acc);
         setActivity(CHIEF_ID, "working", "Watching the company");
       } else acc = await streamChat();
