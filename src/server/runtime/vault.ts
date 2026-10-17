@@ -9,9 +9,9 @@
  */
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { FileDiff, FileHistory, VaultAuthor, VaultCommit, VaultSource, VaultWriteRequest } from "@/lib/vault/types";
+import type { DiffHunk, DiffSegment, FileDiff, FileHistory, VaultAuthor, VaultCommit, VaultSource, VaultWriteRequest } from "@/lib/vault/types";
 
 export interface ScrubResult {
   text: string;
@@ -289,8 +289,85 @@ export class Vault {
     return { path: p, blob: await this.blob(p), commits: parseLog(out.stdout) };
   }
 
+  /** Word diff of the file between two changes; `from` null diffs against "no file yet". */
   async diff(p: string, from: string | null, to: string): Promise<FileDiff> {
-    return { path: p, from, to, hunks: [], stats: { added: 0, removed: 0 } };
+    checkPath(p);
+    const toSha = await this.resolve(p, to);
+    const fromSha = from ? await this.resolve(p, from) : await this.emptyTree();
+    const out = await this.git([
+      "diff", "--no-color", "--no-ext-diff", "--no-renames", "--word-diff=porcelain", "-U3", fromSha, toSha, "--", p,
+    ]);
+    const hunks = parseWordDiff(out.stdout);
+    const words = (op: DiffSegment["op"]) =>
+      hunks.flatMap((h) => h.lines.flat()).reduce((n, s) => n + (s.op === op ? (s.text.match(/\S+/g)?.length ?? 0) : 0), 0);
+    return { path: p, from, to, hunks, stats: { added: words("add"), removed: words("del") } };
+  }
+
+  /** The file's exact content at a change (or sha), or at HEAD; null if it didn't exist there. */
+  async show(p: string, at?: string): Promise<string | null> {
+    checkPath(p);
+    if (!(await this.hasCommits())) {
+      if (at) throw new VaultNotFoundError(`No change ${at} for ${p}`);
+      return null;
+    }
+    const sha = at ? await this.resolve(p, at) : "HEAD";
+    const out = await this.git(["cat-file", "blob", `${sha}:${p}`], { ok: [0, 128] });
+    return out.code === 0 ? out.stdout : null;
+  }
+
+  /** Puts the file back as it was at `change`, as a new commit with `Restores:`; nothing is reset. */
+  async restore(p: string, change: string, author: VaultAuthor = OWNER): Promise<VaultCommit | null> {
+    checkPath(p);
+    const target = (await this.history(p)).commits.find((c) => c.change === change || c.sha === change);
+    if (!target) throw new VaultNotFoundError(`No change ${change} for ${p}`);
+    const content = await this.show(p, target.sha);
+    if (content === null) throw new VaultNotFoundError(`${p} didn't exist at ${change}`);
+    const when = `${target.at.slice(0, 10)} ${target.at.slice(11, 16)} UTC`;
+    return this.write({
+      path: p,
+      content,
+      author,
+      source: "restore",
+      subject: `${typeOf(p)}(${agentOf(p) ?? "vault"}): restore ${path.posix.basename(p)} to the version of ${when}`,
+      trailers: { Restores: target.change },
+    });
+  }
+
+  /**
+   * One seed commit of every file under an app-style agents folder (`<src>/<id>/**`), at
+   * `agents/<id>/**`. Files the vault already has are left alone, so running it again is a no-op.
+   */
+  async importFrom(src: string): Promise<VaultCommit | null> {
+    const root = path.resolve(src);
+    const found: { path: string; abs: string }[] = [];
+    for (const e of await readdir(root, { recursive: true, withFileTypes: true })) {
+      if (!e.isFile()) continue;
+      const abs = path.join(e.parentPath, e.name);
+      const rel = path.relative(root, abs).split(path.sep).join("/");
+      if (!rel.includes("/") || rel.split("/").some((seg) => seg.startsWith("."))) continue;
+      found.push({ path: checkPath(`agents/${rel}`), abs });
+    }
+    found.sort((a, b) => (a.path < b.path ? -1 : 1));
+    return this.enqueue(async () => {
+      const fresh = found.filter((f) => !existsSync(path.join(this.dir, f.path)));
+      if (!fresh.length) return null;
+      const agents = [...new Set(fresh.map((f) => agentOf(f.path)))];
+      const n = fresh.length;
+      return this.commitNow({
+        files: await Promise.all(fresh.map(async (f) => ({ path: f.path, content: await readFile(f.abs, "utf8") }))),
+        author: RUNTIME,
+        source: "seed",
+        subject: `agent(${agents.length === 1 ? agents[0] : "*"}): import ${n} existing file${n === 1 ? "" : "s"} as the seed`,
+        trailers: [],
+        expect: [],
+      });
+    });
+  }
+
+  /** Plug hooks in after construction: the detector pack's scrub, the cache's onCommit. */
+  configure(hooks: { scrub?: Scrub; onCommit?: CommitHook }): void {
+    if ("scrub" in hooks) this.scrub = hooks.scrub;
+    if ("onCommit" in hooks) this.onCommit = hooks.onCommit;
   }
 
   // ---------------------------------------------------------------------------------------- internals
@@ -338,13 +415,55 @@ export class Vault {
     return (await this.git(["rev-parse", "--verify", "-q", "HEAD"], { ok: [0, 1, 128] })).code === 0;
   }
 
-  /** One job = one commit (G §2.3): check expectations, write each file atomically, commit, report. */
-  private async commitNow(job: Job): Promise<VaultCommit | null> {
+  /** A change id (or a commit sha) in this file's history → its sha. */
+  private async resolve(p: string, ref: string): Promise<string> {
+    const missing = () => new VaultNotFoundError(`No change ${ref} for ${p}`);
+    if (!/^(c_[0-9A-HJKMNP-TV-Z]{26}|[0-9a-f]{7,40})$/.test(ref) || !(await this.hasCommits())) throw missing();
+    const out = await this.git(["log", "--format=%H%x1f%(trailers:key=Change,valueonly,separator=)", "HEAD", "--", p]);
+    for (const line of out.stdout.split("\n")) {
+      const [sha, change] = line.split("\x1f");
+      if (sha && (change === ref || sha.startsWith(ref))) return sha;
+    }
+    throw missing();
+  }
+
+  private emptyTreeSha?: string;
+  private async emptyTree(): Promise<string> {
+    return (this.emptyTreeSha ??= (await this.git(["hash-object", "-t", "tree", "--stdin"], { input: "" })).stdout.trim());
+  }
+
+  private async clean(text: string): Promise<ScrubResult> {
+    if (!this.scrub) return { text, redacted: 0 };
+    const out = await this.scrub(text);
+    return typeof out === "string" ? { text: out, redacted: 0 } : out;
+  }
+
+  /** One job = one commit (G §2.3): check expectations, scrub, write each file atomically, commit, report. */
+  private async commitNow(raw: Job): Promise<VaultCommit | null> {
     await this.init();
-    for (const e of job.expect) {
+    for (const e of raw.expect) {
       const actual = await this.blob(e.path);
       if (actual !== e.blob) throw new VaultConflictError(e.path, e.blob, actual);
     }
+
+    // Scrub before anything touches disk: file bodies, the subject and every trailer value (G §6).
+    let redacted = 0;
+    const scrub = async (s: string) => {
+      const out = await this.clean(s);
+      redacted += out.redacted;
+      return out.text;
+    };
+    const files: Job["files"] = [];
+    for (const f of raw.files) files.push({ path: f.path, content: await scrub(f.content) });
+    const subject = checkSubject(await scrub(raw.subject));
+    const scrubbed: [string, string][] = [];
+    for (const [k, v] of raw.trailers) {
+      const value = (await scrub(v)).trim();
+      if (!value || CONTROL.test(value)) throw new Error(`Bad value for trailer ${k} after scrubbing`);
+      scrubbed.push([k, value]);
+    }
+    if (redacted > 0) scrubbed.push(["Redacted", String(redacted)]);
+    const job: Job = { ...raw, files, subject, trailers: scrubbed };
 
     const paths = job.files.map((f) => f.path);
     const before = new Map<string, Buffer | null>();
@@ -378,8 +497,6 @@ export class Vault {
         ],
         { input: `${job.subject}\n` },
       );
-      const out = await this.git(["log", "-1", "--no-renames", "--numstat", `--format=${LOG_FORMAT}`, "HEAD", "--", ...paths]);
-      return parseLog(out.stdout)[0];
     } catch (e) {
       // Put the working tree back as HEAD has it: agents read these files directly.
       await this.git(["reset", "-q", "--", ...paths], { ok: [0, 1, 128] }).catch(() => undefined);
@@ -390,7 +507,51 @@ export class Vault {
       }
       throw e;
     }
+
+    const out = await this.git(["log", "-1", "--no-renames", "--numstat", `--format=${LOG_FORMAT}`, "HEAD", "--", ...paths]);
+    const commit = parseLog(out.stdout)[0];
+    // Still inside the queue, so the cache sees commits in order; a failing hook never undoes a commit.
+    for (const f of job.files) {
+      try {
+        await this.onCommit?.(f.path, f.content, commit);
+      } catch (e) {
+        console.error(`[vault] onCommit failed for ${f.path} at ${commit.change}:`, e);
+      }
+    }
+    return commit;
   }
+}
+
+/** Parses `git diff --word-diff=porcelain` for one file into hunks of lines of segments. */
+function parseWordDiff(out: string): DiffHunk[] {
+  const hunks: DiffHunk[] = [];
+  let hunk: DiffHunk | null = null;
+  let line: DiffSegment[] = [];
+  for (const raw of out.split("\n")) {
+    const m = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(raw);
+    if (m) {
+      if (hunk && line.length) hunk.lines.push(line);
+      hunk = { oldStart: +m[1], oldLines: m[2] === undefined ? 1 : +m[2], newStart: +m[3], newLines: m[4] === undefined ? 1 : +m[4], lines: [] };
+      hunks.push(hunk);
+      line = [];
+      continue;
+    }
+    if (!hunk) continue; // the diff --git / index / ---/+++ header
+    if (raw === "~") {
+      hunk.lines.push(line);
+      line = [];
+      continue;
+    }
+    const op = raw[0] === " " ? "same" : raw[0] === "+" ? "add" : raw[0] === "-" ? "del" : null;
+    if (op) line.push({ op, text: raw.slice(1) });
+  }
+  if (hunk && line.length) hunk.lines.push(line);
+  // git marks an added or removed blank line with a bare "~"; when a hunk has only one side, we know which.
+  for (const h of hunks) {
+    const only = h.oldLines === 0 ? "add" : h.newLines === 0 ? "del" : null;
+    if (only) h.lines = h.lines.map((l) => (l.length ? l : [{ op: only, text: "" }]));
+  }
+  return hunks;
 }
 
 interface Job {
