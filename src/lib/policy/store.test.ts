@@ -1,10 +1,13 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_RULES } from "@/lib/policy/defaults";
 import { policyStore, RuleValidationError } from "@/lib/policy/store";
 import type { Rule } from "@/lib/policy/types";
+import { getServerCache } from "@/server/cache";
+import { Bus, type Change } from "@/server/cache/bus";
+import { nextChange } from "@/server/cache/testing";
 
 let dir: string;
 beforeEach(async () => {
@@ -86,5 +89,56 @@ describe("policyStore", () => {
   it("fails closed on a corrupt rules file instead of dropping rules", async () => {
     await writeFile(path.join(dir, "rules.json"), "{ not json");
     await expect(policyStore(dir).list()).rejects.toThrow();
+  });
+});
+
+describe("policyStore: announcing changes", () => {
+  it("announces rules after a save", async () => {
+    const bus = new Bus();
+    const heard = nextChange(bus, "rules", 1000);
+    await policyStore(dir, bus).save([owner()], { mode: "enforce" });
+    await expect(heard).resolves.toMatchObject({ topic: "rules", version: 1 });
+  });
+
+  it("announces rules after a delete", async () => {
+    const bus = new Bus();
+    const store = policyStore(dir, bus);
+    await store.save([owner()], { mode: "enforce" });
+    const heard = nextChange(bus, "rules", 1000);
+    await store.remove("r_own001");
+    await expect(heard).resolves.toMatchObject({ topic: "rules", version: 2 });
+  });
+
+  it("announces nothing when a save is rejected or a delete refused", async () => {
+    const bus = new Bus();
+    const heard: Change[] = [];
+    bus.subscribe(["rules"], (c) => heard.push(c));
+    const store = policyStore(dir, bus);
+    await expect(store.save([owner({ createdBy: "default" })], { mode: "enforce" })).rejects.toBeInstanceOf(RuleValidationError);
+    expect(await store.remove("r_proj01")).toEqual({ ok: false, reason: "default" });
+    expect(heard).toEqual([]);
+  });
+
+  describe("without a bus", () => {
+    type Global = { __agentTeamsCache?: { close(): void } };
+    let root: string;
+    beforeEach(async () => {
+      // A fresh server cache rooted in a temp dir, so its watchers never touch the repo.
+      root = await mkdtemp(path.join(tmpdir(), "policy-bus-"));
+      vi.spyOn(process, "cwd").mockReturnValue(root);
+      delete (globalThis as Global).__agentTeamsCache;
+    });
+    afterEach(async () => {
+      (globalThis as Global).__agentTeamsCache?.close();
+      delete (globalThis as Global).__agentTeamsCache;
+      vi.restoreAllMocks();
+      await rm(root, { recursive: true, force: true });
+    });
+
+    it("announces on the server cache's bus, the one GET /api/events streams", async () => {
+      const heard = nextChange(getServerCache().bus, "rules", 1000);
+      await policyStore(dir).save([owner()], { mode: "enforce" });
+      await expect(heard).resolves.toMatchObject({ topic: "rules" });
+    });
   });
 });
