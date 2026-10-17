@@ -1,6 +1,7 @@
 /*
  * The detector pack's interface (design §6): labelled spans of secrets and PII in text.
- * Local pack: vendored gitleaks rules and three secretlint rules. The rules engine and routes import these signatures.
+ * Local pack: vendored gitleaks rules, three secretlint rules and six Presidio recognizer ports. The rules engine and
+ * routes import these signatures.
  */
 import type { DetectorSummary, Label } from "../types";
 import { scanDetailed } from "./pipeline";

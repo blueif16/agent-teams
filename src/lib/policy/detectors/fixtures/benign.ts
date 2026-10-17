@@ -41,3 +41,35 @@ export const BENIGN_SECRET_LIKE: BenignFixture[] = [
   { name: "an ISO timestamp", text: "Deployed at 2026-10-17T19:47:43Z by the release job." },
   { name: "CSS colours", text: ".card { color: #1a2b3c; background: #ffffff; border: 1px solid #e5e7eb; }" },
 ];
+
+/** PII-shaped text that fails a validator, is a reserved or placeholder value, or is masked. */
+export const BENIGN_PII_LIKE: BenignFixture[] = [
+  { name: "a card number failing Luhn", text: "Card 4111 1111 1111 1112 was declined" },
+  { name: "a dashed card-like number failing Luhn", text: "Order 5555-5555-5555-4445 shipped" },
+  { name: "an SSN-like number with area 000", text: "ref 000-12-3456" },
+  { name: "an SSN-like number with area 666", text: "ref 666-45-6789" },
+  { name: "an SSN-like number with area 9xx", text: "ref 912-34-5678" },
+  { name: "an SSN-like number with group 00", text: "ref 123-00-4567" },
+  { name: "an SSN-like number with serial 0000", text: "ref 123-45-0000" },
+  { name: "the Woolworth wallet SSN", text: "the famous 078-05-1120 card" },
+  { name: "an SSN-like number with one repeated digit", text: "ref 111-11-1111" },
+  { name: "an SSN-like number with mixed delimiters", text: "ref 536-22 8175" },
+  { name: "an IBAN-like string failing mod-97", text: "IBAN DE89 3704 0044 0532 0130 01" },
+  { name: "a GB IBAN-like string failing mod-97", text: "GB82 WEST 1234 5698 7654 31" },
+  { name: "example.com addresses in docs", text: "Email support@example.com for help, or write to jane.doe@example.org." },
+  { name: "a masked email", text: "Signed in as j***@e***.com" },
+  { name: "a masked card", text: "Paid with **** **** **** 4242" },
+  { name: "a retina asset name", text: "Use logo@2x.png on high-DPI screens" },
+  { name: "a scoped npm spec", text: "npm i -D @types/node@24.19.2" },
+  { name: "a loopback address", text: "Server listening on http://127.0.0.1:3000" },
+  { name: "the unspecified address", text: "Bind to 0.0.0.0 inside the container" },
+  { name: "a millisecond timestamp", text: "created_at 1729180800000" },
+];
+
+/** False positives the pack produced on this repo's own docs and code (measured), kept as regressions. */
+export const BENIGN_MEASURED: BenignFixture[] = [
+  { name: "an email with a masked local part", text: "Masked in the UI as j***@acme.com" },
+  { name: "a markdown file path with an @ in its name", text: "see Meta/muse-agent/workspace/cron.d/minutely/heartbeat__interval@30m.md" },
+  { name: "the IPv6 unspecified address written ::0", text: "listen on ::0 port 8080" },
+  { name: "a commit SHA under a name containing 'secret'", text: 'export const SECRETLINT_COMMIT = "92f0b0c4ada432bfa8e5c3a22fbc2b8dff5946dd";' },
+];

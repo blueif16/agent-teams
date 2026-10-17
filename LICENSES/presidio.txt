@@ -1,0 +1,30 @@
+Microsoft Presidio (MIT)
+
+Upstream:   https://github.com/microsoft/presidio @ 2523c7b74a469270c5c78bb253f140eafca21e31 (2026-10-08)
+Ported:     presidio-analyzer/presidio_analyzer/predefined_recognizers/generic/{email,phone,credit_card,iban,ip}_recognizer.py,
+            generic/iban_patterns.py, country_specific/us/us_ssn_recognizer.py,
+            context_aware_enhancers/lemma_context_aware_enhancer.py (context scoring defaults)
+            → src/lib/policy/detectors/presidio.ts (patterns, scores, context words) and engine.ts (validators luhn,
+            iban, us_ssn, ip, email, phone; context boost). Changes are listed in presidio.ts's header.
+
+The MIT License (MIT)
+
+Copyright (c) Presidio Contributors.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
