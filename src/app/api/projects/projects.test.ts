@@ -39,7 +39,6 @@ const PROPOSAL: Proposal = {
 };
 
 let root: string;
-let cwd: { mockRestore(): void };
 let fetchSpy: ReturnType<typeof vi.spyOn>;
 const env: Record<string, string | undefined> = {};
 
@@ -49,7 +48,7 @@ beforeEach(async () => {
   process.env.DATA_DIR = path.join(root, ".data");
   process.env.SKILLS_DIR = FIXTURES;
   delete process.env.VAULT_DIR;
-  cwd = vi.spyOn(process, "cwd").mockReturnValue(root);
+  vi.spyOn(process, "cwd").mockReturnValue(root);
   fetchSpy = vi.spyOn(globalThis, "fetch");
   vi.resetModules();
   const g = globalThis as Global;
