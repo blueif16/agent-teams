@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:test": "APP_MODE=test DATA_DIR=.data/test-company next dev --port 3001",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
