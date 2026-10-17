@@ -430,6 +430,21 @@ describe("errors", () => {
     expect(r.results[2].error).toMatch(/op/);
   });
 
+  it("leaves no trace of an op that fails part-way, while the rest of the call applies", () => {
+    const c = canvas();
+    c.apply([{ ...FRAME, w: 300, h: 300 }, { op: "note", id: "n1", frame: "f1", x: 0, y: 230, text: "Go" }]);
+    // Four lines of 16px text make the note 90 high: 230 + 90 overruns the 300px frame.
+    const r = c.apply([
+      { op: "update", id: "n1", text: "A rather long label that wraps over lines and lines and lines and more" },
+      { op: "text", id: "t9", x: 0, y: 400, text: "ok" },
+    ]);
+    expect(r.results.map((x) => x.ok)).toEqual([false, true]);
+    expect(r.results[0].error).toMatch(/n1 at 0,230 size 200x90 is outside frame f1 \(300x300\)/);
+    expect(c.el("n1")).toMatchObject({ height: 60, version: 1 });
+    expect(c.el("L1")).toMatchObject({ text: "Go", originalText: "Go", version: 1 });
+    expect(c.el("t9")).toBeDefined();
+  });
+
   it("leaves the rev alone when no op applied", () => {
     const c = canvas();
     const r = c.apply([{ op: "delete", ids: ["nope"] }]);
