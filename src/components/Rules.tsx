@@ -8,11 +8,18 @@ import {
   ChevronRight,
   CircleHelp,
   CreditCard,
+  Ban,
+  Database,
+  Eye,
   EyeOff,
   FilePenLine,
   FileText,
   FolderClosed,
+  FolderOpen,
+  FolderX,
+  Fingerprint,
   Globe,
+  History,
   IdCard,
   KeyRound,
   KeySquare,
@@ -22,9 +29,13 @@ import {
   Mail,
   MessageSquare,
   NotebookPen,
+  PencilLine,
   Plug,
+  Puzzle,
   Search,
+  ShieldCheck,
   SquareTerminal,
+  StickyNote,
   Tag,
   Trash2,
   TriangleAlert,
@@ -33,20 +44,22 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cache, useCached, type Resource } from "@/lib/client-cache";
-import { AGENTS } from "@/lib/data";
+import { useOrg } from "./org";
 import type { Access, CompileResult, DataGuard, DetectorSummary, Permission, Rule, RuleConflict, RulesResponse, SaveRulesResponse } from "@/lib/policy/types";
+import type { FileAccess, FileZoneView } from "@/lib/policy/zones";
 import { POP, SPRING } from "./ui";
 
 /*
  * Permissions tab (design §6): what an agent can do, in plain words, from GET /api/rules. One line per capability
- * (relevant ones first: those in the agent's toolset), one per kind of data, and the rules you added. A row opens to
- * at most three short lines: its limits and who set it.
+ * (relevant ones first: those in the agent's toolset), one per file zone, one per kind of data, and the rules you
+ * added. A row opens to at most three short lines: its limits (or a zone's reason) and who set it.
  */
 
 type State = Access | "hidden";
+type Look = { label: string; Icon: LucideIcon; cls: string };
 
 /** The only words a state is ever shown as. Gray lets through, blue asks, red stops, amber hides. */
-const STATE: Record<State, { label: string; Icon: LucideIcon; cls: string }> = {
+const STATE: Record<State, Look> = {
   allow: { label: "Allowed", Icon: Check, cls: "bg-bubble text-ink-2" },
   ask: { label: "Asks you", Icon: CircleHelp, cls: "bg-accent-wash text-accent" },
   deny: { label: "Blocked", Icon: X, cls: "bg-danger-wash text-danger" },
@@ -75,6 +88,27 @@ const CAPABILITY_ICON: Record<string, LucideIcon> = {
 
 const DATA_ICON: Record<string, LucideIcon> = { secret: KeySquare, pii: IdCard, project: FolderClosed, owner_private: NotebookPen };
 
+/** What an agent can do in a file zone, in the same colors; dimmer gray for "only reads". */
+const FILE_LOOK: Record<FileAccess, Look> = {
+  edit: { label: "Can edit", Icon: PencilLine, cls: "bg-bubble text-ink-2" },
+  ask: { label: "Asks you", Icon: CircleHelp, cls: "bg-accent-wash text-accent" },
+  read: { label: "Read only", Icon: Eye, cls: "bg-bubble text-muted" },
+  protected: { label: "Protected", Icon: ShieldCheck, cls: "bg-bubble text-muted" },
+  never: { label: "Never", Icon: Ban, cls: "bg-danger-wash text-danger" },
+};
+
+const ZONE_ICON: Record<string, LucideIcon> = {
+  project: FolderOpen,
+  scratch: StickyNote,
+  home: Fingerprint,
+  state: ListChecks,
+  skills: Puzzle,
+  history: History,
+  secrets: KeySquare,
+  stores: Database,
+  outside: FolderX,
+};
+
 /** What a rule does when it fires, as a pill; a classifier only labels data, so it has none. */
 function stateOfRule(rule: Rule): State | null {
   switch (rule.kind) {
@@ -96,7 +130,12 @@ const ownedByYou = (r: Rule) => r.createdBy !== "default";
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 function Pill({ state, small = false }: { state: State; small?: boolean }) {
-  const { label, Icon, cls } = STATE[state];
+  return <LookPill look={STATE[state]} id={state} small={small} />;
+}
+
+/** A state pill in any vocabulary: `id` keys the pop when it changes. */
+function LookPill({ look, id, small = false }: { look: Look; id: string; small?: boolean }) {
+  const { label, Icon, cls } = look;
   return (
     // A fixed box for row pills (as wide as "Asks you"), so the marks before it line up down the list. In a narrow
     // pane the glyph goes and the words stay, so the labels keep their room.
@@ -104,7 +143,7 @@ function Pill({ state, small = false }: { state: State; small?: boolean }) {
       {/* Keyed on the state so a change pops instead of swapping silently; no pop on first paint. */}
       <AnimatePresence initial={false} mode="popLayout">
         <motion.span
-          key={state}
+          key={id}
           initial={{ scale: 0.75, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.06 } }}
@@ -261,6 +300,7 @@ function Row({
   label,
   marks,
   state,
+  pill,
   open,
   onToggle,
   children,
@@ -268,7 +308,9 @@ function Row({
   icon: LucideIcon;
   label: string;
   marks?: ReactNode;
-  state: State;
+  state?: State;
+  /** In place of a state pill (the Files section's own words). */
+  pill?: ReactNode;
   open: boolean;
   onToggle: () => void;
   children: ReactNode;
@@ -285,7 +327,7 @@ function Row({
         <Icon className="size-4 shrink-0 text-ink-2 @max-sm:mr-0.5" strokeWidth={1.9} />
         <span className="min-w-0 flex-1 truncate text-[14px] leading-[20px] @max-sm:text-[13.5px]">{label}</span>
         {marks}
-        <Pill state={state} />
+        {pill ?? (state && <Pill state={state} />)}
       </button>
       <AnimatePresence initial={false}>
         {open && (
@@ -405,6 +447,25 @@ function DataRow({ g, open, onToggle }: { g: DataGuard; open: boolean; onToggle:
         <Line key={r.ruleId} text={r.text} state={GUARD_STATE[r.outcome]} />
       ))}
       {g.rules.length > shown.length && <p className="pt-[3px] text-[12.5px] leading-[18px] text-muted">+{g.rules.length - shown.length} more</p>}
+    </Row>
+  );
+}
+
+/** One file zone: what the agent can do there; opens to the reason, the paths and who set it. */
+function FileRow({ z, rules, open, onToggle }: { z: FileZoneView; rules: RuleIndex; open: boolean; onToggle: () => void }) {
+  const yours = z.ruleIds.map((id) => rules.get(id)).find((r) => r !== undefined && ownedByYou(r.rule));
+  return (
+    <Row
+      icon={z.severity === "deliverable" ? FilePenLine : (ZONE_ICON[z.id] ?? FileText)}
+      label={z.label}
+      pill={<LookPill look={FILE_LOOK[z.access]} id={z.access} />}
+      open={open}
+      onToggle={onToggle}
+      marks={z.access === "protected" && <Lock aria-label="Locked" className="size-3.5 shrink-0 text-muted" />}
+    >
+      <p className="py-[3px] text-[13px] leading-[18px] text-ink-2">{z.reason}</p>
+      {z.id !== "outside" && <p className="break-all py-[3px] font-mono text-[11.5px] leading-[16px] text-muted">{z.paths.join("  ")}</p>}
+      <div className="pt-[3px] text-[12.5px] leading-[18px] text-muted">{z.locked ? "Locked: can't be loosened" : yours ? `Your rule: ${yours.sentence}` : "Default"}</div>
     </Row>
   );
 }
@@ -871,8 +932,9 @@ function LoadState({ error, onRetry }: { error: string | undefined; onRetry: () 
 /** The Permissions tab: `agentId` for an agent's panel, `projectId` for a team's (no capability list there yet). */
 export function RulesTab({ agentId, projectId, onNotify }: { agentId?: string; projectId?: string; onNotify: (text: string) => void }) {
   const resource = rulesOf({ agentId, projectId });
+  const org = useOrg();
   // Cached: switching tabs or panels paints the last snapshot at once; the `rules` topic refetches it after a write.
-  const { data, error } = useCached<RulesResponse>(resource);
+  const { data, error } = useCached<RulesResponse & { files?: FileZoneView[] }>(resource);
   const fresh = useArrivals(data);
   const [saved, setSaved] = useState<ReadonlySet<string>>(new Set());
   // One row open at a time keeps the tab short.
@@ -902,13 +964,20 @@ export function RulesTab({ agentId, projectId, onNotify }: { agentId?: string; p
       />
       {agentId && data.permissions && (
         <Permissions
-          name={AGENTS[agentId]?.name ?? agentId}
+          name={org.agents[agentId]?.name ?? agentId}
           permissions={data.permissions}
           rules={byId}
           open={open}
           onToggle={toggle}
           removal={removal}
         />
+      )}
+      {data.files && (
+        <Section title="Files">
+          {data.files.map((z) => (
+            <FileRow key={z.id} z={z} rules={byId} open={open === `file:${z.id}`} onToggle={() => toggle(`file:${z.id}`)} />
+          ))}
+        </Section>
       )}
       <Section title="Data">
         {data.data.length === 0 ? (

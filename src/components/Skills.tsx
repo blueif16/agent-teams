@@ -325,8 +325,13 @@ function SkillDetail({ id, label, onBack }: { id: string; label: Label; onBack: 
   );
 }
 
-/** An agent's skills, from its composition. Until compositions are stored, agents (Mira included) have none. */
-export function AgentSkillsTab({ name, skillIds, onOpenLibrary }: { name: string; skillIds: string[]; onOpenLibrary: () => void }) {
+/** An agent's skills: GET /api/skills?agent=<id>, its composition from the hire. */
+export const agentSkills = (agentId: string): Resource => ({ key: `/api/skills?agent=${encodeURIComponent(agentId)}`, topic: "skills" });
+
+/** An agent's skills, from the composition it was hired with (Mira has none). */
+export function AgentSkillsTab({ agentId, name, onOpenLibrary }: { agentId: string; name: string; onOpenLibrary: () => void }) {
+  const { data, error } = useCached<SkillHit[]>(agentSkills(agentId));
+  const { label } = useArchetypes();
   const browse = (
     <button type="button" onClick={onOpenLibrary} className={retryBtn}>
       Browse the library
@@ -336,25 +341,20 @@ export function AgentSkillsTab({ name, skillIds, onOpenLibrary }: { name: string
     <section className="mt-6">
       <h3 className="mb-2 px-1 text-[13px] font-medium text-muted">Skills</h3>
       <div className="overflow-hidden rounded-2xl bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.05)]">
-        {skillIds.length === 0 ? (
+        {!data ? (
+          error ? (
+            <Notice title="Couldn't load the skills">{problem(error)}.</Notice>
+          ) : (
+            <p className="px-4 py-7 text-center text-[13px] text-muted">Loading skills…</p>
+          )
+        ) : data.length === 0 ? (
           <Notice title="No skills yet" action={browse}>
-            An agent gets its skills when it&apos;s hired for a role: the PM picks them from the library for that role. {name} hasn&apos;t been given any.
+            An agent gets its skills when it&apos;s hired for a role, picked from the library for that role. {name} hasn&apos;t been given any.
           </Notice>
         ) : (
-          <AgentSkillList skillIds={skillIds} onOpen={onOpenLibrary} />
+          data.map((h) => <SkillRow key={h.entry.id} hit={h} label={label} onOpen={onOpenLibrary} />)
         )}
       </div>
     </section>
   );
-}
-
-/** Mounted only when the agent has skills, so an agent with none asks the server nothing. */
-function AgentSkillList({ skillIds, onOpen }: { skillIds: string[]; onOpen: () => void }) {
-  const { data, error } = useCached<SkillHit[]>(skillLibrary);
-  const { label } = useArchetypes();
-  if (!data) {
-    if (error) return <Notice title="Couldn't load the skills">{problem(error)}.</Notice>;
-    return <p className="px-4 py-7 text-center text-[13px] text-muted">Loading skills…</p>;
-  }
-  return data.filter((h) => skillIds.includes(h.entry.id)).map((h) => <SkillRow key={h.entry.id} hit={{ ...h, why: "" }} label={label} onOpen={onOpen} />);
 }
