@@ -3,7 +3,7 @@
  * You.com): GET lists the pending ones for a thread, POST decides one and resumes the paused run.
  */
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/approvals/[id]/route";
 import { GET } from "@/app/api/approvals/route";
 import { openCheckpointer } from "@/server/runtime/checkpointer";
@@ -11,6 +11,9 @@ import { openRuntimeDb, type ApprovalRow, type RuntimeDb } from "@/server/runtim
 import { Runtime, setRuntime } from "@/server/runtime";
 import { tempEnv, type TempEnv } from "@/server/runtime/testing/env";
 import { fakeCrusoe } from "@/server/runtime/testing/fake-crusoe";
+
+// No request scope outside Next: connection() is a no-op here, as in the other route tests.
+vi.mock("next/server", () => ({ connection: async () => {} }));
 
 const T = "a:mira:p:dm";
 let env: TempEnv;
