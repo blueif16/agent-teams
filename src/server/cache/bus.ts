@@ -9,6 +9,9 @@
  *   stats:agent:<id>   a change to one agent's stats
  *   files:agent:<id>   one of an agent's Markdown files changed
  *   rules              a privacy or tool rule was saved or removed
+ *   skills             the skill library changed (skills/index.json or a vendored file)
+ *   config             never sent: code and .env.local change only with a restart, and a client
+ *                      revalidates what it shows when its stream reconnects
  */
 export interface Change {
   topic: string;
@@ -26,6 +29,7 @@ export const TOPICS = {
   agent: (id: string) => `stats:agent:${id}`,
   files: (id: string) => `files:agent:${id}`,
   rules: "rules",
+  skills: "skills",
 };
 
 export class Bus {

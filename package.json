@@ -11,10 +11,13 @@
     "policy:import-gitleaks": "node scripts/policy/import-gitleaks.mts"
   },
   "dependencies": {
+    "@anthropic-ai/sandbox-runtime": "0.0.80",
     "@langchain/core": "^1.2.18",
     "@langchain/langgraph": "^1.5.0",
     "@langchain/langgraph-checkpoint-sqlite": "^1.1.0",
+    "@langchain/mcp-adapters": "^2.0.1",
     "@langchain/openai": "^1.6.2",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@rive-app/react-canvas": "^4.36.0",
     "@streamdown/code": "^2.0.0",
     "deepagents": "^1.15.0",

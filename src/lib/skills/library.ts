@@ -2,7 +2,8 @@
  * The skill library on disk (docs/design/team-setup.md §3b): `skills/index.json` (a SkillIndex) and the vendored
  * files under `skills/library/<id>/`. The curator's import pipeline owns writing both; this module only reads.
  *
- * Server only. The skills dir is `skills/` under the app root, or SKILLS_DIR.
+ * Server only. The skills dir is `skills/` under the app root, or SKILLS_DIR. The app's routes read it through
+ * the server cache (src/server/cache/skills.ts), which keeps it in memory; this module reads disk every time.
  */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -21,10 +22,15 @@ export function skillsDir(): string {
   return process.env.SKILLS_DIR || path.join(process.cwd(), "skills");
 }
 
-async function readIndex(file: string): Promise<SkillIndex> {
+/** Reads one file as UTF-8; rejects with ENOENT like readFile. The server cache passes one that remembers. */
+export type ReadText = (file: string) => Promise<string>;
+
+const readText: ReadText = (file) => readFile(file, "utf8");
+
+async function readIndex(file: string, read: ReadText): Promise<SkillIndex> {
   let raw: string;
   try {
-    raw = await readFile(file, "utf8");
+    raw = await read(file);
   } catch (e) {
     // Before the curator's first import there is no index: an empty library, not an error.
     if ((e as NodeJS.ErrnoException).code === "ENOENT") return { version: 1, updatedAt: "", skills: [] };
@@ -35,8 +41,8 @@ async function readIndex(file: string): Promise<SkillIndex> {
   return index;
 }
 
-export async function loadLibrary(dir = skillsDir()): Promise<Library> {
-  const index = await readIndex(path.join(dir, "index.json"));
+export async function loadLibrary(dir = skillsDir(), read: ReadText = readText): Promise<Library> {
+  const index = await readIndex(path.join(dir, "index.json"), read);
   const byId = new Map(index.skills.map((s) => [s.id, s]));
   const get = (id: string) => byId.get(id);
 
@@ -49,7 +55,7 @@ export async function loadLibrary(dir = skillsDir()): Promise<Library> {
     for (const rel of entry.files) {
       const file = path.resolve(root, rel);
       if (!file.startsWith(root + path.sep)) throw new Error(`Skill "${id}" lists a file outside its folder: ${rel}`);
-      files[path.relative(root, file).split(path.sep).join("/")] = await readFile(file, "utf8");
+      files[path.relative(root, file).split(path.sep).join("/")] = await read(file);
     }
     return files;
   }

@@ -7,13 +7,15 @@
  *   - Files: workerBackend (backends.ts); /home/ is read-only.
  *   - Prompt: a stable identity + tool notes first (prefix cache), HomeFiles' SOUL/MEMORY block last.
  *   - Model: the agent's tier on Crusoe through the process limiter, thinking on, fallback outside retry.
- *   - Summarization at 60K tokens instead of deepagents' 170K default for unprofiled models (D finding 7).
+ *   - Summarization at the role's hard compaction trigger (Mira 80K, workers 128K on V4.1 Flash), not deepagents'
+ *     170K default for unprofiled models (D finding 7).
  * Server only.
  */
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { BaseCheckpointSaver } from "@langchain/langgraph";
 import { createFilesystemMiddleware, createSummarizationMiddleware } from "deepagents";
 import { createMiddleware, modelCallLimitMiddleware, todoListMiddleware, type AgentMiddleware } from "langchain";
+import { compactionTriggers, type ContextRole } from "@/lib/context-budget";
 import { MODELS } from "@/lib/models";
 import { getArchetype } from "@/lib/skills/archetypes";
 import { resolveToolset } from "@/lib/tools/resolve";
@@ -33,8 +35,8 @@ const FILE_TOOLS = new Set<string>(["ls", "read_file", "write_file", "edit_file"
 
 /** D §9: agent steps think, with room for deliverables written as tool arguments. */
 const MAX_TOKENS = 16_384;
-/** D §7.4: well under 170K, so one call never spends a third of a minute's 500K TPM. A guess to tune. */
-const SUMMARIZE_AT = { type: "tokens", value: 60_000 } as const;
+/** Compaction before the next model call at the role's hard trigger from its model's TPM (context-budget.ts), not 170K (D finding 7). */
+const roleOf = (a: AgentRow): ContextRole => (a.archetype === "chief" ? "chief" : a.archetype === "lead" ? "lead" : "worker");
 const KEEP = { type: "messages", value: 20 } as const;
 /** D §1: a run cap protects the shared 30 RPM. */
 const RUN_LIMIT = 40;
@@ -85,7 +87,7 @@ export function buildWorker(agent: AgentRow, project: ProjectRow, deps: WorkerDe
     // Same names as deepagents' built-ins, so these replace them in place (and in its general-purpose helper).
     createFilesystemMiddleware({ backend, tools: fileTools }),
     createMiddleware({ name: "subAgentMiddleware" }),
-    createSummarizationMiddleware({ backend, trigger: SUMMARIZE_AT, keep: KEEP }),
+    createSummarizationMiddleware({ backend, trigger: { type: "tokens", value: compactionTriggers(roleOf(agent), { model: modelId }).hard }, keep: KEEP }),
     todoListMiddleware(),
     modelCallLimitMiddleware({ runLimit: RUN_LIMIT, exitBehavior: "end" }),
     ...(deps.middleware ?? []),

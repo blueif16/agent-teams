@@ -4,6 +4,8 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readAgentFiles, writeAgentFile } from "@/lib/agent-files";
+import { compactionTriggers } from "@/lib/context-budget";
+import { MODELS } from "@/lib/models";
 import { workerBackend } from "./backends";
 import { openCheckpointer } from "./checkpointer";
 import { openRuntimeDb, type RuntimeDb } from "./db";
@@ -132,12 +134,14 @@ describe("workerBackend", () => {
 });
 
 describe("summarization (D finding 7)", () => {
-  it("triggers at 60K tokens, not the 170K default, and offloads the old messages under <DATA_DIR>/history", async () => {
+  it("triggers at Mira's hard compaction trigger, under the 170K default, and offloads old messages under <DATA_DIR>/history", async () => {
     const summarize: Step = (req) =>
       /summar/i.test(textOf(req.messages.at(-1)?.content) + systemOf(req)) && !req.tools?.length ? { text: "Summary of the earlier talk." } : { text: "Answer." };
     const { agent } = mira([summarize, summarize, summarize]);
-    // ~75K tokens in 30 messages: over 60K, under 170K, and more than the 20 messages it keeps.
-    const filler = "lorem ipsum ".repeat(830);
+    const hard = compactionTriggers("chief", { model: MODELS.main }).hard;
+    expect(hard).toBeLessThan(170_000);
+    // ~(hard + 30K) tokens in 30 messages: over the trigger, under 170K, and more than the 20 messages it keeps.
+    const filler = "lorem ipsum ".repeat(Math.ceil(((hard + 30_000) * 4) / 30 / 12));
     const messages = Array.from({ length: 30 }, (_, i) => ({ role: i % 2 ? "assistant" : "user", content: `${i}: ${filler}` }));
     await agent.invoke({ messages: [...messages, { role: "user", content: "Where were we?" }] });
 

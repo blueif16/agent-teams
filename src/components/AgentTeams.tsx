@@ -7,7 +7,7 @@ import { AGENTS, CHIEF, CHIEF_ID, HQ, TEAMS, TEAMS_BY_ID } from "@/lib/data";
 import { excerpt, orderText, ORDERS_BY_KEY, type OrderKey } from "@/lib/orders";
 import { parseProject, PROJECT_FENCE, START_PROJECT, visibleText } from "@/lib/project";
 import { withChartSummaries } from "@/lib/charts";
-import { prefetch } from "@/lib/client-cache";
+import { prefetch, useCached, type Resource } from "@/lib/client-cache";
 import { sendToThread } from "@/lib/thread-client";
 import type { AgentStatus, Message, OrgSnapshot, PlanStep, Team } from "@/lib/types";
 import { ChiefMenu } from "./Chief";
@@ -18,6 +18,7 @@ import { Mascot } from "./Mascot";
 import { OrgContext } from "./org";
 import { IconButton, Toast } from "./ui";
 import { Rail, type SideMode } from "./Rail";
+import { archetypeList, skillLibrary } from "./Skills";
 import { Sidebar } from "./Sidebar";
 import { Conversation, type MessageHandlers } from "./Conversation";
 import { WorkspaceBody, WorkspaceTabs, type Tab } from "./Workspace";
@@ -39,12 +40,22 @@ const CHIEF_VIEW: View = { kind: "dm", agentId: CHIEF_ID };
 /** Her DM's thread on the runtime (src/server/runtime/db.ts seeds it). */
 const MIRA_THREAD = `a:${CHIEF_ID}:p:dm`;
 
+/**
+ * GET /api/chat says whether CRUSOE_API_KEY is set: server config, not chat state. It changes only with a
+ * restart, which nothing announces (`config` is never sent); the stream's reconnect and window focus recheck it.
+ */
+const LIVE_REPLIES: Resource = { key: "/api/chat", topic: "config" };
+
+/** A note that images came with a message; only the newest message's images go to the model. */
+const withImages = (text: string, images?: string[]) =>
+  images?.length ? `${text}${text ? "\n\n" : ""}(${images.length === 1 ? "an image" : `${images.length} images`} attached)` : text;
+
 /** What a model sees of a thread: text, plus a line for each of the chief's proposals. */
 const toHistory = (msgs: Message[]) =>
   msgs
     .flatMap((m) =>
       m.kind === "text"
-        ? [{ from: m.from, text: m.text }]
+        ? [{ from: m.from, text: withImages(m.text, m.images) }]
         : m.kind === "proposal"
           ? [{ from: m.from, text: `(Proposed the ${m.project.name} project as #${m.project.channel}; ${m.state === "launched" ? "the owner launched it" : "waiting for the owner"}.)` }]
           : [],
@@ -72,6 +83,8 @@ interface SendOptions {
   replyQuote?: string;
   /** This message is a reaction order; the server records it as a performance signal. */
   order?: { key: OrderKey; text: string; trace?: string };
+  /** Upload ids attached to this message (at most 4). */
+  images?: string[];
 }
 
 export function AgentTeams() {
@@ -117,7 +130,9 @@ export function AgentTeams() {
   const [reactions, setReactions] = useState<Record<string, Reaction[]>>({});
   const [memories, setMemories] = useState<Record<string, string[]>>({});
   const [plans] = useState<Record<string, PlanStep[]>>({});
-  const [live, setLive] = useState<boolean | null>(null);
+  // null while it's never been checked; painted from the cache after that.
+  const chat = useCached<{ live: boolean }>(LIVE_REPLIES);
+  const live = chat.data ? chat.data.live : chat.error ? false : null;
   const [prefill, setPrefill] = useState<{ key: string; text: string; nonce: number } | null>(null);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -142,18 +157,14 @@ export function AgentTeams() {
   const viewRef = useRef(view);
   viewRef.current = view;
 
-  useEffect(() => {
-    fetch("/api/chat")
-      .then((r) => r.json())
-      .then((d: { live: boolean }) => setLive(d.live))
-      .catch(() => setLive(false));
-  }, []);
-
-  // Mira's panel is the one opened most, so her stats and files are ready before it is.
+  // Mira's panel is the one opened most, so her stats and files are ready before it is; the Skills tab's
+  // library and chips too, so its first open paints at once.
   useEffect(() => {
     void prefetch(agentStats(CHIEF_ID));
     void prefetch(identityOf(CHIEF_ID));
     void prefetch(rulesOf({ agentId: CHIEF_ID }));
+    void prefetch(skillLibrary);
+    void prefetch(archetypeList);
   }, []);
 
   const notify = useCallback((text: string) => {
@@ -288,7 +299,8 @@ export function AgentTeams() {
       spec: launched.launched.spec,
     };
 
-    const userMsg: Message = { id: uid(), kind: "text", from: "you", at: now(), text };
+    const images = opts.images?.length ? opts.images : undefined;
+    const userMsg: Message = { id: uid(), kind: "text", from: "you", at: now(), text, images };
     const history = toHistory([...(convosRef.current[key] ?? []), userMsg]);
 
     const shown = opts.shown === undefined ? userMsg : opts.shown;
@@ -314,9 +326,10 @@ export function AgentTeams() {
     };
     try {
       let acc = "";
-      if (chief && target.kind === "dm" && !opts.order) {
+      if (chief && target.kind === "dm" && !opts.order && !images) {
         // Mira's DM runs on her persistent agent (src/server/runtime): her thread keeps the conversation,
-        // so no history rides along; the reply and her "now" line stream from the run.
+        // so no history rides along; the reply and her "now" line stream from the run. A message with
+        // images still goes through /api/chat until the runtime takes uploads.
         acc = await sendToThread(MIRA_THREAD, text, {
           text: show,
           now: (line) => setActivity(CHIEF_ID, "working", line),
@@ -356,6 +369,7 @@ export function AgentTeams() {
           teamId,
           mode: target.kind,
           history,
+          uploads: images,
           order: opts.order,
           org: chief ? snapshot() : undefined,
           project: project || undefined,
@@ -705,7 +719,7 @@ export function AgentTeams() {
               prefill={prefill?.key === key ? prefill : null}
               reactions={reactions}
               handlers={handlers}
-              onSend={(text) => send(view, text)}
+              onSend={(text, images) => send(view, text, { images })}
               onDecide={(id, d) => decide(key, id, d)}
               onOpenAgent={openAgent}
               onOpenTeam={openTeam}
