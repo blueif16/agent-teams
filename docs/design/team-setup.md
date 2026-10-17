@@ -92,6 +92,11 @@ E privacy · F orchestrator memory); cited as `[D §7]`.
 - `write_todos` is opt-in since deepagents 1.12 [D §0 finding 1]; the **Plan panel reads the lead's `dag.json`**
   (§4), not todos.
 - One new dependency: `@langchain/langgraph-checkpoint-sqlite@^1.1.0` (compatibility verified [D §0]).
+- **Cache and push (owner, 2026-10-17):** nothing the owner has seen once shows a loading screen again. A server
+  cache (`src/server/cache/`) keeps the ledger in memory (appends update it; no re-reads) and caches agent Markdown
+  (writes update it; a file watcher catches outside edits; `invalidate`/`set` for the vault writer). A bus pushes
+  change topics over `GET /api/events` (SSE); the client keeps a stale-while-revalidate cache (persisted to
+  `sessionStorage`) and refreshes on events instead of polling.
 - Fetch chain to Crusoe: `privacyScrub → limit → fetch`. It's the only point that also catches summarization's own
   model call [E §8].
 
