@@ -21,7 +21,9 @@ const Who = z.enum(["mira", "lead", "any-expert", "any", ...ARCHETYPES]);
  * The deliverable checks a rubric can name, with their params. src/lib/sim/checks/ implements each one under the
  * same name. What each checks, on the deliverable's final accepted version unless noted:
  * - exists: at least one version of the deliverable was written.
- * - table_rows: a table/CSV with ≥ min rows; with `columns`, those columns exist and (nonEmpty) no cell is blank.
+ * - table_rows: a table/CSV with ≥ min rows; with `columns`, those columns exist and (nonEmpty) no cell is blank;
+ *   with `distinct`, column `distinct.column` holds ≥ `distinct.min` different values.
+ *   In a doc, the table is the first Markdown table in the text.
  * - sources_cited: every row has an http(s) URL and an access date (YYYY-MM-DD) in the named columns.
  * - verbatim_quote: every row's quote column appears verbatim in text the team fetched during the run (tool results).
  * - cites_facts: every sentence that states a claim carries a fact tag (F1…Fn) that exists in the brief, and every
@@ -40,12 +42,22 @@ const Who = z.enum(["mira", "lead", "any-expert", "any", ...ARCHETYPES]);
  * - monotonic_tiers: rows in table order: each tier's `price` is higher than the row above, and its `features`
  *   (";"-separated) include every feature of the row above.
  * - mentions: the text contains every phrase in `all` (case-insensitive); used to check a new requirement landed.
- * - sections: the doc has each heading in `headings`, in order.
+ * - excludes: the text contains none of the phrases in `none` (case-insensitive, whole words).
+ * - sections: the doc's level-2 headings include, in order, one starting with each entry of `headings`
+ *   (case-insensitive prefix).
+ *
+ * Doc conventions the scenarios ask the team for: in copy, `## S1 Hero` names a section and the `###` heading under
+ * it is that section's headline; so `verbatim_in` with unit `headline` and `frames.orderFrom` use `###` headings.
  * - max_words: the text has at most `max` words.
  */
 export const CHECKS = {
   exists: z.strictObject({}),
-  table_rows: z.strictObject({ min: z.int().min(1), columns: z.array(z.string()).optional(), nonEmpty: z.boolean().default(true) }),
+  table_rows: z.strictObject({
+    min: z.int().min(1),
+    columns: z.array(z.string()).optional(),
+    nonEmpty: z.boolean().default(true),
+    distinct: z.strictObject({ column: z.string(), min: z.int().min(1) }).optional(),
+  }),
   sources_cited: z.strictObject({ urlColumn: z.string().default("url"), dateColumn: z.string().default("accessed") }),
   verbatim_quote: z.strictObject({ quoteColumn: z.string() }),
   cites_facts: z.strictObject({ tag: z.string().default("F\\d+") }),
@@ -59,6 +71,7 @@ export const CHECKS = {
   prices_supported: z.strictObject({ table: z.string(), column: z.string() }),
   monotonic_tiers: z.strictObject({ tier: z.string(), price: z.string(), features: z.string() }),
   mentions: z.strictObject({ all: z.array(z.string().min(1)).min(1) }),
+  excludes: z.strictObject({ none: z.array(z.string().min(1)).min(1) }),
   sections: z.strictObject({ headings: z.array(z.string().min(1)).min(1) }),
   max_words: z.strictObject({ max: z.int().positive() }),
 } as const;
@@ -179,6 +192,8 @@ const ScenarioSchema = z
     /** Markdown files next to the scenario: the owner's studio, and the client with its facts F1…Fn. */
     story: z.string().min(1),
     brief: z.string().min(1),
+    /** The facts file (lines "F1. …"): what the copy may claim, and what cites_facts checks against. */
+    facts: z.string().min(1).optional(),
     /** Files handed to the team at the start (relative to the scenario), with data labels. */
     inputs: z.array(z.strictObject({ path: z.string().min(1), label: z.enum(["owner_private", "public"]).default("public"), note: z.string().optional() })).default([]),
     /** Grader-only notes; never shown to an agent or the owner model. */

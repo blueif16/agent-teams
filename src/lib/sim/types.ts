@@ -201,6 +201,22 @@ export interface RunSummary {
   company: TapeHeader["company"];
 }
 
+/**
+ * What a finished run hands to the learning step (retro, dream, skill tuning; design §7b), written as
+ * `feedback.json` next to the tape. Every item carries an evidence ref, so a learning edit can cite it.
+ */
+export interface RunFeedback {
+  runId: string;
+  scenarioId: string;
+  trial: number;
+  /** Rubric items that failed on the version the owner reacted to, per deliverable and author. */
+  failed: { itemId: string; label: string; deliverable: string; agentId: string; version: number; evidence: ClaimResult["evidence"] }[];
+  /** Every 🔁 (and ✋, 👀) the owner gave, with the note that said why. */
+  orders: { order: OrderKey; agentId: string; deliverable?: string; note?: string; seq: number }[];
+  /** Phases slower than the previous run of the series, for the retro. */
+  slow: { phase: Phase["name"]; ms: number; prevMs: number }[];
+}
+
 /** A file that changed between two runs' start snapshots, with how many commits and from which sources. */
 export interface FileChange {
   path: string;
