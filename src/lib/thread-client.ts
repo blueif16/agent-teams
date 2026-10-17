@@ -24,13 +24,21 @@ export interface ThreadReply {
   lost?: boolean;
 }
 
-/** Resolves when the run that answers is done; rejects when the post or the run fails. `ref` is saved with the message. */
-export async function sendToThread(threadId: string, text: string, on: ThreadReplyHandlers, { ref }: { ref?: string } = {}): Promise<ThreadReply> {
+/**
+ * Resolves when the run that answers is done; rejects when the post or the run fails. `ref` is saved with the message;
+ * `uploads` are ids from POST /api/uploads.
+ */
+export async function sendToThread(
+  threadId: string,
+  text: string,
+  on: ThreadReplyHandlers,
+  { ref, uploads }: { ref?: string; uploads?: string[] } = {},
+): Promise<ThreadReply> {
   await connectRuns();
   const res = await fetch(`/api/threads/${encodeURIComponent(threadId)}/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, ref }),
+    body: JSON.stringify({ text, ref, uploads }),
   });
   const body = (await res.json().catch(() => ({}))) as { delivered?: "run" | "inbox"; runId?: string; error?: string };
   if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status})`);

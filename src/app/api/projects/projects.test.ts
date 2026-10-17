@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -265,6 +265,44 @@ describe("POST /api/projects", () => {
     const { status, body } = await launch({ plan: launchPlan, nonce: "nonce-0004" });
     expect(status).toBe(400);
     expect(body.error).toMatch(/archetype/i);
+    expect(await counts()).toEqual({ projects: 0, agents: 0, members: 0, threads: 0, inbox: 0 });
+  });
+
+  it("copies the opening DM's text uploads into the project's files/inputs/ and lists them in charter.md under Inputs", async () => {
+    const { storeUpload } = await import("@/server/uploads");
+    const { png } = await import("@/server/uploads.testing");
+    const specText = "# Client spec\n\nBrightside Dental: online booking above the fold.\n";
+    const spec = await storeUpload(new TextEncoder().encode(specText), "spec.md");
+    const facts = await storeUpload(new TextEncoder().encode("Founded 2009. Three clinics.\n"), "facts.md");
+    const shot = await storeUpload(png(2, 2, 30));
+    const launchPlan: LaunchPlan = { ...(await balancedPlan()), uploads: [spec.id, facts.id, shot.id] };
+
+    const { status, body } = await launch({ plan: launchPlan, nonce: "nonce-inputs" });
+    expect(status).toBe(201);
+
+    const inputs = path.join(root, ".data", "projects", body.projectId, "files", "inputs");
+    expect(readdirSync(inputs).sort()).toEqual(["facts.md", "spec.md"]);
+    expect(readFileSync(path.join(inputs, "spec.md"), "utf8")).toBe(specText);
+    const { getVault } = await import("@/server/runtime/vault");
+    const charter = (await getVault().show(`projects/${body.projectId}/charter.md`)) ?? "";
+    const section = charter.slice(charter.indexOf("## Inputs"));
+    expect(charter).toContain("## Inputs");
+    expect(section).toContain("/project/inputs/spec.md");
+    expect(section).toContain("/project/inputs/facts.md");
+    expect(section).not.toMatch(/\.png/);
+    // The PM's kickoff carries the charter, so the lead learns of the files without opening it.
+    const d = await db();
+    const [kickoff] = d.inbox.pending(`a:${d.projects.get(body.projectId)!.leadAgentId}:p:${body.projectId}`);
+    expect(JSON.stringify(kickoff.payload)).toContain("/project/inputs/spec.md");
+  });
+
+  it("refuses a launch whose upload ids aren't stored files with 400, and creates nothing", async () => {
+    const launchPlan: LaunchPlan = { ...(await balancedPlan()), uploads: [`${"d".repeat(64)}-spec.md`] };
+
+    const { status, body } = await launch({ plan: launchPlan, nonce: "nonce-inputs-bad" });
+
+    expect(status).toBe(400);
+    expect(body.error).toMatch(/attach/i);
     expect(await counts()).toEqual({ projects: 0, agents: 0, members: 0, threads: 0, inbox: 0 });
   });
 

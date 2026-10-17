@@ -6,9 +6,11 @@ import { CHIEF_ID } from "@/lib/data";
 import type { OrderKey } from "@/lib/orders";
 import { CHIEF_SHORTCUTS } from "@/lib/project";
 import type { Agent, AgentStatus, Message } from "@/lib/types";
+import { isTextUpload } from "@/lib/uploads";
 import { Mascot } from "./Mascot";
 import { POP, RichText, SPRING, StatusDot } from "./ui";
 import { Composer } from "./Composer";
+import { SentFiles } from "./FileChip";
 import { ActionMenu, HoverBar, ReactionChips, type MenuTarget, type Reaction } from "./MessageActions";
 import { Markdown } from "./Markdown";
 import { ChartBlock } from "./Charts";
@@ -211,7 +213,8 @@ export function Conversation({
       node = (
         <div className={`flex justify-end ${first ? "mt-5" : "mt-1.5"}`}>
           <div className="group/msg relative flex max-w-[min(520px,85%)] flex-col items-end gap-1.5">
-            {m.images?.length ? <SentImages ids={m.images} /> : null}
+            {m.images?.some(isTextUpload) ? <SentFiles ids={m.images.filter(isTextUpload)} /> : null}
+            {m.images?.some((id) => !isTextUpload(id)) ? <SentImages ids={m.images.filter((id) => !isTextUpload(id))} /> : null}
             {m.text && (
               <div className="rounded-[20px] bg-accent px-4 py-2.5 text-[15px] leading-[22px] text-white">
                 <RichText text={m.text} />

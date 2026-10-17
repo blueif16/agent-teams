@@ -68,7 +68,7 @@ export type Message =
       /** Agent id, or "you". */
       from: string;
       text: string;
-      /** Images you attached: ids from POST /api/uploads, shown from /api/uploads/<id>. */
+      /** Images and text files you attached: ids from POST /api/uploads, shown from /api/uploads/<id>. */
       images?: string[];
       /** Standing instruction or earlier message this one answers. */
       quote?: string;
