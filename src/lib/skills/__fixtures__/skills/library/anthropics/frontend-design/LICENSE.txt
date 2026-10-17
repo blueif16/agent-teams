@@ -1,0 +1,1 @@
+Fixture LICENSE.txt of anthropics/frontend-design.

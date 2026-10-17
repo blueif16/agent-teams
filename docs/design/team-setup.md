@@ -96,7 +96,9 @@ E privacy · F orchestrator memory); cited as `[D §7]`.
   cache (`src/server/cache/`) keeps the ledger in memory (appends update it; no re-reads) and caches agent Markdown
   (writes update it; a file watcher catches outside edits; `invalidate`/`set` for the vault writer). A bus pushes
   change topics over `GET /api/events` (SSE); the client keeps a stale-while-revalidate cache (persisted to
-  `sessionStorage`) and refreshes on events instead of polling.
+  `sessionStorage`) and refreshes on events instead of polling. **Scope (owner, 2026-10-17): every component and all
+  static data**, including the skill library, archetypes, rules and detectors. The server holds them in memory and
+  watches their files. Every component GET goes through `useCached`/`prefetch`, and a test enforces it (DECISIONS → Product).
 - Fetch chain to Crusoe: `privacyScrub → limit → fetch`. It's the only point that also catches summarization's own
   model call [E §8].
 

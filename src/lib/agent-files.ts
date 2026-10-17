@@ -11,17 +11,19 @@
  * first read; existing files are never overwritten by templates.
  * On Vercel the bundled files are read-only, so edits go to /tmp and last only
  * as long as the instance.
+ * Reads and writes go through the server cache, so a file is read from disk
+ * once and every save announces files:agent:<id>.
  */
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { getServerCache } from "@/server/cache";
 import { AGENTS, CHIEF_ID, TEAMS_BY_ID } from "./data";
 import type { Agent } from "./types";
 
 const ROOT = path.join(process.cwd(), "agents");
 const WRITE_ROOT = process.env.VERCEL ? path.join(tmpdir(), "agent-teams", "agents") : ROOT;
 
-export type AgentType = "chief" | "lead" | "writer" | "researcher" | "analyst" | "engineer" | "coordinator";
+export type AgentType = "chief" | "lead" | "writer" | "researcher" | "analyst" | "engineer" | "designer" | "coordinator";
 export type AgentFile = "soul" | "memory";
 
 export interface FileInfo {
@@ -36,12 +38,13 @@ export function agentType(agent: Agent): AgentType {
   if (/writer|copy|draft/i.test(agent.role)) return "writer";
   if (/research|fact|sourcer/i.test(agent.role)) return "researcher";
   if (/analyst|sql|chart/i.test(agent.role)) return "analyst";
+  if (/design|\bux\b|\bui\b/i.test(agent.role)) return "designer";
   if (/test|ci\b|review|eng/i.test(agent.role)) return "engineer";
   return "coordinator";
 }
 
 /** The default Inherent section per type: how to do this kind of job well. */
-const INHERENT: Record<AgentType, string[]> = {
+export const INHERENT: Record<AgentType, string[]> = {
   chief: [
     "Know every team's goal, date, progress and blockers, and answer for the whole company in a few lines.",
     "Lead with the answer and back it with one number from the ledger; never invent a number.",
@@ -82,6 +85,14 @@ const INHERENT: Record<AgentType, string[]> = {
     "Make the smallest change that fixes it, and keep the diff reviewable.",
     "Run the tests that cover the change and report the actual result.",
     "Flag flaky tests and risks instead of retrying silently.",
+  ],
+  designer: [
+    "Name the user and the one task the screen must make easy before drawing anything.",
+    "Start from the product's existing look: reuse its components, type scale and colors before inventing new ones.",
+    "Show a rough mock early and refine it on feedback, rather than describing the design in prose.",
+    "Offer two distinct directions when the choice is taste, one when it is usability or accessibility.",
+    "Check contrast, text size and keyboard focus before calling a design done.",
+    "Hand off every state: empty, loading, error, and the longest real content.",
   ],
   coordinator: [
     "Confirm times in the human's time zone and check for conflicts before proposing.",
@@ -143,10 +154,10 @@ _None recorded yet._
 }
 
 async function readInfo(file: string): Promise<FileInfo> {
-  const [content, s] = await Promise.all([readFile(file, "utf8"), stat(file)]);
+  const { content, updated } = await getServerCache().files.read(file);
   // Vercel stamps bundled files with a fixed 2018 date; the build time is the honest bound.
   const bundled = WRITE_ROOT !== ROOT && file.startsWith(ROOT);
-  return { content, updated: (bundled && process.env.AGENTS_BUILT_AT) || s.mtime.toISOString() };
+  return { content, updated: (bundled && process.env.AGENTS_BUILT_AT) || updated };
 }
 
 async function readIfThere(file: string): Promise<FileInfo | null> {
@@ -163,11 +174,12 @@ async function ensure(id: string, which: AgentFile): Promise<FileInfo> {
   const found = (await readIfThere(file)) ?? (WRITE_ROOT !== ROOT ? await readIfThere(fileOf(id, which, ROOT)) : null);
   if (found) return found;
   const agent = AGENTS[id];
-  await mkdir(path.dirname(file), { recursive: true });
-  // "wx" never overwrites a file another request created first.
-  await writeFile(file, which === "soul" ? soulTemplate(agent) : memoryTemplate(agent), { flag: "wx" }).catch((e) => {
-    if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
-  });
+  // Exclusive: never overwrites a file another request created first.
+  await getServerCache()
+    .files.write(file, which === "soul" ? soulTemplate(agent) : memoryTemplate(agent), { exclusive: true })
+    .catch((e) => {
+      if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+    });
   return readInfo(file);
 }
 
@@ -180,8 +192,7 @@ export async function readAgentFiles(id: string): Promise<{ soul: FileInfo; memo
 export async function writeAgentFile(id: string, which: AgentFile, content: string): Promise<FileInfo> {
   if (!AGENTS[id]) throw new Error(`Unknown agent "${id}"`);
   const file = fileOf(id, which);
-  await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, content.endsWith("\n") ? content : `${content}\n`);
+  await getServerCache().files.write(file, content.endsWith("\n") ? content : `${content}\n`);
   return readInfo(file);
 }
 

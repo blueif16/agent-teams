@@ -1,5 +1,5 @@
 import { Fragment, useState, type ReactNode } from "react";
-import { ChartColumn, Check, Fingerprint, Hash, List, Loader, Pause, Pin, Play, Shield } from "lucide-react";
+import { ChartColumn, Check, Fingerprint, Hash, List, Loader, Pause, Pin, Play, Puzzle, Shield } from "lucide-react";
 import { motion } from "motion/react";
 import { AGENTS, CHIEF_ID } from "@/lib/data";
 import type { AgentStatus, PlanStep } from "@/lib/types";
@@ -9,6 +9,7 @@ import { useOrg } from "./org";
 import { formatDue } from "@/lib/project";
 import { AgentPerformance, TeamPerformance } from "./Performance";
 import { RulesTab } from "./Rules";
+import { AgentSkillsTab } from "./Skills";
 import { SPRING, StatusChip } from "./ui";
 
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
@@ -86,6 +87,7 @@ export function AgentPanel({
   onMessage,
   onToggleRun,
   onOpenChannel,
+  onOpenSkills,
   onNotify,
 }: {
   agentId: string;
@@ -98,6 +100,7 @@ export function AgentPanel({
   onMessage: (id: string) => void;
   onToggleRun: (id: string) => void;
   onOpenChannel: (teamId: string) => void;
+  onOpenSkills: () => void;
   onNotify: (text: string) => void;
 }) {
   const org = useOrg();
@@ -107,7 +110,7 @@ export function AgentPanel({
   const isLead = team.leadId === a.id && !chief;
   // Projects the chief staffed this agent on, besides its home team.
   const projects = org.teams.filter((t) => t.launched && t.agents.some((x) => x.id === a.id));
-  const [tab, setTab] = useState<"overview" | "performance" | "rules" | "identity">("overview");
+  const [tab, setTab] = useState<"overview" | "performance" | "rules" | "skills" | "identity">("overview");
 
   return (
     <div className="mx-auto max-w-[560px] px-5 pb-10 pt-8">
@@ -169,6 +172,7 @@ export function AgentPanel({
           { key: "overview", label: "Overview", icon: <List className={icon} /> },
           { key: "performance", label: "Performance", icon: <ChartColumn className={icon} /> },
           { key: "rules", label: "Permissions", icon: <Shield className={icon} /> },
+          { key: "skills", label: "Skills", icon: <Puzzle className={icon} /> },
           { key: "identity", label: "Soul and memory", icon: <Fingerprint className={icon} /> },
         ]}
       />
@@ -181,6 +185,12 @@ export function AgentPanel({
       {tab === "rules" && (
         <TabBody tab={tab}>
           <RulesTab agentId={a.id} onNotify={onNotify} />
+        </TabBody>
+      )}
+      {tab === "skills" && (
+        <TabBody tab={tab}>
+          {/* Compositions aren't stored yet, so no agent has skills; this reads them once they are. */}
+          <AgentSkillsTab name={a.name} skillIds={[]} onOpenLibrary={onOpenSkills} />
         </TabBody>
       )}
       {tab === "identity" && (

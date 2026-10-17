@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { Clock, House, LayoutGrid, PanelLeft } from "lucide-react";
+import { Clock, House, LayoutGrid, PanelLeft, Puzzle } from "lucide-react";
 import { ChiefButton } from "./Chief";
 import { IconButton, POP, SPRING } from "./ui";
 
@@ -16,6 +16,7 @@ export function Rail({
   sidebarOpen,
   onToggleSidebar,
   needsYou,
+  skills,
   chief,
 }: {
   mode: SideMode;
@@ -23,6 +24,8 @@ export function Rail({
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   needsYou: number;
+  /** The skill library, opened as a workspace tab rather than a sidebar mode. */
+  skills: { active: boolean; onClick: () => void };
   /** The CEO agent at the bottom of the rail, with her shortcuts menu. */
   chief: { open: boolean; unread: boolean; onClick: () => void };
 }) {
@@ -77,6 +80,21 @@ export function Rail({
         {ITEMS.map(({ mode: m, label, Icon }) => item(m, label, Icon, m === "activity" ? needsYou : undefined))}
         <div className="my-1 h-px w-6 bg-black/10" />
         {item("agents", "All agents", LayoutGrid)}
+        <button
+          type="button"
+          aria-label="Skills"
+          title="Skills"
+          aria-pressed={skills.active}
+          onClick={skills.onClick}
+          className={`tap relative grid size-10 place-items-center rounded-[11px] ${
+            skills.active ? "text-ink" : "text-[#767676] hover:bg-black/[0.05] hover:text-ink"
+          }`}
+        >
+          {skills.active && (
+            <motion.span layoutId="rail-skills" transition={SPRING} className="absolute inset-0 rounded-[11px] bg-[#d6d6d6]" />
+          )}
+          <Puzzle className="relative size-[21px]" strokeWidth={skills.active ? 2.1 : 1.7} />
+        </button>
       </div>
       <div className="flex-1" />
       <ChiefButton {...chief} />
