@@ -1,28 +1,33 @@
 /*
- * Images the owner attaches in chat: screenshots, competitor UIs, mockups.
- *   <data>/uploads/<sha256>.<ext>   content-addressed, so the same image is stored once
- * The type comes from the file's leading bytes, never the name or the claimed MIME. Crusoe can't reach
- * localhost URLs, so imageParts() inlines stored images as base64 data: URLs for the model.
- * Server only.
+ * Files the owner attaches in chat: screenshots, competitor UIs, mockups, and text documents (a client spec,
+ * product facts) as .md, .txt, .csv, .json or .html.
+ *   <data>/uploads/<sha256>.<ext>          an image, content-addressed, so the same image is stored once
+ *   <data>/uploads/<sha256>-<name>.<ext>   a text document, under its hash and its cleaned name
+ * An image's type comes from its leading bytes, never the name or the claimed MIME. A file is text only if it
+ * decodes as UTF-8 with no NUL bytes; then its extension picks the type. Crusoe can't reach localhost URLs, so
+ * imageParts() inlines stored images as base64 data: URLs for the model. Server only.
  */
+import { isUtf8 } from "node:buffer";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { cleanFileName, IMAGE_ID, MAX_TEXT_BYTES, TEXT_TYPES, textExt, textUploadName } from "@/lib/uploads";
+import { dataDir } from "./paths";
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 export const MAX_IMAGES_PER_MESSAGE = 4;
-/** `<sha256>.<ext>`: the only ids that are ever read, so a path can't climb out of the uploads folder. */
-export const UPLOAD_ID = /^[a-f0-9]{64}\.(png|jpg|webp|gif)$/;
 
 export interface StoredUpload {
-  /** `<sha256>.<ext>` */
+  /** `<sha256>.<ext>`, or `<sha256>-<name>` for a text document. */
   id: string;
   /** Where the app shows it: `/api/uploads/<id>`. */
   url: string;
+  /** A text document's cleaned file name. */
+  name?: string;
   width?: number;
   height?: number;
-  /** The sniffed MIME type. */
+  /** The sniffed MIME type (an image), or the extension's (a text document). */
   type: string;
   bytes: number;
 }
@@ -52,8 +57,7 @@ const FORMATS: { ext: Ext; type: string; is: (b: Buffer) => boolean }[] = [
 ];
 const TYPE_OF = Object.fromEntries(FORMATS.map((f) => [f.ext, f.type])) as Record<Ext, string>;
 
-// TODO: use dataDir() from src/server/paths.ts once it lands on main (another builder is adding it).
-const uploadsDir = () => path.join(process.cwd(), ".data", "uploads");
+const uploadsDir = () => path.join(dataDir(), "uploads");
 
 /** Width and height from the file header, when it's one we can read without decoding. */
 function dimensions(b: Buffer, ext: Ext): { width?: number; height?: number } {
@@ -88,30 +92,49 @@ function dimensions(b: Buffer, ext: Ext): { width?: number; height?: number } {
   }
 }
 
-/** Stores one image under its hash. Throws UploadError: 413 over 10 MB, 415 unless PNG, JPEG, WebP or GIF. */
-export async function storeUpload(bytes: Uint8Array): Promise<StoredUpload> {
-  if (bytes.byteLength > MAX_UPLOAD_BYTES) throw new UploadError("Images can be at most 10 MB.", 413);
-  const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const format = FORMATS.find((f) => f.is(buf));
-  if (!format) throw new UploadError("Only PNG, JPEG, WebP or GIF images can be attached.", 415);
-  const id = `${createHash("sha256").update(buf).digest("hex")}.${format.ext}`;
+/** Writes `buf` as `<uploads>/<id>` unless it's there already. */
+async function keep(id: string, buf: Buffer): Promise<void> {
   const file = path.join(uploadsDir(), id);
-  if (!existsSync(file)) {
-    await mkdir(uploadsDir(), { recursive: true });
-    // Written beside it, then renamed, so a reader never sees half a file under the final name.
-    const tmp = `${file}.${randomBytes(6).toString("hex")}.tmp`;
-    await writeFile(tmp, buf);
-    await rename(tmp, file);
-  }
-  return { id, url: `/api/uploads/${id}`, ...dimensions(buf, format.ext), type: format.type, bytes: buf.byteLength };
+  if (existsSync(file)) return;
+  await mkdir(uploadsDir(), { recursive: true });
+  // Written beside it, then renamed, so a reader never sees half a file under the final name.
+  const tmp = `${file}.${randomBytes(6).toString("hex")}.tmp`;
+  await writeFile(tmp, buf);
+  await rename(tmp, file);
 }
 
-/** A stored image and its type, or null for an unknown id or one that isn't `<sha256>.<ext>`. */
-export async function readUpload(id: string): Promise<{ bytes: Buffer; type: string } | null> {
-  const ext = UPLOAD_ID.exec(id)?.[1] as Ext | undefined;
-  if (!ext) return null;
+/**
+ * Stores one image under its hash, or one text document (`name` ends .md, .txt, .csv, .json or .html) under its
+ * hash and name. Throws UploadError: 413 over 10 MB (an image) or 2 MB (text), 400 for a text name on bytes that
+ * aren't text, 415 for anything else.
+ */
+export async function storeUpload(bytes: Uint8Array, name = ""): Promise<StoredUpload> {
+  const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const hash = () => createHash("sha256").update(buf).digest("hex");
+  const format = FORMATS.find((f) => f.is(buf));
+  if (format) {
+    if (buf.byteLength > MAX_UPLOAD_BYTES) throw new UploadError("Images can be at most 10 MB.", 413);
+    const id = `${hash()}.${format.ext}`;
+    await keep(id, buf);
+    return { id, url: `/api/uploads/${id}`, ...dimensions(buf, format.ext), type: format.type, bytes: buf.byteLength };
+  }
+  const clean = cleanFileName(name);
+  if (!clean) throw new UploadError("Only PNG, JPEG, WebP or GIF images, or .md, .txt, .csv, .json or .html text files, can be attached.", 415);
+  if (buf.byteLength > MAX_TEXT_BYTES) throw new UploadError("Text files can be at most 2 MB.", 413);
+  if (buf.includes(0) || !isUtf8(buf)) throw new UploadError(`${clean} isn't a text file: attach .md, .txt, .csv, .json or .html as UTF-8 text.`, 400);
+  const id = `${hash()}-${clean}`;
+  await keep(id, buf);
+  return { id, url: `/api/uploads/${id}`, name: clean, type: TEXT_TYPES[textExt(clean)!], bytes: buf.byteLength };
+}
+
+/** A stored upload, its type and (a text document) its name, or null for an unknown id or one that isn't an upload id. */
+export async function readUpload(id: string): Promise<{ bytes: Buffer; type: string; name?: string } | null> {
+  const ext = IMAGE_ID.exec(id)?.[1] as Ext | undefined;
+  const name = ext ? undefined : textUploadName(id);
+  if (!ext && !name) return null;
   try {
-    return { bytes: await readFile(path.join(uploadsDir(), id)), type: TYPE_OF[ext] };
+    const bytes = await readFile(path.join(uploadsDir(), id));
+    return ext ? { bytes, type: TYPE_OF[ext] } : { bytes, type: TEXT_TYPES[textExt(name!)!], name: name! };
   } catch {
     return null;
   }
@@ -125,7 +148,7 @@ export async function imageParts(ids: string[]): Promise<ImagePart[]> {
   if (ids.length > MAX_IMAGES_PER_MESSAGE) throw new Error(`A message can carry at most ${MAX_IMAGES_PER_MESSAGE} images.`);
   return Promise.all(
     ids.map(async (id) => {
-      const file = await readUpload(id);
+      const file = IMAGE_ID.test(id) ? await readUpload(id) : null;
       if (!file) throw new Error(`Unknown image "${String(id).slice(0, 80)}".`);
       return { type: "image_url", image_url: { url: `data:${file.type};base64,${file.bytes.toString("base64")}` } } as const;
     }),
