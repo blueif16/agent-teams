@@ -323,6 +323,29 @@ describe("closeProject", () => {
     expect(await vaultFile("agents/wren/skills/copywriting/SKILL.md")).toBe(SKILL("copywriting", "Write benefit-led copy"));
   });
 
+  it("leaves the project open when a step fails, and a retry commits only what is missing", async () => {
+    const before = head();
+    const good = model({ retro: RETRO, dream: DREAMS, skill: SKILLS });
+    const broken = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const body = String(init?.body ?? "");
+      if (body.includes("step: dream") && body.includes("agent: wren")) return Response.json({ error: { message: "upstream is down" } }, { status: 400 });
+      return good.fetch(input, init);
+    }) as typeof fetch;
+
+    const first = await closeProject(PID, { feedback: FEEDBACK, fetch: broken });
+
+    expect(first.closed).toBe(false);
+    expect(getRuntimeDb().projects.get(PID)!.status).toBe("active");
+    expect(first.skipped).toContainEqual(expect.objectContaining({ step: "dream", agentId: "wren", reason: expect.stringMatching(/^error/) }));
+
+    const second = await closeProject(PID, { feedback: FEEDBACK, fetch: good.fetch });
+
+    expect(second.closed).toBe(true);
+    expect(second.commits.map((c) => `${c.step}:${c.agentId}`)).toEqual(["dream:wren"]);
+    // Across both closes, each learning file was committed once.
+    expect(commitsSince(before)).toHaveLength(5);
+  });
+
   it("is a no-op the second time: no model call, no commit", async () => {
     const fake = model({ retro: RETRO, dream: DREAMS, skill: SKILLS });
     await closeProject(PID, { feedback: FEEDBACK, fetch: fake.fetch });
