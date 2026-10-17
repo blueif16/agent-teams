@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, BadgeCheck, ExternalLink, FileText, Puzzle, Search, ShieldAlert, ShieldCheck, SquareTerminal, Star, X } from "lucide-react";
+import { cache, useCached, type Resource } from "@/lib/client-cache";
 import type { Archetype } from "@/lib/policy/types";
-import type { SkillEntry, SkillHit } from "@/lib/skills/types";
+import type { ArchetypeDef, SkillEntry, SkillHit } from "@/lib/skills/types";
 import { Markdown } from "./Markdown";
 import { SPRING } from "./ui";
 
@@ -10,19 +11,32 @@ import { SPRING } from "./ui";
  * The skill library (design §3b): vetted SKILL.md packages experts load at hire. A Skills tab in the workspace,
  * opened from the rail: local search over GET /api/skills, archetype chips, one row per skill, and a detail view
  * with the rendered SKILL.md from GET /api/skills/<id>. The agent panel's Skills tab lists what one agent has.
+ * Everything here comes through the client cache, so what's been seen once paints at once; an import announces
+ * `skills` and the open views refresh.
  */
 
-/** Chip order and labels; the PM is the `lead` archetype, Mira the `chief`. */
-const ARCHETYPE_CHIPS: { id: Archetype; label: string }[] = [
-  { id: "engineer", label: "Engineer" },
-  { id: "designer", label: "Designer" },
-  { id: "researcher", label: "Researcher" },
-  { id: "analyst", label: "Analyst" },
-  { id: "writer", label: "Writer" },
-  { id: "lead", label: "PM" },
-  { id: "chief", label: "Chief" },
-];
-const ARCHETYPE_LABEL = Object.fromEntries(ARCHETYPE_CHIPS.map((a) => [a.id, a.label])) as Record<string, string>;
+/** The whole library, most starred first. With no query the route ignores the archetype; the chips filter it here. */
+export const skillLibrary: Resource = { key: "/api/skills", topic: "skills" };
+
+/** The archetype chips. They ship with the server's code, so nothing announces them; a restart is caught on reconnect. */
+export const archetypeList: Resource = { key: "/api/archetypes", topic: "config" };
+
+function skillSearch(q: string, archetype: Archetype | null): Resource {
+  if (!q) return skillLibrary;
+  const params = new URLSearchParams({ limit: "50", q });
+  if (archetype) params.set("archetype", archetype);
+  return { key: `/api/skills?${params}`, topic: "skills" };
+}
+
+const skillOf = (id: string): Resource => ({ key: `/api/skills/${id.split("/").map(encodeURIComponent).join("/")}`, topic: "skills" });
+
+type Label = (archetype: string) => string;
+
+/** Chip order and labels from the archetypes (the PM is `lead`, Mira `chief`); a bare id until they've loaded. */
+function useArchetypes(): { list: ArchetypeDef[]; label: Label } {
+  const list = useCached<ArchetypeDef[]>(archetypeList).data ?? [];
+  return { list, label: (id) => list.find((a) => a.id === id)?.name ?? id };
+}
 
 const stars = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 const day = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -40,7 +54,7 @@ function needs(e: SkillEntry): string[] {
   return out;
 }
 
-function Meta({ e, archetypes = true }: { e: SkillEntry; archetypes?: boolean }) {
+function Meta({ e, label, archetypes = true }: { e: SkillEntry; label: Label; archetypes?: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="text-[12.5px] leading-[16px] text-ink-2">{e.source.publisher}</span>
@@ -60,7 +74,7 @@ function Meta({ e, archetypes = true }: { e: SkillEntry; archetypes?: boolean })
       {archetypes &&
         e.archetypes.map((a) => (
           <span key={a} className={`${chip} bg-bubble text-ink-2`}>
-            {ARCHETYPE_LABEL[a] ?? a}
+            {label(a)}
           </span>
         ))}
       {needs(e).map((n) => (
@@ -73,7 +87,7 @@ function Meta({ e, archetypes = true }: { e: SkillEntry; archetypes?: boolean })
   );
 }
 
-export function SkillRow({ hit, onOpen }: { hit: SkillHit; onOpen: () => void }) {
+export function SkillRow({ hit, label, onOpen }: { hit: SkillHit; label: Label; onOpen: () => void }) {
   const e = hit.entry;
   return (
     <button type="button" onClick={onOpen} className="tap-soft block w-full border-t border-line px-4 py-3 text-left first:border-t-0 hover:bg-bubble">
@@ -83,7 +97,7 @@ export function SkillRow({ hit, onOpen }: { hit: SkillHit; onOpen: () => void })
       </div>
       <p className="mt-0.5 truncate text-[13px] leading-[19px] text-ink-2">{e.description}</p>
       <div className="mt-1.5">
-        <Meta e={e} />
+        <Meta e={e} label={label} />
       </div>
     </button>
   );
@@ -101,34 +115,9 @@ function Notice({ title, children, action }: { title: string; children: React.Re
 
 const retryBtn = "tap mt-3 rounded-full bg-white px-3.5 py-1.5 text-[13.5px] font-medium ring-1 ring-black/10 hover:bg-bubble";
 
-function problem(e: unknown): string {
-  return e instanceof TypeError ? "The app server didn't answer" : (e as Error).message;
-}
-
-/** GET a JSON url; `data` is null until it answers, and keeps the last answer while a new url loads. */
-function useJson<T>(url: string | null) {
-  const [state, setState] = useState<{ url: string; data: T | null; error: string | null } | null>(null);
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    if (!url) return;
-    let alive = true;
-    fetch(url)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`The server answered ${r.status}`))))
-      .then((data: T) => alive && setState({ url, data, error: null }))
-      .catch((e) => alive && setState((s) => ({ url, data: s?.data ?? null, error: problem(e) })));
-    return () => {
-      alive = false;
-    };
-  }, [url, tick]);
-  return {
-    data: state?.data ?? null,
-    error: state?.url === url ? state.error : null,
-    loading: !!url && state?.url !== url,
-    retry: () => {
-      setState(null);
-      setTick((t) => t + 1);
-    },
-  };
+/** The client cache's error is the status code, or the network failure's message. */
+function problem(error: string): string {
+  return /^\d+$/.test(error) ? `The server answered ${error}` : "The app server didn't answer";
 }
 
 /** The library: search, archetype chips, rows; a row opens its detail. */
@@ -142,14 +131,18 @@ export function SkillsView() {
     return () => clearTimeout(t);
   }, [query]);
 
-  const params = new URLSearchParams({ limit: "50" });
-  if (q) params.set("q", q);
-  if (archetype) params.set("archetype", archetype);
-  const { data, error, loading, retry } = useJson<SkillHit[]>(`/api/skills?${params}`);
+  const archetypes = useArchetypes();
+  const search = skillSearch(q, archetype);
+  const { data: answer, error } = useCached<SkillHit[]>(search);
+  // A new search keeps the last list on screen, dimmed, until its own answer lands.
+  const [last, setLast] = useState<SkillHit[]>();
+  if (answer && answer !== last) setLast(answer);
+  const data = answer ?? last;
+  const loading = !answer && !!last;
   // The route boosts the archetype's skills; the chip also filters to them.
   const hits = (data ?? []).filter((h) => !archetype || h.entry.archetypes.includes(archetype));
 
-  if (openId) return <SkillDetail id={openId} onBack={() => setOpenId(null)} />;
+  if (openId) return <SkillDetail id={openId} label={archetypes.label} onBack={() => setOpenId(null)} />;
 
   return (
     <div className="mx-auto max-w-[620px] px-5 pb-10 pt-6">
@@ -180,7 +173,7 @@ export function SkillsView() {
       </label>
 
       <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Archetype">
-        {[{ id: null, label: "All" } as { id: Archetype | null; label: string }, ...ARCHETYPE_CHIPS].map((a) => {
+        {[{ id: null, label: "All" } as { id: Archetype | null; label: string }, ...archetypes.list.map((a) => ({ id: a.id, label: a.name }))].map((a) => {
           const on = archetype === a.id;
           return (
             <button
@@ -199,14 +192,14 @@ export function SkillsView() {
 
       <div className="mt-4 overflow-hidden rounded-2xl bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.05)]">
         {error && !data ? (
-          <Notice title="Couldn't load the skills" action={<button type="button" onClick={retry} className={retryBtn}>Try again</button>}>
-            {error}. Try again in a moment.
+          <Notice title="Couldn't load the skills" action={<button type="button" onClick={() => void cache.revalidate(search.key)} className={retryBtn}>Try again</button>}>
+            {problem(error)}. Try again in a moment.
           </Notice>
         ) : !data ? (
           <p className="px-4 py-7 text-center text-[13px] text-muted">Loading skills…</p>
         ) : hits.length === 0 ? (
           q || archetype ? (
-            <Notice title={q ? `No skill matches "${q}"` : `No ${ARCHETYPE_LABEL[archetype!]} skills yet`}>
+            <Notice title={q ? `No skill matches "${q}"` : `No ${archetypes.label(archetype!)} skills yet`}>
               When a PM staffs a role the library doesn&apos;t cover, find_skill searches GitHub and brings candidates to you to approve.
             </Notice>
           ) : (
@@ -217,7 +210,7 @@ export function SkillsView() {
             <AnimatePresence initial={false}>
               {hits.map((h) => (
                 <motion.div key={h.entry.id} layout="position" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={SPRING}>
-                  <SkillRow hit={h} onOpen={() => setOpenId(h.entry.id)} />
+                  <SkillRow hit={h} label={archetypes.label} onOpen={() => setOpenId(h.entry.id)} />
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -243,8 +236,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function SkillDetail({ id, onBack }: { id: string; onBack: () => void }) {
-  const { data, error, retry } = useJson<{ entry: SkillEntry; skillMd: string | null }>(`/api/skills/${id.split("/").map(encodeURIComponent).join("/")}`);
+function SkillDetail({ id, label, onBack }: { id: string; label: Label; onBack: () => void }) {
+  const resource = skillOf(id);
+  const { data, error } = useCached<{ entry: SkillEntry; skillMd: string | null }>(resource);
   const e = data?.entry;
   const repoAt = e ? `https://github.com/${e.source.repo}/tree/${e.source.commit}${e.source.path ? `/${e.source.path}` : ""}` : "";
   return (
@@ -255,8 +249,8 @@ function SkillDetail({ id, onBack }: { id: string; onBack: () => void }) {
       </button>
       {!e ? (
         error ? (
-          <Notice title="Couldn't load this skill" action={<button type="button" onClick={retry} className={retryBtn}>Try again</button>}>
-            {error}.
+          <Notice title="Couldn't load this skill" action={<button type="button" onClick={() => void cache.revalidate(resource.key)} className={retryBtn}>Try again</button>}>
+            {problem(error)}.
           </Notice>
         ) : (
           <p className="mt-8 text-center text-[13px] text-muted">Loading the skill…</p>
@@ -266,7 +260,7 @@ function SkillDetail({ id, onBack }: { id: string; onBack: () => void }) {
           <h2 className="mt-3 text-[20px] font-semibold tracking-[-0.01em]">{e.name}</h2>
           <p className="mt-1 text-[14px] leading-[21px] text-ink-2">{e.description}</p>
           <div className="mt-3">
-            <Meta e={e} />
+            <Meta e={e} label={label} />
           </div>
 
           <Section title="Source">
@@ -333,8 +327,6 @@ function SkillDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
 /** An agent's skills, from its composition. Until compositions are stored, agents (Mira included) have none. */
 export function AgentSkillsTab({ name, skillIds, onOpenLibrary }: { name: string; skillIds: string[]; onOpenLibrary: () => void }) {
-  const { data, error } = useJson<SkillHit[]>(skillIds.length ? "/api/skills?limit=200" : null);
-  const mine = (data ?? []).filter((h) => skillIds.includes(h.entry.id));
   const browse = (
     <button type="button" onClick={onOpenLibrary} className={retryBtn}>
       Browse the library
@@ -348,14 +340,21 @@ export function AgentSkillsTab({ name, skillIds, onOpenLibrary }: { name: string
           <Notice title="No skills yet" action={browse}>
             An agent gets its skills when it&apos;s hired for a role: the PM picks them from the library for that role. {name} hasn&apos;t been given any.
           </Notice>
-        ) : error ? (
-          <Notice title="Couldn't load the skills">{error}.</Notice>
-        ) : !data ? (
-          <p className="px-4 py-7 text-center text-[13px] text-muted">Loading skills…</p>
         ) : (
-          mine.map((h) => <SkillRow key={h.entry.id} hit={{ ...h, why: "" }} onOpen={onOpenLibrary} />)
+          <AgentSkillList skillIds={skillIds} onOpen={onOpenLibrary} />
         )}
       </div>
     </section>
   );
+}
+
+/** Mounted only when the agent has skills, so an agent with none asks the server nothing. */
+function AgentSkillList({ skillIds, onOpen }: { skillIds: string[]; onOpen: () => void }) {
+  const { data, error } = useCached<SkillHit[]>(skillLibrary);
+  const { label } = useArchetypes();
+  if (!data) {
+    if (error) return <Notice title="Couldn't load the skills">{problem(error)}.</Notice>;
+    return <p className="px-4 py-7 text-center text-[13px] text-muted">Loading skills…</p>;
+  }
+  return data.filter((h) => skillIds.includes(h.entry.id)).map((h) => <SkillRow key={h.entry.id} hit={{ ...h, why: "" }} label={label} onOpen={onOpen} />);
 }
