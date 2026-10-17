@@ -5,7 +5,6 @@
  * and who is stuck?". A mascot (or the card, when the app knows the agent) opens that agent's panel.
  */
 import { motion } from "motion/react";
-import { AGENTS } from "@/lib/data";
 import { SPRING } from "../ui";
 import { ContextBar } from "./ContextBar";
 import { StatusDot } from "./PlanView";
@@ -22,7 +21,7 @@ const STATE: Record<MemberVM["state"], { label: string; chip: string }> = {
 function MemberCard({ m, index }: { m: MemberVM; index: number }) {
   const env = useStateEnv();
   const now = useNow();
-  const known = Boolean(AGENTS[m.id]);
+  const known = Boolean(env.agents[m.id]);
   const s = STATE[m.state];
   const body = (
     <>

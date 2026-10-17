@@ -60,7 +60,7 @@ function Row({ item, onOpenTask, index }: { item: OpenItemVM; onOpenTask: (id: s
         <div className="flex flex-wrap items-center gap-1.5">
           <IdChip id={item.id} />
           {item.severity && <span className={`rounded-full px-1.5 py-px text-[11px] font-semibold capitalize ${SEVERITY[item.severity]}`}>{item.severity}</span>}
-          {item.kind === "question" && !you && <span className="text-[12px] text-muted">for {nameOf(item.askOf, env.leadId)}</span>}
+          {item.kind === "question" && !you && <span className="text-[12px] text-muted">for {nameOf(item.askOf, env)}</span>}
         </div>
         <p className={`mt-1 text-[14.5px] leading-[21px] ${item.status === "resolved" ? "text-ink-2" : ""}`}>{item.text}</p>
         {item.resolution && (

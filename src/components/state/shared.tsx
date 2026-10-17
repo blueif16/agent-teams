@@ -4,8 +4,8 @@
  */
 import { createContext, useContext, useSyncExternalStore, type ReactNode } from "react";
 import { CircleDashed } from "lucide-react";
-import { AGENTS, CAST } from "@/lib/data";
-import type { AgentStatus, AgentType, MascotLook } from "@/lib/types";
+import { CAST } from "@/lib/data";
+import type { Agent, AgentStatus, AgentType, MascotLook } from "@/lib/types";
 import { relativeTime } from "@/lib/vault/present";
 import { Mascot } from "../Mascot";
 import { YouAvatar } from "../ui";
@@ -15,6 +15,8 @@ import type { Who } from "./types";
 export interface StateViewEnv {
   pid: string;
   leadId: string;
+  /** Every agent the app knows (the org), for names, looks and whether a mascot can open a panel. */
+  agents: Record<string, Agent>;
   status: Record<string, AgentStatus>;
   onOpenAgent: (id: string) => void;
   /** Opens one of the team panel's state tabs (the strip's "waiting on you" opens Open). */
@@ -80,14 +82,16 @@ export function Empty({ children }: { children: ReactNode }) {
 }
 
 const ARCHETYPES = new Set<string>(Object.keys(CAST));
-export function lookOf(who: Who, leadId: string): MascotLook | null {
-  if (who.kind === "pm") return AGENTS[leadId]?.look ?? CAST.lead;
-  if (who.kind === "agent") return AGENTS[who.id]?.look ?? CAST[(ARCHETYPES.has(who.archetype ?? "") ? who.archetype : "coordinator") as AgentType];
+type Known = Pick<StateViewEnv, "leadId" | "agents">;
+
+export function lookOf(who: Who, { leadId, agents }: Known): MascotLook | null {
+  if (who.kind === "pm") return agents[leadId]?.look ?? CAST.lead;
+  if (who.kind === "agent") return agents[who.id]?.look ?? CAST[(ARCHETYPES.has(who.archetype ?? "") ? who.archetype : "coordinator") as AgentType];
   return null;
 }
 
-export function nameOf(who: Who, leadId: string): string {
-  if (who.kind === "pm") return AGENTS[leadId]?.name ?? "The PM";
+export function nameOf(who: Who, { leadId, agents }: Known): string {
+  if (who.kind === "pm") return agents[leadId]?.name ?? "The PM";
   if (who.kind === "owner") return "You";
   if (who.kind === "agent") return who.name;
   return "Unassigned";
@@ -100,9 +104,10 @@ const agentIdOf = (who: Who, leadId: string) => (who.kind === "pm" ? leadId : wh
  * so it is a button whenever the app knows the agent.
  */
 export function WhoMascot({ who, size = 24, className = "", still = false }: { who: Who; size?: number; className?: string; still?: boolean }) {
-  const { leadId, status, onOpenAgent } = useStateEnv();
+  const env = useStateEnv();
+  const { leadId, status, onOpenAgent, agents } = env;
   if (who.kind === "owner") return <YouAvatar size={size} className={className} />;
-  const look = lookOf(who, leadId);
+  const look = lookOf(who, env);
   if (!look)
     return (
       <span className={`grid shrink-0 place-items-center text-muted ${className}`} style={{ width: size, height: size }} title="Unassigned">
@@ -111,7 +116,7 @@ export function WhoMascot({ who, size = 24, className = "", still = false }: { w
     );
   const id = agentIdOf(who, leadId);
   const mascot = <Mascot look={look} size={size} status={size >= 48 && id ? status[id] : undefined} bob={size >= 48 && id ? status[id] === "working" : false} />;
-  if (still || !id || !AGENTS[id]) return <span className={`block shrink-0 ${className}`} title={nameOf(who, leadId)}>{mascot}</span>;
+  if (still || !id || !agents[id]) return <span className={`block shrink-0 ${className}`} title={nameOf(who, env)}>{mascot}</span>;
   return (
     <button
       type="button"
@@ -119,8 +124,8 @@ export function WhoMascot({ who, size = 24, className = "", still = false }: { w
         e.stopPropagation();
         onOpenAgent(id);
       }}
-      aria-label={`${nameOf(who, leadId)}'s profile`}
-      title={nameOf(who, leadId)}
+      aria-label={`${nameOf(who, env)}'s profile`}
+      title={nameOf(who, env)}
       className={`squish block shrink-0 rounded-full ${className}`}
     >
       {mascot}

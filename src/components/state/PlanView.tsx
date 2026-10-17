@@ -78,7 +78,7 @@ type GroupNodeData = { title: string; id: string; done: number; total: number };
 
 const TaskNode = memo(function TaskNode({ data }: NodeProps<Node<TaskNodeData, "task">>) {
   const { task, open, order } = data;
-  const { leadId } = useStateEnv();
+  const env = useStateEnv();
   const m = statusMeta(task.status);
   const closed = isClosed(task.status);
   return (
@@ -103,7 +103,7 @@ const TaskNode = memo(function TaskNode({ data }: NodeProps<Node<TaskNodeData, "
         <span className="flex min-w-0 items-center gap-1.5">
           <IdChip id={task.id} />
           <WhoMascot who={task.owner} size={22} />
-          <span className="min-w-0 flex-1 truncate text-[12px] text-ink-2">{nameOf(task.owner, leadId)}</span>
+          <span className="min-w-0 flex-1 truncate text-[12px] text-ink-2">{nameOf(task.owner, env)}</span>
           <Flag task={task} />
         </span>
       </div>
@@ -235,7 +235,7 @@ function PlanGraph({ plan, onOpen, height, width, tall = false }: { plan: PlanVM
 // ------------------------------------------------------------------------------------------------ board
 
 function BoardCard({ task, onOpen }: { task: TaskVM; onOpen: (id: string) => void }) {
-  const { leadId } = useStateEnv();
+  const env = useStateEnv();
   const closed = isClosed(task.status);
   return (
     <motion.div
@@ -252,7 +252,7 @@ function BoardCard({ task, onOpen }: { task: TaskVM; onOpen: (id: string) => voi
         <span className="mt-2 flex min-w-0 items-center gap-1.5">
           <IdChip id={task.id} />
           <WhoMascot who={task.owner} size={22} />
-          <span className="min-w-0 flex-1 truncate text-[12px] text-ink-2">{nameOf(task.owner, leadId)}</span>
+          <span className="min-w-0 flex-1 truncate text-[12px] text-ink-2">{nameOf(task.owner, env)}</span>
           <Flag task={task} />
         </span>
       </span>
@@ -362,7 +362,7 @@ export function TaskDrawer({ plan, id, onOpen, onClose }: { plan: PlanVM; id: st
               <h2 className="mt-2 text-[17px] font-semibold leading-[23px] tracking-[-0.01em]">{task.title}</h2>
               <div className="mt-2 flex items-center gap-2 text-[13px] text-ink-2">
                 <WhoMascot who={task.owner} size={24} />
-                <span>{nameOf(task.owner, env.leadId)}</span>
+                <span>{nameOf(task.owner, env)}</span>
                 {task.due && <span className="text-muted">· due {shortDate(task.due)}</span>}
                 {task.reopened > 0 && <span className="text-muted">· reopened {task.reopened}×</span>}
               </div>
@@ -394,7 +394,7 @@ export function TaskDrawer({ plan, id, onOpen, onClose }: { plan: PlanVM; id: st
                     <WhoMascot who={task.lastReport.by} size={24} />
                     <div className="min-w-0">
                       <p className="text-[12.5px] text-muted">
-                        {nameOf(task.lastReport.by, env.leadId)} · {ago(task.lastReport.at, now)}
+                        {nameOf(task.lastReport.by, env)} · {ago(task.lastReport.at, now)}
                       </p>
                       <p className="mt-0.5 text-[13.5px] leading-[19px]">{task.lastReport.summary}</p>
                     </div>

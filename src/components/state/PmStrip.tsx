@@ -7,7 +7,6 @@
  */
 import { motion } from "motion/react";
 import { Check, ChevronRight } from "lucide-react";
-import { AGENTS } from "@/lib/data";
 import { POP, SPRING } from "../ui";
 import { ContextRow } from "./ContextBar";
 import { ago, card, nameOf, useNow, useStateEnv, WhoMascot } from "./shared";
@@ -60,7 +59,7 @@ export function PmStrip({ state, now: shared }: { state: ProjectStateVM; now?: s
   const env = useStateEnv();
   const clock = useNow();
   const pm = state.pm;
-  const lead = AGENTS[env.leadId]?.name ?? "The PM";
+  const lead = env.agents[env.leadId]?.name ?? "The PM";
   const waiting = pm.waiting.questions + pm.waiting.approvals;
   const now = shared || pm.now;
   const empty = state.plan.tasks.length === 0;
@@ -111,7 +110,7 @@ export function PmStrip({ state, now: shared }: { state: ProjectStateVM; now?: s
             <p className="mt-1 flex items-center gap-1.5 text-[12.5px] text-muted">
               Last report {ago(pm.lastReport.at, clock)} from
               <WhoMascot who={pm.lastReport.by} size={16} />
-              {nameOf(pm.lastReport.by, env.leadId)}
+              {nameOf(pm.lastReport.by, env)}
             </p>
           )}
         </div>

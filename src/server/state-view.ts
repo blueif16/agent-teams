@@ -9,6 +9,7 @@ import { AGENTS } from "@/lib/data";
 import { readLedger, type CallEvent } from "@/lib/ledger";
 import { MODELS } from "@/lib/models";
 import { agentVault } from "@/lib/agent-files";
+import { getAgent } from "@/server/directory";
 import {
   STATE_FILES,
   type CharterVM,
@@ -53,13 +54,17 @@ const byIdAsc = (a: { id: string }, b: { id: string }) => num(a.id) - num(b.id);
  * Who an id in the state files is. "pm", the lead's agent id and the PM's thread-style ids (pm-p_42) are the PM;
  * "owner" is you; anyone else is an agent, named as the app knows them (else by their id) with the roster's archetype.
  */
-export function whoResolver(members: readonly Member[], lead?: string): WhoOf {
+/** An agent's display name, when the app knows the agent. */
+export type NameOf = (id: string) => string | undefined;
+const constantName: NameOf = (id) => AGENTS[id]?.name;
+
+export function whoResolver(members: readonly Member[], lead?: string, name: NameOf = constantName): WhoOf {
   const byId = new Map(members.map((m) => [m.agentId, m]));
   return (id) => {
     if (!id) return { kind: "none" };
     if (id === "pm" || id === lead || /^pm-/.test(id)) return { kind: "pm" };
     if (id === "owner") return { kind: "owner" };
-    return { kind: "agent", id, name: AGENTS[id]?.name ?? cap(id), archetype: byId.get(id)?.archetype ?? null };
+    return { kind: "agent", id, name: name(id) ?? cap(id), archetype: byId.get(id)?.archetype ?? null };
   };
 }
 
@@ -226,14 +231,14 @@ export function contextFor(events: readonly unknown[], agentId: string, pid: str
 const CURRENT: Task["status"][] = ["in_progress", "blocked", "review"];
 
 /** The roster with each member's current task and load derived from the plan (F §3.3: never stored twice). */
-export function toTeam(roster: Roster, dag: Dag, context: (agentId: string) => ContextStatus): MemberVM[] {
+export function toTeam(roster: Roster, dag: Dag, context: (agentId: string) => ContextStatus, name: NameOf = constantName): MemberVM[] {
   return roster.members.map((m) => {
     const mine = dag.tasks.filter((x) => x.owner === m.agentId && x.kind !== "milestone");
     const current = CURRENT.map((s) => mine.filter((x) => x.status === s).sort((a, b) => t(b.updated) - t(a.updated))[0]).find(Boolean);
     const blocker = m.blockers[0];
     return {
       id: m.agentId,
-      name: AGENTS[m.agentId]?.name ?? cap(m.agentId),
+      name: name(m.agentId) ?? cap(m.agentId),
       role: m.role,
       archetype: m.archetype,
       state: m.state,
@@ -348,7 +353,8 @@ async function fileStamps(vault: Awaited<ReturnType<typeof agentVault>>, pid: st
 /** Everything the state views show for one project, in one consistent read. `lead` is the team lead's agent id. */
 export async function buildStateView(pid: string, { lead }: { lead?: string } = {}): Promise<ProjectStateVM> {
   const [state, vault, events] = await Promise.all([readState(pid), agentVault(), readLedger()]);
-  const who = whoResolver(state.roster.members, lead);
+  const name: NameOf = (id) => getAgent(id)?.name;
+  const who = whoResolver(state.roster.members, lead, name);
   const roster = new Set(state.roster.members.map((m) => m.agentId));
   const known = (id: string) => id === "pm" || id === "owner" || id === lead || /^pm-/.test(id) || roster.has(id);
 
@@ -363,7 +369,7 @@ export async function buildStateView(pid: string, { lead }: { lead?: string } = 
     plan,
     decisions: toDecisions(state.decisions, who),
     open,
-    team: toTeam(state.roster, state.dag, (id) => contextFor(events, id, pid, "worker")),
+    team: toTeam(state.roster, state.dag, (id) => contextFor(events, id, pid, "worker"), name),
     charter: toCharter(state.charter, projectSpend(events, pid)),
     journal,
     prefs: state.prefs.map((p) => ({ id: p.id, text: p.text })),

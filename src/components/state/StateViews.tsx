@@ -8,6 +8,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useCached } from "@/lib/client-cache";
 import { isAgentFileName, type AgentFileName } from "@/lib/vault/types";
+import { useOrg } from "../org";
 import { agentHistorySource, HistorySheet, stateHistorySource, type HistorySource } from "../FileHistory";
 import { CharterView } from "./CharterView";
 import { DecisionsView } from "./DecisionsView";
@@ -48,11 +49,12 @@ export function TeamStateEnv({
   onOpenFull,
   onNotify,
   children,
-}: Omit<StateViewEnv, "onOpenHistory"> & { channel: string; onNotify: (text: string) => void; children: ReactNode }) {
+}: Omit<StateViewEnv, "onOpenHistory" | "agents"> & { channel: string; onNotify: (text: string) => void; children: ReactNode }) {
   const [history, setHistory] = useState<HistoryTarget | null>(null);
+  const { agents } = useOrg();
   const env = useMemo<StateViewEnv>(
-    () => ({ pid, leadId, status, onOpenAgent, onOpenTab, onOpenFull, onOpenHistory: setHistory }),
-    [pid, leadId, status, onOpenAgent, onOpenTab, onOpenFull],
+    () => ({ pid, leadId, agents, status, onOpenAgent, onOpenTab, onOpenFull, onOpenHistory: setHistory }),
+    [pid, leadId, agents, status, onOpenAgent, onOpenTab, onOpenFull],
   );
   const source = history ? sourceOf(history, channel) : null;
   return (
