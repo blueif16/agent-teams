@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCassette, type Cassette } from "./cassette";
 
 const CRUSOE = "https://api.inference.crusoecloud.com/v1/chat/completions";
@@ -282,5 +282,56 @@ describe("recording while the caller streams", () => {
     await reader.cancel();
 
     expect(up.state.cancelled).toBe(1);
+  });
+});
+
+const text = (s: string): Reply => ({ chunks: [enc.encode(s)] });
+
+describe("occurrences", () => {
+  it("numbers identical requests 1 and 2, and each replays its own answer", async () => {
+    const rec = await recordAll([chat("Draft the launch plan"), chat("Draft the launch plan")], [text("one"), text("two")]);
+    expect(rec.entries().map((e) => e.n)).toEqual([1, 2]);
+
+    const play = createCassette({ file, mode: "replay", upstream: offline });
+    const first = await (await post(play.fetch, chat("Draft the launch plan"))).text();
+    const second = await (await post(play.fetch, chat("Draft the launch plan"))).text();
+
+    expect([first, second]).toEqual(["one", "two"]);
+  });
+
+  it("assigns the occurrence when a request starts, so parallel calls match in any order", async () => {
+    await recordAll(
+      [chat("Draft the launch plan"), chat("Size the market"), chat("Draft the launch plan")],
+      [text("plan one"), text("market"), text("plan two")],
+    );
+
+    const play = createCassette({ file, mode: "replay", upstream: offline });
+    // Started together, the market call first; the bodies are read last-started first.
+    const [market, plan1, plan2] = await Promise.all([
+      post(play.fetch, chat("Size the market")),
+      post(play.fetch, chat("Draft the launch plan")),
+      post(play.fetch, chat("Draft the launch plan")),
+    ]);
+
+    expect(await plan2.text()).toBe("plan two");
+    expect(await plan1.text()).toBe("plan one");
+    expect(await market.text()).toBe("market");
+  });
+
+  it("records an error the caller never reads, so a retry replays the 429 and then the answer", async () => {
+    const up = fakeUpstream([{ status: 429, ...text('{"error":"rate limited"}') }, { chunks: sseChunks() }]);
+    const rec = createCassette({ file, mode: "record", upstream: up.fetch });
+    await post(rec.fetch, chat("Draft the launch plan")); // like callCrusoe: a 429 body is left unread
+    await bytesOf(await post(rec.fetch, chat("Draft the launch plan")));
+    await vi.waitFor(() => expect(rec.entries()).toHaveLength(2));
+
+    const play = createCassette({ file, mode: "replay", upstream: offline });
+    const limited = await post(play.fetch, chat("Draft the launch plan"));
+    const answer = await post(play.fetch, chat("Draft the launch plan"));
+
+    expect(limited.status).toBe(429);
+    expect(await limited.text()).toBe('{"error":"rate limited"}');
+    expect(answer.status).toBe(200);
+    expect(await answer.text()).toContain("Café");
   });
 });
