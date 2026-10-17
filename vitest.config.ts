@@ -7,5 +7,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
+    // node:sqlite (src/server/runtime/db.ts) warns once per process that it is experimental in Node 24.
+    execArgv: ["--disable-warning=ExperimentalWarning"],
   },
 });
