@@ -108,6 +108,16 @@ export interface FileDiff {
   stats: { added: number; removed: number };
 }
 
+/** Several files in one commit: a worker `report` touches dag.json, roster.json and the report together. */
+export interface VaultWriteManyRequest {
+  files: { path: string; content: string; expectedBlob?: string | null }[];
+  author: VaultAuthor;
+  source: VaultSource;
+  /** Code-written subject; omitted, the vault writes one from the source and the first path. */
+  subject?: string;
+  trailers?: TrailerInput;
+}
+
 export interface VaultWriteRequest {
   /** Vault-relative path, e.g. `agents/mira/MEMORY.md`. */
   path: string;
