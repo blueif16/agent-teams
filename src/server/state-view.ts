@@ -321,6 +321,30 @@ export const projectSpend = (events: readonly unknown[], pid: string) =>
 
 // ------------------------------------------------------------------------------------------------ build
 
+type Stamps = Record<StateFileName, FileStamp | null>;
+const stampMemo = new Map<string, { rev: number; stamps: Stamps }>();
+
+/**
+ * Each state file's last change, from the vault (a git log per file: the slow part of a read). Every state write
+ * bumps the project rev, so the stamps are kept per vault, project and rev: a read with nothing new skips git.
+ */
+async function fileStamps(vault: Awaited<ReturnType<typeof agentVault>>, pid: string, rev: number, window: number): Promise<Stamps> {
+  const key = `${vault.dir}\0${pid}`;
+  const memo = stampMemo.get(key);
+  if (memo?.rev === rev) return memo.stamps;
+  const pathOf = (f: StateFileName) => (f === "journal" ? journalPath(pid, window) : statePath(pid, f));
+  const entries = await Promise.all(
+    STATE_FILES.map(async (f): Promise<[StateFileName, FileStamp | null]> => {
+      const p = pathOf(f);
+      const last = (await vault.history(p)).commits[0];
+      return [f, last ? { path: p, updated: last.at, change: last.change } : null];
+    }),
+  );
+  const stamps = Object.fromEntries(entries) as Stamps;
+  stampMemo.set(key, { rev, stamps });
+  return stamps;
+}
+
 /** Everything the state views show for one project, in one consistent read. `lead` is the team lead's agent id. */
 export async function buildStateView(pid: string, { lead }: { lead?: string } = {}): Promise<ProjectStateVM> {
   const [state, vault, events] = await Promise.all([readState(pid), agentVault(), readLedger()]);
@@ -331,14 +355,7 @@ export async function buildStateView(pid: string, { lead }: { lead?: string } = 
   const plan = toPlan(state.dag, who);
   const open = toOpen(state.open, state.dag, who);
   const journal = toJournal(state.journal.lines, who, known);
-  const pathOf = (f: StateFileName) => (f === "journal" ? journalPath(pid, state.journal.window) : statePath(pid, f));
-  const stamps = await Promise.all(
-    STATE_FILES.map(async (f): Promise<[StateFileName, FileStamp | null]> => {
-      const p = pathOf(f);
-      const last = (await vault.history(p)).commits[0];
-      return [f, last ? { path: p, updated: last.at, change: last.change } : null];
-    }),
-  );
+  const files = await fileStamps(vault, pid, state.rev, state.journal.window);
 
   return {
     pid,
@@ -351,6 +368,6 @@ export async function buildStateView(pid: string, { lead }: { lead?: string } = 
     journal,
     prefs: state.prefs.map((p) => ({ id: p.id, text: p.text })),
     pm: toPm(plan, open, journal, lead ? contextFor(events, lead, pid, "lead") : null),
-    files: Object.fromEntries(stamps) as Record<StateFileName, FileStamp | null>,
+    files,
   };
 }
