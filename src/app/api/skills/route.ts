@@ -3,16 +3,29 @@ import type { Archetype } from "@/lib/policy/types";
 import { createSearchSkills } from "@/lib/skills/search";
 import type { SkillHit } from "@/lib/skills/types";
 import { skillLibrary } from "@/server/cache";
+import { getAgent } from "@/server/directory";
 
 /*
  * The skill library, searched locally (no network; the web only through find_skill).
  *   GET /api/skills?q=&archetype=&limit=   SkillHit[] best first; archetype boosts its own skills
  *   GET /api/skills                        every scan-clean skill, most starred first (score 0, no why)
+ *   GET /api/skills?agent=<id>             the skills of the agent's composition, in its order (score 0, no why)
  * Skills whose scan found anything are never listed. The library comes from the server cache; an import
  * announces `skills` on GET /api/events.
  */
 export async function GET(req: Request) {
   const params = new URL(req.url).searchParams;
+  const agentId = params.get("agent");
+  if (agentId) {
+    const agent = getAgent(agentId);
+    if (!agent) return Response.json({ error: `Unknown agent "${agentId}".` }, { status: 404 });
+    const library = await skillLibrary();
+    const mine: SkillHit[] = (agent.composition?.skills ?? []).flatMap((id) => {
+      const entry = library.get(id);
+      return entry && entry.scan.findings === 0 ? [{ entry, score: 0, why: "" }] : [];
+    });
+    return Response.json(mine);
+  }
   const q = (params.get("q") ?? "").trim();
   const archetype = params.get("archetype") || undefined;
   if (archetype && !ARCHETYPES.includes(archetype as Archetype)) {

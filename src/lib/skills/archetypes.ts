@@ -7,7 +7,7 @@
  * archetype inherits (file tools, web_search, fetch_page, report, chart, mermaid) is not listed; the registry's
  * resolver adds it, and drops planned or sandbox-only (T7) entries.
  */
-import { INHERENT } from "../agent-files";
+import { INHERENT } from "../inherent";
 import type { Archetype } from "../policy/types";
 import type { ArchetypeDef } from "./types";
 

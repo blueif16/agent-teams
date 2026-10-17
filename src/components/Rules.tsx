@@ -33,7 +33,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cache, useCached, type Resource } from "@/lib/client-cache";
-import { AGENTS } from "@/lib/data";
+import { useOrg } from "./org";
 import type { Access, CompileResult, DataGuard, DetectorSummary, Permission, Rule, RuleConflict, RulesResponse, SaveRulesResponse } from "@/lib/policy/types";
 import { POP, SPRING } from "./ui";
 
@@ -871,6 +871,7 @@ function LoadState({ error, onRetry }: { error: string | undefined; onRetry: () 
 /** The Permissions tab: `agentId` for an agent's panel, `projectId` for a team's (no capability list there yet). */
 export function RulesTab({ agentId, projectId, onNotify }: { agentId?: string; projectId?: string; onNotify: (text: string) => void }) {
   const resource = rulesOf({ agentId, projectId });
+  const org = useOrg();
   // Cached: switching tabs or panels paints the last snapshot at once; the `rules` topic refetches it after a write.
   const { data, error } = useCached<RulesResponse>(resource);
   const fresh = useArrivals(data);
@@ -902,7 +903,7 @@ export function RulesTab({ agentId, projectId, onNotify }: { agentId?: string; p
       />
       {agentId && data.permissions && (
         <Permissions
-          name={AGENTS[agentId]?.name ?? agentId}
+          name={org.agents[agentId]?.name ?? agentId}
           permissions={data.permissions}
           rules={byId}
           open={open}

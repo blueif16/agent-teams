@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { Hash, Search } from "lucide-react";
-import { AGENTS, CHIEF, CHIEF_ID } from "@/lib/data";
+import { CHIEF, CHIEF_ID } from "@/lib/data";
 import type { AgentStatus, Message } from "@/lib/types";
 import { Mascot } from "./Mascot";
 import { useOrg } from "./org";
@@ -91,13 +91,14 @@ export function Sidebar({
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const org = useOrg();
+  const agents = org.agents;
   const teamOf = (key: string) =>
-    key.startsWith("team:") ? org.teamsById[key.slice(5)] : org.teamsById[AGENTS[key.slice(3)].teamId];
+    (key.startsWith("team:") ? org.teamsById[key.slice(5)] : org.teamsById[agents[key.slice(3)]?.teamId ?? ""]) ?? org.teamsById.company;
 
   const teams = org.teams.filter((t) => !q || t.channel.includes(q) || t.name.toLowerCase().includes(q));
-  const dms = dmIds.map((id) => AGENTS[id]).filter((a) => !q || a.name.toLowerCase().includes(q));
+  const dms = dmIds.flatMap((id) => (agents[id] ? [agents[id]] : [])).filter((a) => !q || a.name.toLowerCase().includes(q));
   const matchingAgents = q
-    ? Object.values(AGENTS).filter((a) => a.id !== CHIEF_ID && a.name.toLowerCase().includes(q) && !dmIds.includes(a.id))
+    ? Object.values(agents).filter((a) => a.id !== CHIEF_ID && a.name.toLowerCase().includes(q) && !dmIds.includes(a.id))
     : [];
   const showChief = !q || CHIEF.name.toLowerCase().includes(q) || "ceo".includes(q);
 
@@ -209,7 +210,8 @@ export function Sidebar({
             <Section title="Needs you" count={pending.length}>
               {pending.length === 0 && <p className="px-2 py-1 text-[13px] text-muted">Nothing is waiting on you.</p>}
               {pending.map(({ key, msg }) => {
-                const a = AGENTS[msg.from];
+                const a = agents[msg.from];
+                if (!a) return null;
                 // An approval is a hand-off to you: the agent's mascot passes to your avatar.
                 return (
                   <Row key={msg.id} onClick={() => goKey(key)}>
@@ -229,16 +231,16 @@ export function Sidebar({
             </Section>
             <Section title="Handoffs">
               {handoffs.length === 0 && <p className="px-2 py-1 text-[13px] text-muted">No handoffs yet.</p>}
-              {handoffs.map(({ key, msg }) => (
+              {handoffs.map(({ key, msg }) => agents[msg.from] && agents[msg.to] && (
                 <Row key={msg.id} onClick={() => goKey(key)}>
                   <span className="flex shrink-0 -space-x-1.5 self-start pt-0.5">
-                    <Mascot look={AGENTS[msg.from].look} size={18} />
-                    <Mascot look={AGENTS[msg.to].look} size={18} />
+                    <Mascot look={agents[msg.from].look} size={18} />
+                    <Mascot look={agents[msg.to].look} size={18} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13.5px] text-ink">{msg.task}</span>
                     <span className="block truncate text-[12px] text-muted">
-                      {AGENTS[msg.from].name} to {AGENTS[msg.to].name}, {msg.at}
+                      {agents[msg.from].name} to {agents[msg.to].name}, {msg.at}
                     </span>
                   </span>
                 </Row>
@@ -277,7 +279,7 @@ export function Sidebar({
 
         {mode === "agents" &&
           (["needs-you", "working", "idle", "done"] as AgentStatus[]).map((s) => {
-            const list = Object.values(AGENTS).filter((a) => a.id !== CHIEF_ID && status[a.id] === s);
+            const list = Object.values(agents).filter((a) => a.id !== CHIEF_ID && (status[a.id] ?? "idle") === s);
             if (!list.length) return null;
             return (
               <Section key={s} title={STATUS_LABEL[s]} count={list.length}>

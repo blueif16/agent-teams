@@ -1,5 +1,4 @@
-import { agentType } from "@/lib/agent-files";
-import { AGENTS, TEAMS_BY_ID } from "@/lib/data";
+import { getAgent, listAgents, listDms, listTeams } from "@/server/directory";
 import { compileRules, type CompileContext } from "@/lib/policy/compile";
 import { policyStore } from "@/lib/policy/store";
 
@@ -16,11 +15,11 @@ export async function POST(req: Request) {
   const project = typeof body?.project === "string" && body.project ? body.project.slice(0, 60) : undefined;
 
   const rules = await policyStore().list();
-  const agents: CompileContext["agents"] = Object.values(AGENTS).map((a) => ({ id: a.id, name: a.name, archetype: agentType(a) }));
+  const agents: CompileContext["agents"] = listAgents().map((a) => ({ id: a.id, name: a.name, archetype: a.archetype }));
   // An agent launched at runtime isn't in the seed data; the owner typed the sentence on its panel, so it exists.
-  if (agent && !AGENTS[agent]) agents.push({ id: agent, name: agent.charAt(0).toUpperCase() + agent.slice(1) });
+  if (agent && !getAgent(agent)) agents.push({ id: agent, name: agent.charAt(0).toUpperCase() + agent.slice(1) });
   const projects = [
-    ...new Set([...Object.keys(TEAMS_BY_ID), ...(project ? [project] : []), ...rules.flatMap((r) => (r.scope.projects ?? []).filter((p) => p !== "*" && !p.startsWith("dm:")))]),
+    ...new Set(["company", ...[...listTeams(), ...listDms()].map((t) => t.id), ...(project ? [project] : []), ...rules.flatMap((r) => (r.scope.projects ?? []).filter((p) => p !== "*" && !p.startsWith("dm:")))]),
   ];
 
   const out = await compileRules({ text, agent, project }, { agents, projects, rules, now: new Date() });

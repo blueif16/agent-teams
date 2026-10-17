@@ -1,10 +1,10 @@
-import { AGENTS } from "@/lib/data";
 import { agentFilePath, isAgentFileName } from "@/lib/vault/types";
+import { getAgent } from "@/server/directory";
 import { VaultConflictError, VaultNotFoundError } from "@/server/runtime/vault";
 
 /** The vault path behind /api/agents/[id]/files/[name], or the 404 to send. */
 export function fileOr404(id: string, name: string): string | Response {
-  if (!AGENTS[id]) return Response.json({ error: `Unknown agent "${id}".` }, { status: 404 });
+  if (!getAgent(id)) return Response.json({ error: `Unknown agent "${id}".` }, { status: 404 });
   if (!isAgentFileName(name)) return Response.json({ error: `Unknown file "${name}": use soul, memory or notes.` }, { status: 404 });
   return agentFilePath(id, name);
 }
