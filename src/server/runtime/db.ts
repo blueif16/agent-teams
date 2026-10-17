@@ -501,6 +501,9 @@ export class RuntimeDb {
         .run(threadId, kind, JSON.stringify(payload), new Date().toISOString());
       return this.one(toInbox<P>, "SELECT * FROM inbox WHERE id = ?", lastInsertRowid)!;
     },
+    /** Whether the thread ever got an item of `kind`, delivered or not. */
+    has: (threadId: string, kind: InboxKind): boolean =>
+      this.sql.prepare("SELECT 1 FROM inbox WHERE thread_id = ? AND kind = ? LIMIT 1").get(threadId, kind) !== undefined,
     /** Undelivered items, oldest first (only `kinds` when given). */
     pending: <P = unknown>(threadId: string, kinds?: InboxKind[]): InboxRow<P>[] => {
       const only = kinds?.length ? ` AND kind IN (${placeholders(kinds.length)})` : "";
