@@ -49,6 +49,11 @@ export class PlanError extends Error {
 }
 
 export const KICKOFF = "Write the plan and assign first tasks.";
+/** You scope the project, so the charter's open questions are yours to ask; work that doesn't hang on them starts now. */
+const kickoffFor = (open: string[] = []) =>
+  open.length
+    ? `Ask the owner the charter's open questions in one short message, each with the default you'd pick, and start the work that doesn't depend on them. ${KICKOFF}`
+    : KICKOFF;
 const NONCE = /^[A-Za-z0-9_-]{8,100}$/;
 export const isNonce = (v: unknown): v is string => typeof v === "string" && NONCE.test(v);
 
@@ -166,6 +171,7 @@ export function charterMd(plan: CheckedPlan, team: { agentId: string; name: stri
     "Won't:",
     bullets(c.scope.wont),
     "",
+    ...(c.open?.length ? ["## Open questions", "", "Ask the owner these first:", bullets(c.open), ""] : []),
     "## Roles",
     "",
     ...roles,
@@ -249,7 +255,7 @@ export async function provision(raw: unknown, nonce: string, deps: ProvisionDeps
       db.members.add({ projectId, agentId: team[i].agentId, role: m.role, qualifications: m.qualifications });
       db.threads.ensure(team[i].agentId, projectId);
     });
-    db.inbox.add(threadId(lead, projectId), "assignment", { from: "mira", projectId, charter: spec, budgetUsd: plan.budgetUsd, instruction: KICKOFF });
+    db.inbox.add(threadId(lead, projectId), "assignment", { from: "mira", projectId, charter: spec, budgetUsd: plan.budgetUsd, instruction: kickoffFor(plan.charter.open) });
     return true;
   });
   if (created) deps.bus.emit(TOPICS.org);
