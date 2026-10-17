@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { CHIEF_ID } from "@/lib/data";
 import { storeUpload } from "@/server/uploads";
 import { png } from "@/server/uploads.testing";
@@ -28,7 +28,7 @@ const crusoeReply = () =>
   );
 
 let root: string;
-let fetchSpy: ReturnType<typeof vi.spyOn<typeof globalThis, "fetch">>;
+let fetchSpy: MockInstance<typeof fetch>;
 const env = { ...process.env };
 
 beforeEach(async () => {
