@@ -27,6 +27,7 @@ import { homeFiles } from "./home-files";
 import { getLimiter, limitFetch, type Limiter } from "./limiter";
 import { crusoe } from "./models";
 import { resilient } from "./resilience";
+import { startTeamTool } from "./tools/start-team";
 
 type FileToolNames = NonNullable<Parameters<typeof createFilesystemMiddleware>[0]>["tools"];
 type FileTool = Extract<NonNullable<FileToolNames>, readonly unknown[]>[number];
@@ -105,7 +106,8 @@ export function buildWorker(agent: AgentRow, project: ProjectRow, deps: WorkerDe
     model: chat(modelId),
     checkpointer: deps.checkpointer,
     backend,
-    tools: deps.tools,
+    // Mira starts teams herself; every other non-file tool comes from the runtime's factory.
+    tools: agent.archetype === "chief" ? [...(deps.tools ?? []), startTeamTool()] : deps.tools,
     middleware,
   });
 }
