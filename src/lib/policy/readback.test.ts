@@ -59,6 +59,26 @@ describe("readBack: flow rules", () => {
     expect(readBack(r)).toBe("Block acme-launch project data or personal info from going to email in project acme-launch when any recipient is outside acme.com.");
   });
 
+  it("names cc and bcc recipients apart, so ANDed constraints read as AND", () => {
+    const r: Rule = {
+      id: "r_ccbcc1",
+      kind: "flow",
+      scope: {},
+      labels: ["pii.*"],
+      sinks: ["email"],
+      where: [
+        { path: "to[*]", op: "domain_not_in", value: ["acme.com"] },
+        { path: "cc[*]", op: "domain_not_in", value: ["acme.com"] },
+        { path: "bcc[*]", op: "domain_not_in", value: ["acme.com"] },
+      ],
+      action: "block",
+      createdBy: "nl-compiler",
+    };
+    expect(readBack(r)).toBe(
+      "Block personal info from going to email when any recipient is outside acme.com and any cc recipient is outside acme.com and any bcc recipient is outside acme.com.",
+    );
+  });
+
   it("tokenize", () => {
     expect(readBack(byId("r_secr01"))).toBe("Replace secrets with placeholders before they reach any model.");
   });

@@ -156,10 +156,11 @@ function noun(path: string, relaxing: boolean): string {
   const q = relaxing ? "every" : "any";
   switch (base) {
     case "to":
-    case "cc":
-    case "bcc":
     case "recipients":
       return `${q} recipient`;
+    case "cc":
+    case "bcc":
+      return `${q} ${base} recipient`;
     case "attendees":
       return `${q} guest`;
     case "url":
