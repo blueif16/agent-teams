@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Columns2, Ellipsis, Hash, X } from "lucide-react";
+import { Columns2, Ellipsis, Hash, Puzzle, X } from "lucide-react";
 import { AGENTS } from "@/lib/data";
 import { useOrg } from "./org";
 import type { AgentStatus, PlanStep, Team } from "@/lib/types";
 import { Mascot } from "./Mascot";
 import { IconButton, SPRING } from "./ui";
 import { AgentPanel, TeamPanel } from "./Panels";
+import { SkillsView } from "./Skills";
 
 export type Tab = { id: string } & (
   | { type: "agent"; agentId: string }
   | { type: "team"; teamId: string }
+  | { type: "skills" }
 );
 
 function tabMeta(tab: Tab, teamsById: Record<string, Team>): { title: string; icon: React.ReactNode } {
@@ -29,6 +31,8 @@ function tabMeta(tab: Tab, teamsById: Record<string, Team>): { title: string; ic
         icon: <Hash className="size-[15px] text-ink-2" />,
       };
     }
+    case "skills":
+      return { title: "Skills", icon: <Puzzle className="size-[15px] text-ink-2" /> };
   }
 }
 
@@ -117,6 +121,7 @@ export function WorkspaceBody({
   onMessage,
   onOpenChannel,
   onToggleRun,
+  onOpenSkills,
   onCloseOthers,
   onCloseTab,
 }: {
@@ -130,6 +135,7 @@ export function WorkspaceBody({
   onMessage: (agentId: string) => void;
   onOpenChannel: (teamId: string) => void;
   onToggleRun: (agentId: string) => void;
+  onOpenSkills: () => void;
   onCloseOthers: (id: string) => void;
   onCloseTab: (id: string) => void;
 }) {
@@ -198,9 +204,11 @@ export function WorkspaceBody({
             onMessage={onMessage}
             onToggleRun={onToggleRun}
             onOpenChannel={onOpenChannel}
+            onOpenSkills={onOpenSkills}
             onNotify={onNotify}
           />
         )}
+        {tab.type === "skills" && <SkillsView />}
         {tab.type === "team" && (
           <TeamPanel
             teamId={tab.teamId}
