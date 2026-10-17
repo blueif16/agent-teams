@@ -3,7 +3,8 @@
  * the price table and its chart) and helpers that turn tape bodies into timed events. Used by the state, driver
  * and claims tests only.
  */
-import { parseScenario, type Scenario, type ScenarioInput } from "./scenario";
+import type { CheckContext, CheckRegistry } from "./checks/types";
+import { CHECKS, parseScenario, type Scenario, type ScenarioInput } from "./scenario";
 import type { Member, Place, TapeBody, TapeEvent } from "./types";
 
 export const MIRA_DM: Place = { kind: "dm", agentId: "mira" };
@@ -79,3 +80,32 @@ export const say = (msgId: string, from: string, place: Place, text: string, err
   { kind: "msg.start", msgId, place, from },
   { kind: "msg.end", msgId, text, ...(error ? { error } : {}) },
 ];
+
+/**
+ * A small stand-in for the real deliverable checks (another module implements those): the four the fixture rubric
+ * uses, each reading the version the context calls current. Any other check throws, so a test can't lean on it.
+ */
+export function fakeChecks(): CheckRegistry {
+  const unused = (name: string) => () => {
+    throw new Error(`fake check "${name}" is not implemented`);
+  };
+  const text = (ctx: CheckContext) => ctx.current(ctx.deliverable.id)?.text ?? null;
+  const registry = Object.fromEntries(Object.keys(CHECKS).map((k) => [k, unused(k)])) as unknown as CheckRegistry;
+  return {
+    ...registry,
+    exists: (ctx) => (ctx.current(ctx.deliverable.id) ? { pass: true, evidence: ["written"] } : { pass: false, evidence: ["never written"] }),
+    mentions: (ctx, p) => {
+      const t = (text(ctx) ?? "").toLowerCase();
+      const missing = p.all.filter((w) => !t.includes(w.toLowerCase()));
+      return { pass: missing.length === 0, evidence: missing.length ? missing.map((w) => `missing "${w}"`) : ["all present"] };
+    },
+    max_words: (ctx, p) => {
+      const n = (text(ctx) ?? "").split(/\s+/).filter(Boolean).length;
+      return { pass: n <= p.max, evidence: [`${n} words`] };
+    },
+    table_rows: (ctx, p) => {
+      const rows = Math.max(0, (text(ctx) ?? "").trim().split("\n").filter(Boolean).length - 1);
+      return { pass: rows >= p.min, evidence: [`${rows} rows`] };
+    },
+  };
+}
