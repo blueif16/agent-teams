@@ -7,10 +7,10 @@ import { ARCHETYPES, getArchetype } from "./archetypes";
 const BASE = ["ls", "read_file", "write_file", "edit_file", "glob", "grep", "web_search", "fetch_page", "report", "chart", "mermaid"];
 /** H §3 curated sets: action ids in prompt order, then the archetype's panes. */
 const CURATED: Record<string, string[]> = {
-  designer: ["canvas_edit", "canvas_read", "canvas_export", "request_review", "write_mockup", "fetch_image", "canvas", "mockup"],
-  engineer: ["propose_patch", "repo_read", "run_tests", "diff", "files", "tests"],
-  researcher: ["research", "add_source", "doc_write", "sources", "doc", "citations"],
-  analyst: ["describe", "answer", "write_table", "table"],
+  designer: ["canvas_edit", "canvas_read", "canvas_export", "request_review", "write_mockup", "fetch_image", "bash", "canvas", "mockup"],
+  engineer: ["propose_patch", "repo_read", "run_tests", "bash", "diff", "files", "tests"],
+  researcher: ["research", "add_source", "doc_write", "bash", "sources", "doc", "citations"],
+  analyst: ["describe", "answer", "write_table", "bash", "table"],
   writer: ["doc_write", "doc_suggest", "doc_comment", "doc_read", "doc"],
   lead: ["add_task", "update_task", "assign_task", "record_decision", "raise_item", "resolve_item", "find_skill", "search_skills", "plan", "board", "timeline", "decisions"],
   chief: ["project", "find_agent", "dispatch", "answer", "research", "find_skill", "search_skills", "plan", "dashboard", "inbox"],
@@ -53,6 +53,10 @@ describe("archetype definitions", () => {
   it("gives search_skills and find_skill to the orchestrators (lead and chief) only", () => {
     expect(ids.filter((id) => has(id, "search_skills")).sort()).toEqual(["chief", "lead"]);
     expect(ids.filter((id) => has(id, "find_skill")).sort()).toEqual(["chief", "lead"]);
+  });
+
+  it("gives the sandboxed bash to the experts who compute (engineer, designer, researcher, analyst), not the writer, PM or Mira", () => {
+    expect(ids.filter((id) => has(id, "bash")).sort()).toEqual(["analyst", "designer", "engineer", "researcher"]);
   });
 
   it("never lists raw shell or delete tools (T7 is the registry's run_tests, filtered until a sandbox exists)", () => {
