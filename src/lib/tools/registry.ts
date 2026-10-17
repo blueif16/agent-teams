@@ -7,7 +7,7 @@
  * Artifact paths are relative to .data/vault/. Each artifact type has exactly one `pane:` renderer; other views of
  * the same file (board, timeline, decisions) carry the artifact but draw in that type's pane.
  */
-import { CHARTS_NOTE } from "../charts";
+import { CANVAS_NOTE, CHARTS_NOTE, DOC_NOTE } from "./notes";
 import type { ToolDef } from "./types";
 
 const CANVAS = "projects/{pid}/work/canvas/{slug}.excalidraw";
@@ -88,7 +88,7 @@ export const REGISTRY: readonly ToolDef[] = [
     id: "canvas", name: "Canvas", description: "An infinite canvas with frames as artboards to edit, comment, approve and export.",
     kind: "present", mechanism: "artifact", tier: "T0", archetypes: ["designer"], status: "planned", origin: "adopt",
     calls: [], renderer: "pane:canvas", artifact: { type: "canvas", path: CANVAS, writtenBy: ["canvas_edit"] },
-    deps: [EXCALIDRAW],
+    note: CANVAS_NOTE, deps: [EXCALIDRAW],
   },
   {
     id: "mockup", name: "Mockup", description: "A sandboxed HTML prototype at mobile and desktop widths.",
@@ -154,7 +154,7 @@ export const REGISTRY: readonly ToolDef[] = [
     id: "doc", name: "Doc", description: "A document to read, edit, comment on and accept or reject suggestions in.",
     kind: "present", mechanism: "artifact", tier: "T0", archetypes: ["researcher", "writer"], status: "planned", origin: "build",
     calls: [], renderer: "pane:doc", artifact: { type: "doc", path: DOC, writtenBy: ["doc_write", "doc_suggest", "doc_comment"] },
-    deps: ["diff@9.0.0"],
+    note: DOC_NOTE, deps: ["diff@9.0.0"],
   },
   {
     id: "citations", name: "Citations", description: "[S1]-style markers drawn as source chips; unknown ones show red.",
