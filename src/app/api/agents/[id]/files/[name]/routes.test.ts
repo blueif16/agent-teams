@@ -26,8 +26,11 @@ const V3 = "# Mira's soul\n\n- 📌 Keep it short.\n- Lead with the number.\n";
 let tmp: string;
 let vault: Vault;
 let c: VaultCommit[];
+let cwd: { mockRestore(): void };
 beforeEach(async () => {
   tmp = await mkdtemp(path.join(tmpdir(), "vault-routes-"));
+  // Hermetic: the routes seed the vault from <cwd>/agents, and the real repo's agents/ must not leak in.
+  cwd = vi.spyOn(process, "cwd").mockReturnValue(tmp);
   vault = new Vault({ dir: path.join(tmp, "vault") });
   setVault(vault);
   c = [
@@ -37,6 +40,7 @@ beforeEach(async () => {
   ];
 });
 afterEach(async () => {
+  cwd.mockRestore();
   setVault(null);
   await rm(tmp, { recursive: true, force: true });
 });

@@ -18,7 +18,7 @@ vi.mock("node:fs/promises", async (importOriginal) => {
 });
 
 const readsOf = (file: string) => reads.filter((p) => p === file).length;
-type Global = { __agentTeamsCache?: { close(): void } };
+type Global = { __agentTeamsCache?: { close(): void }; __agentTeamsVault?: unknown };
 
 beforeEach(() => {
   reads.length = 0;
@@ -33,11 +33,13 @@ describe("agent files saved through agent-files.ts", () => {
     cwd = vi.spyOn(process, "cwd").mockReturnValue(root);
     vi.resetModules();
     delete (globalThis as Global).__agentTeamsCache;
+    delete (globalThis as Global).__agentTeamsVault;
   });
 
   afterEach(async () => {
     (globalThis as Global).__agentTeamsCache?.close();
     delete (globalThis as Global).__agentTeamsCache;
+    delete (globalThis as Global).__agentTeamsVault;
     cwd.mockRestore();
     await rm(root, { recursive: true, force: true });
   });
@@ -45,7 +47,8 @@ describe("agent files saved through agent-files.ts", () => {
   it("a SOUL.md save updates the cache and announces files:agent:<id>", async () => {
     const { readAgentFiles, writeAgentFile } = await import("@/lib/agent-files");
     const { getServerCache } = await import("@/server/cache");
-    const soul = path.join(root, "agents", "mira", "SOUL.md");
+    // SOUL.md lives in the vault (agent-files.ts), not the repo's agents/.
+    const soul = path.join(root, ".data", "vault", "agents", "mira", "SOUL.md");
     await readAgentFiles("mira");
     const changed = nextChange(getServerCache().bus, "files:agent:mira");
 
