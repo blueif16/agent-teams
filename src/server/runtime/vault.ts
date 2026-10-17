@@ -12,6 +12,8 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { DiffHunk, DiffSegment, FileDiff, FileHistory, VaultAuthor, VaultCommit, VaultSource, VaultWriteRequest } from "@/lib/vault/types";
+import { getServerCache } from "@/server/cache";
+import { TOPICS } from "@/server/cache/bus";
 
 export interface ScrubResult {
   text: string;
@@ -557,9 +559,19 @@ function parseWordDiff(out: string): DiffHunk[] {
 // The process's vault, kept on globalThis so dev reloads don't start a second queue on the same repo.
 const G = globalThis as { __agentTeamsVault?: Vault };
 
+/**
+ * The app vault's onCommit: announce `files:agent:<id>` on the server cache's bus, so every open view of
+ * that agent's files (Identity, History) revalidates through the client cache. Compose it with your own
+ * hook rather than replacing it.
+ */
+export const announceCommit: CommitHook = (p) => {
+  const agent = agentOf(p);
+  if (agent) getServerCache().bus.emit(TOPICS.files(agent));
+};
+
 /** The app's vault: `$VAULT_DIR`, else `.data/vault`. Every route and writer shares it. */
 export function getVault(): Vault {
-  return (G.__agentTeamsVault ??= new Vault({ dir: process.env.VAULT_DIR || undefined }));
+  return (G.__agentTeamsVault ??= new Vault({ dir: process.env.VAULT_DIR || undefined, onCommit: announceCommit }));
 }
 
 /** Replace the app's vault (boot wiring with hooks, or a temp vault in tests); null resets to the default. */

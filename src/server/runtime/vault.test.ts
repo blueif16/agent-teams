@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VaultAuthor } from "@/lib/vault/types";
-import { OWNER, RUNTIME, Vault, VaultConflictError, VaultNotFoundError } from "./vault";
+import { getServerCache } from "@/server/cache";
+import { nextChange } from "@/server/cache/testing";
+import { getVault, OWNER, RUNTIME, setVault, Vault, VaultConflictError, VaultNotFoundError } from "./vault";
 
 // Real git, ~100 spawns in the queue test: a loaded machine blows through the 5 s default.
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
@@ -452,5 +454,31 @@ describe("scrub and onCommit", () => {
     vault.configure({ scrub: fakeScrub, onCommit: (_p, content) => void seen.push(content) });
     await vault.write({ path: P, content: "SECRET-123\n", author: PIP, source: "dream" });
     expect(seen).toEqual(["[REDACTED:secret.test]\n"]);
+  });
+});
+
+describe("the app's vault", () => {
+  type Global = { __agentTeamsCache?: { close(): void } };
+  const env = process.env.VAULT_DIR;
+  afterEach(() => {
+    (globalThis as Global).__agentTeamsCache?.close();
+    delete (globalThis as Global).__agentTeamsCache;
+    setVault(null);
+    if (env === undefined) delete process.env.VAULT_DIR;
+    else process.env.VAULT_DIR = env;
+    vi.restoreAllMocks();
+  });
+
+  it("announces files:agent:<id> on the server bus after each commit, so open views refresh", async () => {
+    // The server cache roots and ledger under the temp dir, not the repo.
+    vi.spyOn(process, "cwd").mockReturnValue(tmp);
+    delete (globalThis as Global).__agentTeamsCache;
+    process.env.VAULT_DIR = dir;
+    setVault(null);
+
+    const heard = nextChange(getServerCache().bus, "files:agent:mira");
+    const c = await getVault().write({ path: "agents/mira/SOUL.md", content: "# Mira\n", author: OWNER, source: "owner" });
+    expect(c?.sha).toBe(git(dir, "rev-parse", "HEAD").trim());
+    expect((await heard).topic).toBe("files:agent:mira");
   });
 });
