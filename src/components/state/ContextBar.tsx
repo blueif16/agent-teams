@@ -56,20 +56,20 @@ export function ContextBar({ status, slim = false, className = "" }: { status: C
   );
 }
 
-function Step({ step, index, enter, onOpenFile }: { step: StepChip; index: number; enter: boolean; onOpenFile?: (path: string, change: string) => void }) {
+function Step({ step, index, enter, small, onOpenFile }: { step: StepChip; index: number; enter: boolean; small: boolean; onOpenFile?: (path: string, change: string) => void }) {
   const caution = step.tone === "caution";
   return (
     <motion.span
       initial={enter ? { opacity: 0, scale: 0.8 } : false}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ ...POP, delay: enter ? 0.06 * index : 0 }}
-      className="inline-flex flex-wrap items-center gap-1"
+      className={`inline-flex flex-wrap items-center ${small ? "gap-0.5" : "gap-1"}`}
     >
-      {index > 0 && <ChevronRight aria-hidden className="size-3 shrink-0 text-black/20" />}
+      {index > 0 && <ChevronRight aria-hidden className={`shrink-0 text-black/20 ${small ? "size-2.5" : "size-3"}`} />}
       <span
-        className={`inline-flex items-center gap-1 rounded-full px-2 py-[2px] text-[12px] font-medium ${caution ? "bg-caution-wash text-caution" : "bg-bubble text-ink-2"}`}
+        className={`inline-flex items-center gap-1 rounded-full font-medium ${small ? "px-1.5 py-px text-[11.5px]" : "px-2 py-[2px] text-[12px]"} ${caution ? "bg-caution-wash text-caution" : "bg-bubble text-ink-2"}`}
       >
-        {caution ? <TriangleAlert className="size-3" strokeWidth={2.4} /> : <Check className="size-3 text-mint" strokeWidth={3} />}
+        {caution ? <TriangleAlert className={small ? "size-2.5" : "size-3"} strokeWidth={2.4} /> : <Check className={`text-mint ${small ? "size-2.5" : "size-3"}`} strokeWidth={3} />}
         {step.label}
       </span>
       {onOpenFile &&
@@ -93,11 +93,11 @@ function Step({ step, index, enter, onOpenFile }: { step: StepChip; index: numbe
 }
 
 /** One compaction's steps on one line (wrapping on a phone). */
-export function StepRow({ event, enter = false, onOpenFile }: { event: CompactionEvent; enter?: boolean; onOpenFile?: (path: string, change: string) => void }) {
+export function StepRow({ event, enter = false, small = false, onOpenFile }: { event: CompactionEvent; enter?: boolean; small?: boolean; onOpenFile?: (path: string, change: string) => void }) {
   return (
-    <span className="flex flex-wrap items-center gap-x-1 gap-y-1.5">
+    <span className={`flex flex-wrap items-center gap-y-1.5 ${small ? "gap-x-0.5" : "gap-x-1"}`}>
       {compactionSteps(event).map((s, i) => (
-        <Step key={`${s.kind}-${i}`} step={s} index={i} enter={enter} onOpenFile={onOpenFile} />
+        <Step key={`${s.kind}-${i}`} step={s} index={i} enter={enter} small={small} onOpenFile={onOpenFile} />
       ))}
     </span>
   );
@@ -152,9 +152,9 @@ export function ContextRow({ status, who, onOpenFile }: { status: ContextStatus;
         </motion.span>
       </button>
       {latest && (
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pl-[74px] pr-2 pt-0.5 text-[11.5px] text-muted">
-          <span>Compacted {ago(latest.at, now)}</span>
-          <StepRow key={latest.at} event={latest} enter={Boolean(fresh)} />
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pl-2 pr-2 pt-0.5 text-[11.5px] text-muted min-[440px]:pl-[74px]">
+          <StepRow key={latest.at} event={latest} enter={Boolean(fresh)} small />
+          <span>{ago(latest.at, now)}</span>
         </div>
       )}
       <AnimatePresence>

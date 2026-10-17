@@ -26,6 +26,7 @@ function task(id: string, title: string, status: TaskStatus, owner: Who, deps: s
     blocker: null,
     evidence: [],
     lastReport: null,
+    notes: [],
     updated: T,
     reopened: 0,
     needsYou: false,

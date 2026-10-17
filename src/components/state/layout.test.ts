@@ -7,7 +7,7 @@ import { layoutPlan, type Box } from "./layout";
  * backgrounds that hold exactly their own tasks, and every dependency pointing right.
  */
 const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-const inside = (a: Box, outer: Box) => a.x >= outer.x && a.y >= outer.y && a.x + a.width <= outer.x + outer.width && a.y + a.height <= outer.y + outer.height;
+const inside = (a: Box, outer: Omit<Box, "id">) => a.x >= outer.x && a.y >= outer.y && a.x + a.width <= outer.x + outer.width && a.y + a.height <= outer.y + outer.height;
 
 describe("layoutPlan", () => {
   const plan = planFixture();

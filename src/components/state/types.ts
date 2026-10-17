@@ -37,6 +37,8 @@ export interface TaskVM {
   blocker: { text: string; on: string | null; since: string } | null;
   evidence: EvidenceVM[];
   lastReport: { at: string; by: Who; status: "progress" | "blocked" | "review" | "done"; summary: string } | null;
+  /** The PM's notes on it, newest first. */
+  notes: { at: string; text: string }[];
   updated: string;
   /** Times it went back from review to in progress. */
   reopened: number;

@@ -100,6 +100,7 @@ function toTask(t: Task, who: WhoOf): TaskVM {
     blocker: t.blocker ? { text: t.blocker.text, on: t.blocker.on ?? null, since: t.blocker.since } : null,
     evidence: t.evidence.map(evidenceOf),
     lastReport: t.lastReport ? { at: t.lastReport.at, by: who(t.lastReport.by), status: t.lastReport.status, summary: t.lastReport.summary } : null,
+    notes: [...t.notes].reverse().map((n) => ({ at: n.at, text: n.text })),
     updated: t.updated,
     reopened: t.reopened,
     needsYou: needsYou(t),
@@ -279,6 +280,16 @@ export function toCharter(c: Charter | null, spent: number): CharterVM | null {
   };
 }
 
+/** A journal line in the owner's words: statuses spelled out, refs shortened to a file name or kind. */
+export function humanizeLine(text: string): string {
+  return text
+    .replace(/\b(in_progress|ready|todo|review|blocked|done|failed|dropped)\b/g, (s) => (s === "in_progress" ? "in progress" : s))
+    .replace(/\bfile:(?:[^\s,()]*\/)?([^\s,/()]+)/g, "$1")
+    .replace(/\bled:[^\s,()]+\/([a-z]+)/g, "$1")
+    .replace(/\bmsg:[^\s,()]+/g, "a message")
+    .replace(/→ pm\b/g, "→ PM");
+}
+
 /** The last 8 journal lines, newest first; a line that starts with "<agent>: " names who did it. */
 export function toJournal(lines: readonly JournalLine[], who: WhoOf, known: (id: string) => boolean): JournalVM[] {
   return lines
@@ -287,7 +298,7 @@ export function toJournal(lines: readonly JournalLine[], who: WhoOf, known: (id:
     .map((l) => {
       const m = /^([A-Za-z0-9][A-Za-z0-9._-]*): (.+)$/.exec(l.text);
       const actor = m && known(m[1]) ? who(m[1]) : null;
-      return { at: l.at, rev: l.rev, text: actor && m ? m[2] : l.text, actor };
+      return { at: l.at, rev: l.rev, text: humanizeLine(actor && m ? m[2] : l.text), actor };
     });
 }
 

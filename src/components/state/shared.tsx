@@ -56,6 +56,24 @@ export function IdChip({ id, className = "" }: { id: string; className?: string 
   return <span className={`inline-flex shrink-0 items-center rounded-md bg-black/[0.05] px-1.5 py-px font-mono text-[11px] font-medium text-ink-2 ${className}`}>{id}</span>;
 }
 
+/**
+ * Props for a card that opens something but holds a mascot button: a div acting as a button (Enter and Space
+ * work), so the mascot inside stays its own button and still opens its agent.
+ */
+export function pressable(onPress: () => void) {
+  return {
+    role: "button" as const,
+    tabIndex: 0,
+    onClick: onPress,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+        e.preventDefault();
+        onPress();
+      }
+    },
+  };
+}
+
 /** One short line, in the panel's voice. */
 export function Empty({ children }: { children: ReactNode }) {
   return <p className={`${card} mt-5 px-4 py-4 text-center text-[13.5px] text-muted`}>{children}</p>;
@@ -81,7 +99,7 @@ const agentIdOf = (who: Who, leadId: string) => (who.kind === "pm" ? leadId : wh
  * Whoever owns or asks something, as a mascot (you are the accent disc). A mascot always opens that agent's panel,
  * so it is a button whenever the app knows the agent.
  */
-export function WhoMascot({ who, size = 24, className = "" }: { who: Who; size?: number; className?: string }) {
+export function WhoMascot({ who, size = 24, className = "", still = false }: { who: Who; size?: number; className?: string; still?: boolean }) {
   const { leadId, status, onOpenAgent } = useStateEnv();
   if (who.kind === "owner") return <YouAvatar size={size} className={className} />;
   const look = lookOf(who, leadId);
@@ -93,7 +111,7 @@ export function WhoMascot({ who, size = 24, className = "" }: { who: Who; size?:
     );
   const id = agentIdOf(who, leadId);
   const mascot = <Mascot look={look} size={size} status={size >= 48 && id ? status[id] : undefined} bob={size >= 48 && id ? status[id] === "working" : false} />;
-  if (!id || !AGENTS[id]) return <span className={`block shrink-0 ${className}`} title={nameOf(who, leadId)}>{mascot}</span>;
+  if (still || !id || !AGENTS[id]) return <span className={`block shrink-0 ${className}`} title={nameOf(who, leadId)}>{mascot}</span>;
   return (
     <button
       type="button"
