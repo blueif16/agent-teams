@@ -1,13 +1,11 @@
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { ChevronDown, Hash, Search } from "lucide-react";
-import { withChartSummaries } from "@/lib/charts";
-import { AGENTS, ARTIFACTS, CHIEF, CHIEF_ID, TEAMS } from "@/lib/data";
+import { Hash, Search } from "lucide-react";
+import { AGENTS, CHIEF, CHIEF_ID } from "@/lib/data";
 import type { AgentStatus, Message } from "@/lib/types";
 import { Mascot } from "./Mascot";
 import { useOrg } from "./org";
 import { POP, SPRING, StatusDot, STATUS_LABEL, YouAvatar } from "./ui";
-import { KindIcon } from "./Workspace";
 import type { SideMode } from "./Rail";
 import type { View } from "./AgentTeams";
 
@@ -15,9 +13,7 @@ type Pending = { key: string; msg: Extract<Message, { kind: "approval" }> };
 
 const TITLES: Record<SideMode, string> = {
   home: "Agent Teams",
-  library: "Library",
   activity: "Activity",
-  mentions: "Mentions",
   agents: "All agents",
 };
 
@@ -77,7 +73,6 @@ export function Sidebar({
   chiefUnread,
   onMode,
   onNavigate,
-  onOpenArtifact,
 }: {
   className?: string;
   mode: SideMode;
@@ -92,7 +87,6 @@ export function Sidebar({
   chiefUnread: boolean;
   onMode: (m: SideMode) => void;
   onNavigate: (v: View) => void;
-  onOpenArtifact: (id: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -107,15 +101,6 @@ export function Sidebar({
     : [];
   const showChief = !q || CHIEF.name.toLowerCase().includes(q) || "ceo".includes(q);
 
-  const mentions = useMemo(
-    () =>
-      Object.entries(convos).flatMap(([key, msgs]) =>
-        msgs
-          .filter((m): m is Extract<Message, { kind: "text" }> => m.kind === "text" && !!m.mentionsYou)
-          .map((m) => ({ key, msg: m })),
-      ),
-    [convos],
-  );
   const handoffs = useMemo(
     () =>
       Object.entries(convos).flatMap(([key, msgs]) =>
@@ -133,10 +118,7 @@ export function Sidebar({
   return (
     <aside className={`flex w-[252px] shrink-0 flex-col bg-frame ${className}`}>
       <div className="flex h-11 shrink-0 items-center px-3">
-        <span className="flex items-center gap-1 text-[15px] font-semibold tracking-[-0.01em]">
-          {TITLES[mode]}
-          {mode === "home" && <ChevronDown className="size-4 text-muted" />}
-        </span>
+        <span className="text-[15px] font-semibold tracking-[-0.01em]">{TITLES[mode]}</span>
       </div>
 
       <motion.div
@@ -159,6 +141,7 @@ export function Sidebar({
             </label>
 
             <Section title="Teams" count={org.teams.length}>
+              {org.teams.length === 0 && <p className="px-2 py-1 text-[13px] text-muted">No teams yet. Ask {CHIEF.name} to start a project.</p>}
               {teams.map((t) => {
                 const v: View = { kind: "channel", teamId: t.id };
                 const working = t.agents.filter((a) => status[a.id] === "working" || status[a.id] === "needs-you");
@@ -245,6 +228,7 @@ export function Sidebar({
               })}
             </Section>
             <Section title="Handoffs">
+              {handoffs.length === 0 && <p className="px-2 py-1 text-[13px] text-muted">No handoffs yet.</p>}
               {handoffs.map(({ key, msg }) => (
                 <Row key={msg.id} onClick={() => goKey(key)}>
                   <span className="flex shrink-0 -space-x-1.5 self-start pt-0.5">
@@ -262,43 +246,6 @@ export function Sidebar({
             </Section>
           </>
         )}
-
-        {mode === "mentions" && (
-          <Section title="Messages for you" count={mentions.length}>
-            {mentions.map(({ key, msg }) => {
-              const a = AGENTS[msg.from];
-              return (
-                <Row key={msg.id} onClick={() => goKey(key)}>
-                  <span className="squish-group mt-0.5 shrink-0 self-start">
-                      <Mascot look={a.look} size={22} />
-                    </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[12px] text-muted">
-                      {a.name} in #{teamOf(key).channel}
-                    </span>
-                    <span className="line-clamp-2 text-[13.5px] text-ink">{withChartSummaries(msg.text).replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/[*_`#>]+/g, "")}</span>
-                  </span>
-                </Row>
-              );
-            })}
-          </Section>
-        )}
-
-        {mode === "library" &&
-          TEAMS.map((t) => {
-            const items = ARTIFACTS.filter((a) => a.teamId === t.id);
-            if (!items.length) return null;
-            return (
-              <Section key={t.id} title={`#${t.channel}`}>
-                {items.map((art) => (
-                  <Row key={art.id} onClick={() => onOpenArtifact(art.id)}>
-                    <KindIcon kind={art.body.kind} />
-                    <span className="min-w-0 flex-1 truncate">{art.title}</span>
-                  </Row>
-                ))}
-              </Section>
-            );
-          })}
 
         {mode === "agents" && (
           <Section title="Company">
@@ -320,7 +267,7 @@ export function Sidebar({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13.5px] font-medium text-ink">{CHIEF.name}</span>
                   <span className="block truncate text-[12px] text-muted">
-                    CEO · {org.teams.length} teams · {doing[CHIEF_ID]}
+                    CEO · {org.teams.length} teams{doing[CHIEF_ID] ? ` · ${doing[CHIEF_ID]}` : ""}
                   </span>
                 </span>
               </Row>
@@ -341,7 +288,7 @@ export function Sidebar({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13.5px] text-ink">{a.name}</span>
-                      <span className="block truncate text-[12px] text-muted">{doing[a.id]}</span>
+                      {doing[a.id] && <span className="block truncate text-[12px] text-muted">{doing[a.id]}</span>}
                     </span>
                   </Row>
                 ))}

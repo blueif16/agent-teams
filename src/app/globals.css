@@ -19,9 +19,7 @@
   --color-accent-soft: #a9b7f6;
   --color-accent-wash: #eef2fe;
   --color-pane: #f9fbfc;
-  --color-paper: #fbf9f5;
   --color-sky: #d5f0ff;
-  --color-cobalt: #2033a4;
   --color-amber: #f59e0b;
   --color-mint: #22a06b;
 
@@ -208,19 +206,6 @@ body {
   50% {
     box-shadow: 0 0 0 4px rgba(65, 102, 235, 0);
   }
-}
-
-.ruler {
-  background-image:
-    repeating-linear-gradient(to right, #b9b9b9 0 1px, transparent 1px 8px),
-    repeating-linear-gradient(to right, #8f8f8f 0 1px, transparent 1px 40px);
-  background-size:
-    100% 4px,
-    100% 7px;
-  background-position:
-    0 100%,
-    0 100%;
-  background-repeat: repeat-x;
 }
 
 @media (prefers-reduced-motion: reduce) {

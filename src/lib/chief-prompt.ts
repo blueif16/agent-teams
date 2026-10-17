@@ -36,16 +36,15 @@ function roster(org: OrgSnapshot, events: LedgerEvent[]): string {
 }
 
 function teams(org: OrgSnapshot): string {
+  if (!org.teams.length) return "No teams yet.";
   return org.teams
     .map((t) => {
       const lead = AGENTS[t.leadId]?.name ?? t.leadId;
       const agents = t.agents
-        .map((a) => `  - ${AGENTS[a.id]?.name ?? a.id} (${AGENTS[a.id]?.role ?? "agent"}) ${a.status}: ${a.doing}`)
+        .map((a) => `  - ${AGENTS[a.id]?.name ?? a.id} (${AGENTS[a.id]?.role ?? "agent"}) ${a.status}${a.doing ? `: ${a.doing}` : ""}`)
         .join("\n");
       const waiting = t.pending.length ? ` Waiting on the owner: ${t.pending.join("; ")}.` : "";
-      // Same number as the team panel: the average of its agents' plan progress; launched teams start at 0.
-      const progress = t.launched ? 0 : t.agents.reduce((n, a) => n + (AGENTS[a.id]?.progress ?? 0), 0) / (t.agents.length || 1);
-      return `#${t.channel}${t.launched ? " (launched by you)" : ""}: ${t.name}. Goal: ${t.goal} Lead: ${lead}. Progress ${pct(progress)}.${waiting}\n${agents}`;
+      return `#${t.channel}${t.launched ? " (launched by you)" : ""}: ${t.name}. Goal: ${t.goal} Lead: ${lead}.${waiting}\n${agents}`;
     })
     .join("\n");
 }

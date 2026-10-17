@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
-  AlarmClock,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -15,8 +14,6 @@ import { ORDERS, ORDERS_BY_KEY, type OrderKey } from "@/lib/orders";
 import type { Agent } from "@/lib/types";
 import { Mascot } from "./Mascot";
 import { POP } from "./ui";
-
-export const CHECK_INS = ["In 1 hour", "Tomorrow at 9 AM", "Every weekday at 9 AM"];
 
 export interface MenuTarget {
   msgId: string;
@@ -107,7 +104,6 @@ export function ActionMenu({
   onMessage,
   onAsk,
   onHandOff,
-  onCheckIn,
   onProfile,
   onCopy,
 }: {
@@ -120,12 +116,11 @@ export function ActionMenu({
   onMessage: () => void;
   onAsk: () => void;
   onHandOff: (agentId: string) => void;
-  onCheckIn: (when: string) => void;
   onProfile: () => void;
   onCopy: () => void;
 }) {
   const [hovered, setHovered] = useState<OrderKey | null>(null);
-  const [sub, setSub] = useState<"main" | "handoff" | "checkin">("main");
+  const [sub, setSub] = useState<"main" | "handoff">("main");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -248,7 +243,6 @@ export function ActionMenu({
                 {row(MessageCircle, `Message ${agent.name}`, onMessage)}
                 {row(MessageSquareQuote, "Ask about this", onAsk)}
                 {teammates.length > 0 && row(Forward, "Hand off to a teammate", () => setSub("handoff"), true)}
-                {row(AlarmClock, "Check in later", () => setSub("checkin"), true)}
                 {row(UserRound, `View ${agent.name}'s profile`, onProfile)}
                 {row(Copy, "Copy text", onCopy)}
               </>
@@ -273,12 +267,6 @@ export function ActionMenu({
                     </span>
                   </button>
                 ))}
-              </>
-            )}
-            {sub === "checkin" && (
-              <>
-                {back(`${agent.name} checks in on this`)}
-                {CHECK_INS.map((when) => row(AlarmClock, when, () => onCheckIn(when)))}
               </>
             )}
           </motion.div>

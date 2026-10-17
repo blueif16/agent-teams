@@ -49,43 +49,8 @@ export interface Agent {
   /** Crusoe Managed Inference model ID used for live replies. */
   model: string;
   look: MascotLook;
-  status: AgentStatus;
-  /** One line: what the agent is doing right now. */
-  task: string;
-  progress: number;
-  elapsed: string;
-  steps: PlanStep[];
-  schedule?: string[];
-  subAgents?: number;
-  artifactId?: string;
   /** Persona notes fed into the system prompt. */
   brief: string;
-}
-
-export type ArtifactBody =
-  | {
-      kind: "slides";
-      section: string;
-      variants: { label: string; title: string; body: string; cta: string }[];
-    }
-  | { kind: "doc"; heading: string; sections: { heading?: string; body: string }[] }
-  | { kind: "sheet"; columns: string[]; rows: string[][]; note?: string }
-  | {
-      kind: "code";
-      file: string;
-      lines: { text: string; type?: "add" | "del" | "meta" }[];
-      checks: { label: string; ok: boolean }[];
-    }
-  | { kind: "browser"; heading: string; items: { title: string; body: string }[] };
-
-export interface Artifact {
-  id: string;
-  title: string;
-  host: string;
-  agentId: string;
-  teamId: string;
-  updated: string;
-  body: ArtifactBody;
 }
 
 interface MessageBase {
@@ -101,7 +66,6 @@ export type Message =
       text: string;
       /** Standing instruction or earlier message this one answers. */
       quote?: string;
-      mentionsYou?: boolean;
       /** LangSmith run id of a live reply, so reactions land as feedback on it. */
       traceId?: string;
       /** Set while the reply is still streaming in, so Markdown animates and charts show a skeleton. */
@@ -122,7 +86,6 @@ export type Message =
       detail: string;
       state: "pending" | "approved" | "declined";
     })
-  | (MessageBase & { kind: "artifact"; from: string; artifactId: string })
   | (MessageBase & { kind: "status"; text: string })
   | (MessageBase & {
       kind: "proposal";
@@ -155,7 +118,6 @@ export interface Team {
   leadId: string;
   agents: Agent[];
   messages: Message[];
-  unread: number;
   /** Teams the chief launched at runtime: their spec and each member's assignment. */
   launched?: { spec: string; due?: string; assignments: Record<string, string> };
 }

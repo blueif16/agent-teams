@@ -1,5 +1,5 @@
 import { CHARTS_NOTE, withChartSummaries } from "./charts";
-import { AGENTS, ARTIFACTS_BY_ID, TEAMS_BY_ID } from "./data";
+import { AGENTS, TEAMS_BY_ID } from "./data";
 import type { Message } from "./types";
 
 export interface Turn {
@@ -18,8 +18,6 @@ function describeMessage(m: Message): string | null {
         : `${name(m.from)} handed "${m.task}" to ${name(m.to)}`;
     case "approval":
       return `${name(m.from)} asked for approval: ${m.title} (${m.state})`;
-    case "artifact":
-      return `${name(m.from)} shared "${ARTIFACTS_BY_ID[m.artifactId]?.title}"`;
     case "proposal":
       return `${name(m.from)} proposed the "${m.project.name}" project (${m.state})`;
     case "status":
@@ -28,7 +26,7 @@ function describeMessage(m: Message): string | null {
 }
 
 /**
- * Stable system prompt per agent: persona, team, plan, and the channel log.
+ * Stable system prompt per agent: persona, team, and the channel log.
  * Kept byte-identical between turns so Crusoe's prefix cache can hit.
  */
 export function systemPrompt(
@@ -43,11 +41,9 @@ export function systemPrompt(
   const lead = AGENTS[team.leadId];
   const teammates = team.agents
     .filter((a) => a.id !== agentId)
-    .map((a) => `- ${a.name} (${a.role}): ${a.task}`)
+    .map((a) => `- ${a.name} (${a.role})`)
     .join("\n");
-  const plan = agent.steps.map((s) => `- [${s.state}] ${s.label}`).join("\n");
   const log = team.messages.map(describeMessage).filter(Boolean).join("\n");
-  const artifact = agent.artifactId ? ARTIFACTS_BY_ID[agent.artifactId] : undefined;
 
   const home = homeFiles(files);
 
@@ -59,10 +55,6 @@ Team lead: ${lead.name}${lead.id === agentId ? " (you)" : ""}
 Teammates:
 ${teammates}
 
-Your current task: ${agent.task} (${Math.round(agent.progress * 100)}% done, running ${agent.elapsed})
-Your plan:
-${plan}
-${artifact ? `Your current artifact: "${artifact.title}" at ${artifact.host}\n` : ""}${agent.schedule?.length ? `Scheduled: ${agent.schedule.join("; ")}\n` : ""}
 Recent #${team.channel} log:
 ${log}
 

@@ -4,7 +4,7 @@ What Mira has done, what went wrong, and what works. Newest first.
 
 ## Done
 
-- 2026-10-17 · Morning review of every team
+_Nothing yet._
 
 ## Mistakes
 

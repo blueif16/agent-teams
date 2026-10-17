@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { ArrowLeft, ArrowRight, Columns2, Copy, Ellipsis, Hash, ListChecks, SquarePen } from "lucide-react";
-import { AGENTS, ARTIFACTS_BY_ID, CHIEF, CHIEF_ID, DMS, HQ, TEAMS, TEAMS_BY_ID } from "@/lib/data";
+import { ArrowLeft, ArrowRight, Columns2, Hash, ListChecks, SquarePen } from "lucide-react";
+import { AGENTS, CHIEF, CHIEF_ID, HQ, TEAMS, TEAMS_BY_ID } from "@/lib/data";
 import { excerpt, orderText, ORDERS_BY_KEY, type OrderKey } from "@/lib/orders";
 import { parseProject, PROJECT_FENCE, START_PROJECT, visibleText } from "@/lib/project";
 import { withChartSummaries } from "@/lib/charts";
-import type { AgentStatus, Message, OrgSnapshot, Team } from "@/lib/types";
+import type { AgentStatus, Message, OrgSnapshot, PlanStep, Team } from "@/lib/types";
 import { ChiefMenu } from "./Chief";
 import { Mascot } from "./Mascot";
 import { OrgContext } from "./org";
@@ -71,14 +71,14 @@ export function AgentTeams() {
   const wide = useMedia("(min-width: 1024px)", true);
   const medium = useMedia("(min-width: 768px)", true);
 
-  const [view, setView] = useState<View>({ kind: "channel", teamId: "aster-launch" });
+  const [view, setView] = useState<View>(CHIEF_VIEW);
   const [past, setPast] = useState<View[]>([]);
   const [future, setFuture] = useState<View[]>([]);
   const [side, setSide] = useState<SideMode>("home");
   // Desktop and mobile keep separate open states so resizing never fights the user.
   const [sidebarDesktop, setSidebarDesktop] = useState(true);
   const [sidebarMobile, setSidebarMobile] = useState(false);
-  const [workspaceDesktop, setWorkspaceDesktop] = useState(true);
+  const [workspaceDesktop, setWorkspaceDesktop] = useState(false);
   const [workspaceMobile, setWorkspaceMobile] = useState(false);
   const sidebarOpen = medium ? sidebarDesktop : sidebarMobile;
   const setSidebarOpen = (open: boolean) => (medium ? setSidebarDesktop(open) : setSidebarMobile(open));
@@ -87,37 +87,34 @@ export function AgentTeams() {
     setWorkspaceDesktop(open);
     setWorkspaceMobile(open);
   }, []);
-  const [tabs, setTabs] = useState<Tab[]>([{ id: "artifact:aster-slide5", type: "artifact", artifactId: "aster-slide5" }]);
-  const [activeTab, setActiveTab] = useState("artifact:aster-slide5");
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [activeTab, setActiveTab] = useState("");
   const [convos, setConvos] = useState<Record<string, Message[]>>(() => {
     const c: Record<string, Message[]> = {};
     for (const t of TEAMS) c[`team:${t.id}`] = t.messages;
-    for (const [id, msgs] of Object.entries(DMS)) c[`dm:${id}`] = msgs;
     return c;
   });
   // One source for what each agent is doing: every mascot, chip and "now" line reads these.
   const [status, setStatus] = useState<Record<string, AgentStatus>>(() =>
-    Object.fromEntries(Object.values(AGENTS).map((a) => [a.id, a.status])),
+    Object.fromEntries(Object.keys(AGENTS).map((id) => [id, id === CHIEF_ID ? "working" : "idle"])),
   );
   const [doing, setDoing] = useState<Record<string, string>>(() =>
-    Object.fromEntries(Object.values(AGENTS).map((a) => [a.id, a.task])),
+    Object.fromEntries(Object.keys(AGENTS).map((id) => [id, id === CHIEF_ID ? "Watching the company" : ""])),
   );
   const setActivity = useCallback((agentId: string, s: AgentStatus, now?: string) => {
     setStatus((st) => ({ ...st, [agentId]: s }));
     if (now) setDoing((d) => ({ ...d, [agentId]: now }));
   }, []);
   const [typing, setTyping] = useState<Record<string, string | null>>({});
-  const [unread, setUnread] = useState<Record<string, number>>(() =>
-    Object.fromEntries(TEAMS.map((t) => [t.id, t.unread])),
-  );
+  const [unread, setUnread] = useState<Record<string, number>>({});
   const [reactions, setReactions] = useState<Record<string, Reaction[]>>({});
   const [memories, setMemories] = useState<Record<string, string[]>>({});
-  const [checkIns, setCheckIns] = useState<Record<string, string[]>>({});
+  const [plans] = useState<Record<string, PlanStep[]>>({});
   const [live, setLive] = useState<boolean | null>(null);
   const [prefill, setPrefill] = useState<{ key: string; text: string; nonce: number } | null>(null);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  // Teams the chief launched; they live alongside the seed teams everywhere a team shows.
+  // Teams the chief launched; they show everywhere a team shows.
   const [extraTeams, setExtraTeams] = useState<Team[]>([]);
   const org = useMemo(() => {
     const teams = [...TEAMS, ...extraTeams];
@@ -211,15 +208,8 @@ export function AgentTeams() {
     [setWorkspaceOpen],
   );
 
-  const openArtifact = useCallback(
-    (artifactId: string) => {
-      if (ARTIFACTS_BY_ID[artifactId]) openTab({ id: `artifact:${artifactId}`, type: "artifact", artifactId });
-    },
-    [openTab],
-  );
   const openAgent = useCallback((agentId: string) => openTab({ id: `agent:${agentId}`, type: "agent", agentId }), [openTab]);
   const openTeam = useCallback((teamId: string) => openTab({ id: `team:${teamId}`, type: "team", teamId }), [openTab]);
-  const openLibrary = useCallback(() => openTab({ id: "library", type: "library" }), [openTab]);
 
   const closeTab = (id: string) => {
     setTabs((ts) => {
@@ -418,7 +408,6 @@ export function AgentTeams() {
       leadId: lead.id,
       agents: members,
       messages: [],
-      unread: 0,
       launched: { spec: p.spec, due: p.due, assignments },
     };
     // send() below must see the team before React re-renders.
@@ -446,13 +435,6 @@ export function AgentTeams() {
       shown: null,
       replyQuote: `Kickoff from ${CHIEF.name}`,
     });
-  };
-
-  const askAbout = (artifactId: string) => {
-    const art = ARTIFACTS_BY_ID[artifactId];
-    const v: View = { kind: "dm", agentId: art.agentId };
-    navigate(v);
-    setPrefill({ key: convKey(v), text: `About “${art.title}”: `, nonce: Date.now() });
   };
 
   const key = convKey(view);
@@ -486,13 +468,6 @@ export function AgentTeams() {
         shown: { id: uid(), kind: "handoff", from: fromId, to: toId, at: now(), task: excerpt(plain(text), 90), byYou: true },
         replyQuote: `Handed over from ${from.name}`,
       });
-    },
-    onCheckIn: (agentId, text, when) => {
-      const name = AGENTS[agentId].name;
-      const lower = when.charAt(0).toLowerCase() + when.slice(1);
-      setCheckIns((c) => ({ ...c, [agentId]: [...(c[agentId] ?? []), `${when}: check in on “${excerpt(plain(text), 60)}”`] }));
-      append(key, { id: uid(), kind: "status", at: now(), text: `${name} will check in on this ${lower}` });
-      notify(`Check-in set for ${name}`);
     },
     onAsk: (agentId, text) => {
       const quote = `“${excerpt(plain(text), 80)}”`;
@@ -530,7 +505,6 @@ export function AgentTeams() {
       active={activeTab}
       onSelect={setActiveTab}
       onClose={closeTab}
-      onNew={openLibrary}
       onHide={() => setWorkspaceOpen(false)}
     />
   );
@@ -540,9 +514,8 @@ export function AgentTeams() {
       status={status}
       doing={doing}
       memories={memories}
-      checkIns={checkIns}
+      plans={plans}
       onNotify={notify}
-      onOpenArtifact={openArtifact}
       onOpenAgent={openAgent}
       onMessage={(agentId) => navigate({ kind: "dm", agentId })}
       onOpenChannel={(teamId) => navigate({ kind: "channel", teamId })}
@@ -550,12 +523,6 @@ export function AgentTeams() {
         const resuming = status[agentId] === "idle";
         setStatus((s) => ({ ...s, [agentId]: resuming ? "working" : "idle" }));
         notify(`${AGENTS[agentId].name} ${resuming ? "is back to work" : "is paused"}`);
-      }}
-      onAsk={askAbout}
-      onSendTo={(agentId, text) => {
-        const v: View = { kind: "dm", agentId };
-        navigate(v);
-        send(v, text);
       }}
       onCloseOthers={(id) => {
         setTabs((ts) => ts.filter((t) => t.id === id));
@@ -634,7 +601,6 @@ export function AgentTeams() {
                 chiefUnread={chiefUnread}
                 onMode={setSide}
                 onNavigate={navigate}
-                onOpenArtifact={openArtifact}
               />
             </motion.div>
           )}
@@ -648,10 +614,6 @@ export function AgentTeams() {
               </IconButton>
               <IconButton label="Forward" onClick={forward} disabled={future.length === 0}>
                 <ArrowRight className="size-[18px]" strokeWidth={1.7} />
-              </IconButton>
-              <IconButton label="Library" onClick={openLibrary} className="relative">
-                <Copy className="size-[17px]" strokeWidth={1.7} />
-                {pending.length > 0 && <span className="absolute right-1 top-1 size-[7px] rounded-full bg-accent ring-2 ring-frame" />}
               </IconButton>
               <IconButton label="New message" onClick={() => document.querySelector<HTMLTextAreaElement>("#composer")?.focus()}>
                 <SquarePen className="size-[17px]" strokeWidth={1.7} />
@@ -668,14 +630,11 @@ export function AgentTeams() {
                   <Hash className="size-[17px]" strokeWidth={1.7} />
                 </IconButton>
               )}
-              <IconButton label="Library" onClick={openLibrary}>
-                <Ellipsis className="size-[18px]" strokeWidth={1.7} />
-              </IconButton>
               <IconButton label="Plan" onClick={() => (view.kind === "dm" ? openAgent(view.agentId) : openTeam(view.teamId))}>
                 <ListChecks className="size-[18px]" strokeWidth={1.7} />
               </IconButton>
-              {!workspace && (
-                <IconButton label="Show workspace" onClick={() => (tabs.length ? setWorkspaceOpen(true) : openLibrary())}>
+              {!workspace && tabs.length > 0 && (
+                <IconButton label="Show workspace" onClick={() => setWorkspaceOpen(true)}>
                   <Columns2 className="size-[17px]" strokeWidth={1.7} />
                 </IconButton>
               )}
@@ -709,10 +668,8 @@ export function AgentTeams() {
               handlers={handlers}
               onSend={(text) => send(view, text)}
               onDecide={(id, d) => decide(key, id, d)}
-              onOpenArtifact={openArtifact}
               onOpenAgent={openAgent}
               onOpenTeam={openTeam}
-              onOpenLibrary={openLibrary}
               onMessageAgent={(agentId) => navigate({ kind: "dm", agentId })}
               onOpenChannel={(teamId) => navigate({ kind: "channel", teamId })}
               onLaunchProject={(msgId) => launchProject(key, msgId)}

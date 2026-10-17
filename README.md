@@ -20,7 +20,7 @@ Live at https://agent-teams-mu.vercel.app. Redeploy with `vercel deploy --prod`.
 
 | Area | Where |
 | --- | --- |
-| 8 teams, 26 agents, messages, artifacts (seed state) | `src/lib/data.ts` |
+| Seed state: a fresh company is you and Mira; teams start empty | `src/lib/data.ts` |
 | Live agent replies, streamed from Crusoe | `src/app/api/chat/route.ts`, `src/lib/prompt.ts` |
 | Mascots (placeholder SVG plushies: shape, color, eyes, accessory) | `src/components/Mascot.tsx` |
 | Rive mascots for looks with `rig` set (Felipe for now): the look's own SVG plushie animated in Rive, same fuzz texture; the view model's `action` takes the status directly (idle, working: keyboard + mittens, needs-you, done). Live at 48 px and up; smaller sizes draw the SVG. Built in `/home/ran/rive/felipe-rig` (`tools/export_app.sh` re-exports) | `src/components/RiveMascot.tsx`, `public/rive/` |
@@ -48,10 +48,10 @@ Hover an agent's message for the quick bar; click or right-click it for the full
 | ✋ | Hold | Pause until you say go (agent goes idle) |
 | 📌 | Remember | Added as a standing instruction in the agent's SOUL.md |
 
-The agent replies live, quoting the order. The menu also has Message, Ask about this, Hand off to a teammate, Check in later, View profile and Copy text. UI conventions (including click feedback) are in `.claude/skills/agent-teams-ui/SKILL.md`.
+The agent replies live, quoting the order. The menu also has Message, Ask about this, Hand off to a teammate, View profile and Copy text. UI conventions (including click feedback) are in `.claude/skills/agent-teams-ui/SKILL.md`.
 
 In a channel, `@Name` routes your message to that agent; otherwise the team lead answers. Models are a fixed set of four, in `src/lib/models.ts`; `DECISIONS.md` has the routing rules. In short: every agent runs on DeepSeek V4.1 Flash (falls back to GLM-5.3, and back), Nemotron 3.5 Lightning does cheap labeling and never falls back, and image work goes to V4.1 Flash or, when it can't, to Nemotron 3.5 Super VL. `/api/chat` accepts `images` (URLs or data URLs) on the newest message. All IDs were checked against `GET /v1/models` on 2026-10-16.
 
 ## Not built yet
 
-Agents don't execute work yet: plans, progress, handoffs, approvals, check-ins and pause/hold are UI state only (nothing runs on a schedule). Replies come from the real model, in character, using the team context. The orchestrator that runs each team's workflow is the next step.
+Agents don't execute work yet: handoffs, approvals and pause/hold are UI state only, and the Plan section stays empty until a runtime writes it. Mira's project kickoff has no roster to staff from until agents can be created. Replies come from the real model, in character, using the team context. The orchestrator that runs each team's workflow is the next step.
