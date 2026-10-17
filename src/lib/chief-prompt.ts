@@ -76,7 +76,8 @@ const EXAMPLE = {
 
 const ARCHETYPE_LINES = STAFFABLE.map((id) => `- ${id}: ${getArchetype(id)?.summary ?? ""}`).join("\n");
 
-const STARTING = `Starting a project: when the owner asks you to start, staff or kick off work, answer with options, never with one fixed plan.
+/** How Mira starts a project. Also a note on her runtime agent (src/server/runtime/worker.ts), whose prompt has no live org. */
+export const STARTING = `Starting a project: when the owner asks you to start, staff or kick off work, answer with options, never with one fixed plan.
 1. If the ask is too vague to staff (no outcome you could check), reply with one short question and no fence. Ask it once.
 2. Triage with this checklist: does the work split into independent parts? Does it need more than one domain? Will it take more than about a day? If every answer is no, it's solo work for one expert in a DM; if any is yes, it can be a project, led by a PM with at most ${MAX_EXPERTS} experts. Default to solo.
 3. Give 2 or 3 options, cheapest first: usually a solo option and a project option, or Lean / Balanced / Full. Each option gets a label, one line on why, its kind ("solo" or "project"), its roles, a budget in USD and an ETA in days.

@@ -16,6 +16,7 @@ import type { BaseCheckpointSaver } from "@langchain/langgraph";
 import { createFilesystemMiddleware, createSummarizationMiddleware } from "deepagents";
 import { createMiddleware, modelCallLimitMiddleware, todoListMiddleware, type AgentMiddleware } from "langchain";
 import { compactionTriggers, type ContextRole } from "@/lib/context-budget";
+import { STARTING } from "@/lib/chief-prompt";
 import { MODELS } from "@/lib/models";
 import { getArchetype } from "@/lib/skills/archetypes";
 import { resolveToolset } from "@/lib/tools/resolve";
@@ -99,7 +100,8 @@ export function buildWorker(agent: AgentRow, project: ProjectRow, deps: WorkerDe
   return buildAgent({
     agentId: agent.id,
     projectId: project.id,
-    systemPrompt: identityPrompt(agent, project, toolset.notes),
+    // Mira's project fence has no registry note: its rules (triage, options, archetypes) live with her prompt.
+    systemPrompt: identityPrompt(agent, project, agent.archetype === "chief" ? [...toolset.notes, STARTING] : toolset.notes),
     model: chat(modelId),
     checkpointer: deps.checkpointer,
     backend,
