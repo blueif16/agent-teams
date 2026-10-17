@@ -8,8 +8,11 @@
  */
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { BaseCheckpointSaver } from "@langchain/langgraph";
+import { HQ } from "@/lib/data";
+import { MODELS } from "@/lib/models";
 import { openCheckpointer } from "./checkpointer";
 import { getRuntimeDb, type AgentRow, type ProjectRow, type RuntimeDb } from "./db";
+import { ThreadEvents } from "./events";
 import { inboxDrain, type DmPayload } from "./inbox";
 import type { Limiter } from "./limiter";
 import { executeRun } from "./run";
@@ -46,6 +49,8 @@ type Job = { runId: string };
 export class Runtime {
   readonly db: RuntimeDb;
   readonly checkpointer: NonNullable<RuntimeOptions["checkpointer"]>;
+  /** Every run's token, now, plan, tool, done and error events, per thread (events.ts). */
+  readonly events = new ThreadEvents();
   private readonly queue: ThreadQueue<Job>;
   private readonly workers = new Map<string, Worker>();
   /** The run in progress per thread. */
@@ -114,7 +119,16 @@ export class Runtime {
       this.active.set(threadId, id);
       return () => this.active.delete(threadId);
     };
-    return executeRun({ db: this.db, worker: this.worker(threadId), activate }, threadId, runId);
+    const thread = this.db.threads.get(threadId)!;
+    const agent = this.db.agents.get(thread.agentId)!;
+    const project = this.db.projects.get(thread.projectId)!;
+    // Stats teams are projects; a DM or company thread counts toward the company (Mira's HQ team).
+    const team = project.kind === "team" ? project.id : HQ.id;
+    return executeRun(
+      { db: this.db, worker: this.worker(threadId), events: this.events, activate, ledger: { team, agent: agent.id, asked: MODELS[agent.modelTier] } },
+      threadId,
+      runId,
+    );
   }
 
   /** A DM parked after the last run's final model call gets a run of its own. */
@@ -129,4 +143,9 @@ const G = globalThis as { __agentTeamsRuntime?: Runtime };
 /** The app's runtime, on <DATA_DIR>/runtime.db and checkpoints.db. */
 export function getRuntime(): Runtime {
   return (G.__agentTeamsRuntime ??= new Runtime());
+}
+
+/** Replace the app's runtime (a test's, on its own db and fake model); null resets to the default. */
+export function setRuntime(rt: Runtime | null): void {
+  G.__agentTeamsRuntime = rt ?? undefined;
 }
