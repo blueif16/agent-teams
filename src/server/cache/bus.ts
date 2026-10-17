@@ -8,6 +8,9 @@
  *   stats:team:<id>    a change to one team's stats
  *   stats:agent:<id>   a change to one agent's stats
  *   files:agent:<id>   one of an agent's Markdown files changed
+ *   skills             the skill library changed (skills/index.json or a vendored file)
+ *   config             never sent: code and .env.local change only with a restart, and a client
+ *                      revalidates what it shows when its stream reconnects
  */
 export interface Change {
   topic: string;
@@ -24,6 +27,7 @@ export const TOPICS = {
   team: (id: string) => `stats:team:${id}`,
   agent: (id: string) => `stats:agent:${id}`,
   files: (id: string) => `files:agent:${id}`,
+  skills: "skills",
 };
 
 export class Bus {
