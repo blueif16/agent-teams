@@ -1,80 +1,120 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowUp, Info, Loader, Lock, Quote, Trash2, TriangleAlert } from "lucide-react";
+import {
+  ArrowUp,
+  Brain,
+  CalendarDays,
+  Check,
+  ChevronRight,
+  CircleHelp,
+  CreditCard,
+  EyeOff,
+  FilePenLine,
+  FileText,
+  FolderClosed,
+  Globe,
+  IdCard,
+  KeyRound,
+  KeySquare,
+  ListChecks,
+  Loader,
+  Lock,
+  Mail,
+  MessageSquare,
+  NotebookPen,
+  Plug,
+  Search,
+  SquareTerminal,
+  Tag,
+  Trash2,
+  TriangleAlert,
+  Users,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { AGENTS } from "@/lib/data";
-import type { CompileResult, DetectorSummary, Outcome, Rule, RuleConflict, RuleKind, RulesResponse, Scope } from "@/lib/policy/types";
-import { useOrg } from "./org";
+import type { Access, CompileResult, DataGuard, DetectorSummary, Permission, Rule, RuleConflict, RulesResponse } from "@/lib/policy/types";
 import { POP, SPRING } from "./ui";
 
 /*
- * Rules tab (design §6, E-privacy §7 V4): the privacy and tool rules an agent or project runs under, from
- * GET /api/rules. One line per rule, read back in plain English from the JSON, with an outcome chip.
+ * Permissions tab (design §6): what an agent can do, in plain words, from GET /api/rules. One line per capability
+ * (relevant ones first: those in the agent's toolset), one per kind of data, and the rules you added. A row opens to
+ * at most three short lines: its limits and who set it.
  */
 
-const TONE = {
-  danger: "bg-danger-wash text-danger",
-  ask: "bg-accent-wash text-accent",
-  caution: "bg-caution-wash text-caution",
-  neutral: "bg-bubble text-ink-2",
-} as const;
-type Tone = keyof typeof TONE;
+type State = Access | "hidden";
 
-/** Red stops, blue asks, amber rewrites, gray lets through. */
-const OUTCOME_TONE: Record<Outcome, Tone> = {
-  block: "danger",
-  deny: "danger",
-  ask: "ask",
-  tokenize: "caution",
-  redact: "caution",
-  hash: "caution",
-  mask: "caution",
-  allow: "neutral",
+/** The only words a state is ever shown as. Gray lets through, blue asks, red stops, amber hides. */
+const STATE: Record<State, { label: string; Icon: LucideIcon; cls: string }> = {
+  allow: { label: "Allowed", Icon: Check, cls: "bg-bubble text-ink-2" },
+  ask: { label: "Asks you", Icon: CircleHelp, cls: "bg-accent-wash text-accent" },
+  deny: { label: "Blocked", Icon: X, cls: "bg-danger-wash text-danger" },
+  hidden: { label: "Hidden", Icon: EyeOff, cls: "bg-caution-wash text-caution" },
 };
 
-const GROUPS: { kind: RuleKind; title: string }[] = [
-  { kind: "flow", title: "Data flows" },
-  { kind: "tool", title: "Tools" },
-  { kind: "grant", title: "Grants" },
-  { kind: "budget", title: "Budgets" },
-  { kind: "classifier", title: "Classifiers" },
-];
+const GUARD_STATE: Record<DataGuard["outcome"], State> = { block: "deny", ask: "ask", hidden: "hidden", allow: "allow" };
 
-const DETECTOR_KIND: Record<DetectorSummary["kind"], string> = { secret: "Secrets", pii: "PII", custom: "Custom" };
+const CAPABILITY_ICON: Record<string, LucideIcon> = {
+  "files.read": FileText,
+  "files.write": FilePenLine,
+  plan: ListChecks,
+  team: Users,
+  memory: Brain,
+  "web.search": Search,
+  "web.open": Globe,
+  email: Mail,
+  post: MessageSquare,
+  calendar: CalendarDays,
+  delete: Trash2,
+  apis: Plug,
+  money: CreditCard,
+  accounts: KeyRound,
+  code: SquareTerminal,
+};
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const DATA_ICON: Record<string, LucideIcon> = { secret: KeySquare, pii: IdCard, project: FolderClosed, owner_private: NotebookPen };
 
-/** What a rule does when it fires, as a chip. */
-function outcomeOf(rule: Rule): { label: string; tone: Tone } {
+/** What a rule does when it fires, as a pill; a classifier only labels data, so it has none. */
+function stateOfRule(rule: Rule): State | null {
   switch (rule.kind) {
     case "tool":
-      return { label: rule.effect, tone: OUTCOME_TONE[rule.effect] };
+      return rule.effect;
     case "flow":
-      return { label: rule.action, tone: OUTCOME_TONE[rule.action] };
+      return rule.action === "block" ? "deny" : rule.action === "ask" ? "ask" : rule.action === "allow" ? "allow" : "hidden";
     case "grant":
       // A grant only ever turns an ask into an allow.
-      return { label: "allow", tone: "neutral" };
+      return "allow";
     case "budget":
-      return rule.onExceed === "ask"
-        ? { label: "ask", tone: "ask" }
-        : rule.onExceed === "deny"
-          ? { label: "deny", tone: "danger" }
-          : rule.onExceed === "end"
-            ? { label: "end run", tone: "danger" }
-            : { label: "pause", tone: "caution" };
+      return rule.onExceed === "ask" ? "ask" : "deny";
     case "classifier":
-      return { label: "label", tone: "neutral" };
+      return null;
   }
 }
 
-function OutcomeChip({ label, tone, pop = false }: { label: string; tone: Tone; pop?: boolean }) {
-  const cls = `inline-flex min-w-[48px] shrink-0 items-center justify-center rounded-full px-2 py-0.5 text-[12px] font-medium leading-[16px] ${TONE[tone]}`;
-  // Keyed on the outcome so a change pops instead of swapping silently.
-  return pop ? (
-    <motion.span key={label} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={POP} className={cls}>
-      {label}
-    </motion.span>
-  ) : (
-    <span className={cls}>{label}</span>
+const ownedByYou = (r: Rule) => r.createdBy !== "default";
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+function Pill({ state, small = false }: { state: State; small?: boolean }) {
+  const { label, Icon, cls } = STATE[state];
+  return (
+    <span className="flex shrink-0 justify-end">
+      {/* Keyed on the state so a change pops instead of swapping silently; no pop on first paint. */}
+      <AnimatePresence initial={false} mode="popLayout">
+        <motion.span
+          key={state}
+          initial={{ scale: 0.75, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ opacity: 0, transition: { duration: 0.06 } }}
+          transition={POP}
+          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full font-medium ${
+            small ? "px-1.5 text-[11.5px] leading-[18px]" : "px-2 py-0.5 text-[12px] leading-[16px]"
+          } ${cls}`}
+        >
+          <Icon className="size-3" strokeWidth={2.5} />
+          {label}
+        </motion.span>
+      </AnimatePresence>
+    </span>
   );
 }
 
@@ -114,66 +154,29 @@ function useRules(url: string) {
   return { ...state, error, reload };
 }
 
-function Section({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
+function Section({ title, children, className = "mt-6" }: { title?: string; children: ReactNode; className?: string }) {
   return (
-    <section className="mt-6">
-      <div className="mb-2 flex items-end justify-between gap-3 px-1">
-        <h3 className="text-[13px] font-medium text-muted">{title}</h3>
-        {aside}
-      </div>
-      <div className="rounded-2xl bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.05)]">{children}</div>
+    <section className={className}>
+      {title && <h3 className="mb-2 px-1 text-[13px] font-medium text-muted">{title}</h3>}
+      {/* No overflow clip: the remove popover hangs out of the card. Rows round their own corners instead. */}
+      <ul className="rounded-2xl bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.05)]">{children}</ul>
     </section>
   );
 }
 
-function DetectorChip({ d }: { d: DetectorSummary }) {
-  const hosted = d.configured !== undefined;
-  return (
-    <span
-      title={`${d.source} · ${d.license}${hosted && !d.configured ? " · not configured" : ""}`}
-      className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[12px] leading-[16px] text-ink-2 shadow-[0_0_0_1px_rgba(0,0,0,0.06)]"
-    >
-      {hosted ? (
-        <>
-          <span className={`size-1.5 rounded-full ${d.configured ? "bg-mint" : "bg-muted"}`} />
-          {d.name} · {d.configured ? "on" : "off"}
-        </>
-      ) : (
-        <>
-          {DETECTOR_KIND[d.kind]} · {d.name}
-          <span className="font-medium tabular-nums text-ink">{d.rules}</span>
-        </>
-      )}
-    </span>
-  );
-}
+// ---------- removing a rule ----------
 
-/** Who a rule applies to, when it isn't everyone. */
-function scopeChips(scope: Scope, channel: (projectId: string) => string): { label: string; title: string }[] {
-  const real = (xs?: string[]) => (xs ?? []).filter((x) => x !== "*");
-  const chip = (xs: string[], name: (x: string) => string) => {
-    const names = xs.map(name);
-    return { label: names.length > 2 ? `${names[0]} +${names.length - 1}` : names.join(", "), title: names.join(", ") };
-  };
-  const out: { label: string; title: string }[] = [];
-  const agents = real(scope.agents);
-  const archetypes = real(scope.archetypes);
-  const projects = real(scope.projects);
-  if (agents.length) out.push(chip(agents, (id) => AGENTS[id]?.name ?? id));
-  if (archetypes.length) out.push(chip(archetypes, (a) => `${a}s`));
-  if (projects.length) out.push(chip(projects, (p) => (p === "dm:*" ? "DMs" : `#${channel(p)}`)));
-  return out;
-}
-
-/** The confirm step before a DELETE: anchored to the trash button, closes on Escape or a click outside. */
+/** The confirm step before a DELETE: anchored to its button, closes on Escape or a click outside. */
 function RemoveConfirm({
   sentence,
+  align,
   busy,
   error,
   onCancel,
   onConfirm,
 }: {
   sentence: string;
+  align: "left" | "right";
   busy: boolean;
   error: string | null;
   onCancel: () => void;
@@ -194,8 +197,8 @@ function RemoveConfirm({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.1 } }}
         transition={SPRING}
-        style={{ transformOrigin: "top right" }}
-        className="absolute right-0 top-full z-40 mt-1.5 w-64 rounded-2xl bg-white p-3 text-left text-ink shadow-[0_8px_30px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05)]"
+        style={{ transformOrigin: align === "right" ? "top right" : "top left" }}
+        className={`absolute ${align === "right" ? "right-0" : "left-0"} top-full z-40 mt-1.5 w-64 rounded-2xl bg-white p-3 text-left text-ink shadow-[0_8px_30px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05)]`}
       >
         <p className="text-[13.5px] font-medium">Remove this rule?</p>
         <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-[17px] text-ink-2">{sentence}</p>
@@ -227,111 +230,12 @@ interface Removal {
   onConfirm: () => void;
 }
 
-function RuleRow({ rule, sentence, fresh, reveal, removal }: { rule: Rule; sentence: string; fresh: boolean; reveal: boolean; removal: Removal }) {
-  const org = useOrg();
-  // Defaults and locked rules stay; anything you or an approval added can go.
-  const removable = !rule.locked && rule.createdBy !== "default";
-  const ref = useRef<HTMLLIElement>(null);
-  // A rule you just saved scrolls into view, so you see it pop in.
-  useEffect(() => {
-    if (!reveal) return;
-    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    ref.current?.scrollIntoView({ block: "nearest", behavior: calm ? "auto" : "smooth" });
-  }, [reveal]);
-  const outcome = outcomeOf(rule);
-  const shadow = rule.mode === "shadow";
-  const scopes = scopeChips(rule.scope, (p) => org.teamsById[p]?.channel ?? p);
-  const meta = (shadow || scopes.length > 0) && (
-    <>
-      {shadow && (
-        <span
-          title="Shadow mode: logged, never enforced"
-          className="shrink-0 rounded-full border border-dashed border-ink-2/40 px-1.5 text-[11px] leading-[16px] text-ink-2"
-        >
-          shadow
-        </span>
-      )}
-      {scopes.map((s) => (
-        <span key={s.title} title={s.title} className="max-w-[140px] shrink-0 truncate rounded-full bg-bubble px-1.5 text-[11.5px] leading-[18px] text-ink-2">
-          {s.label}
-        </span>
-      ))}
-    </>
-  );
-  return (
-    <motion.li
-      ref={ref}
-      initial={fresh ? { opacity: 0, y: 12, scale: 0.97 } : false}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      // Fade first, then close the gap, so the leaving text never overlaps the row below.
-      exit={{ opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0, transition: { opacity: { duration: 0.08 }, default: SPRING } }}
-      transition={POP}
-      className="border-t border-line px-4 py-2.5 first:border-t-0"
-    >
-      <div className="flex items-center gap-2">
-        {/* One line in a wide pane; two in a narrow one, where one line would cut most of the sentence. */}
-        <span
-          className="min-w-0 flex-1 text-[14px] leading-[20px] @max-md:line-clamp-2 @md:truncate"
-          title={rule.reason ? `${sentence}\n${rule.reason}` : sentence}
-        >
-          {sentence}
-        </span>
-        {meta && <span className="hidden shrink-0 items-center gap-1 @md:flex">{meta}</span>}
-        <OutcomeChip {...outcome} />
-        <span className="relative grid size-7 shrink-0 place-items-center text-muted">
-          {rule.locked ? (
-            <span role="img" aria-label="Locked" title="Locked: no grant can relax it, and it can't be removed here">
-              <Lock className="size-3.5" />
-            </span>
-          ) : (
-            removable && (
-              <button
-                type="button"
-                aria-label={`Remove rule: ${sentence}`}
-                aria-expanded={removal.confirming}
-                title="Remove"
-                onClick={removal.onAsk}
-                className={`tap grid size-7 place-items-center rounded-full hover:bg-danger-wash hover:text-danger ${removal.confirming ? "bg-danger-wash text-danger" : ""}`}
-              >
-                <Trash2 className="size-3.5" />
-              </button>
-            )
-          )}
-          <AnimatePresence>
-            {removal.confirming && (
-              <RemoveConfirm sentence={sentence} busy={removal.busy} error={removal.error} onCancel={removal.onCancel} onConfirm={removal.onConfirm} />
-            )}
-          </AnimatePresence>
-        </span>
-      </div>
-      {meta && <div className="mt-1 flex flex-wrap gap-1 @md:hidden">{meta}</div>}
-      {rule.source?.nl && (
-        <p className="mt-0.5 flex items-center gap-1.5 text-[12.5px] leading-[18px] text-muted">
-          <Quote className="size-3 shrink-0" />
-          <span className="min-w-0 truncate" title={rule.source.nl}>
-            {rule.source.nl}
-          </span>
-        </p>
-      )}
-    </motion.li>
-  );
-}
-
-function RulesList({
-  data,
-  fresh,
-  saved,
-  onRemoved,
-}: {
-  data: RulesResponse;
-  fresh: ReadonlySet<string>;
-  saved: ReadonlySet<string>;
-  onRemoved: () => void;
-}) {
+/** One confirm open at a time across the tab; `where` keeps a row's remove and its Your-rules trash apart. */
+function useRemoval(onRemoved: () => void) {
   const [confirm, setConfirm] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Removed rows leave at once, before the refetch lands.
+  // Removed rules leave at once, before the refetch lands.
   const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
   const cancel = useCallback(() => {
     setConfirm(null);
@@ -352,52 +256,296 @@ function RulesList({
       setBusy(false);
     }
   };
-  if (data.rules.length === 0)
-    return (
-      <div className="mt-6 rounded-2xl bg-white px-4 py-6 text-center shadow-[0_0_0_1px_rgba(0,0,0,0.05)]">
-        <p className="text-[14.5px] font-medium">No rules yet</p>
-        <p className="mx-auto mt-1 max-w-[360px] text-[13px] leading-[19px] text-ink-2">
-          Each tool falls back to its tier&apos;s default. Describe a rule in plain words and it shows here once you save it.
-        </p>
-      </div>
-    );
+  const removal = (id: string, where: string): Removal => {
+    const key = `${where}:${id}`;
+    return {
+      confirming: confirm === key,
+      busy: busy && confirm === key,
+      error: confirm === key ? error : null,
+      onAsk: () => {
+        setError(null);
+        setConfirm((c) => (c === key ? null : key));
+      },
+      onCancel: cancel,
+      onConfirm: () => void remove(id),
+    };
+  };
+  return { gone, removal };
+}
+
+// ---------- rows ----------
+
+/** A one-line row that opens to a few short lines. */
+function Row({
+  icon: Icon,
+  label,
+  marks,
+  state,
+  open,
+  onToggle,
+  children,
+}: {
+  icon: LucideIcon;
+  label: string;
+  marks?: ReactNode;
+  state: State;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <li className="border-t border-line first:border-t-0">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className="tap-soft flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-black/[0.03] [li:first-child>&]:rounded-t-2xl [li:last-child>&]:rounded-b-2xl"
+      >
+        <Icon className="size-4 shrink-0 text-ink-2" strokeWidth={1.9} />
+        <span className="min-w-0 flex-1 truncate text-[14px] leading-[20px]">{label}</span>
+        {marks}
+        <Pill state={state} />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="detail"
+            // Clip while the height moves, then let the remove popover hang out.
+            initial={{ height: 0, opacity: 0, overflow: "hidden" }}
+            animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
+            exit={{ height: 0, opacity: 0, overflow: "hidden" }}
+            transition={SPRING}
+          >
+            <div className="pb-2.5 pl-11 pr-4">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </li>
+  );
+}
+
+function Line({ text, state }: { text: string; state?: State }) {
+  return (
+    <div className="flex items-center gap-2 py-[3px]">
+      <span className="min-w-0 flex-1 truncate text-[13px] leading-[18px] text-ink-2" title={text}>
+        {text}
+      </span>
+      {state && <Pill small state={state} />}
+    </div>
+  );
+}
+
+const LIMIT_ORDER: Access[] = ["deny", "ask", "allow"];
+
+function PermissionRow({
+  p,
+  rules,
+  open,
+  onToggle,
+  removal,
+}: {
+  p: Permission;
+  rules: Map<string, Rule>;
+  open: boolean;
+  onToggle: () => void;
+  removal: (id: string, where: string) => Removal;
+}) {
+  // Limits read as one line per outcome, so the detail stays at three lines: two of limits, one of who set it.
+  const groups = LIMIT_ORDER.map((a) => ({ a, texts: p.limits.filter((l) => l.access === a).map((l) => l.text) })).filter((g) => g.texts.length);
+  const shown = groups.slice(0, 2);
+  const rest = groups.slice(2).flatMap((g) => g.texts);
+  const yours = p.ruleIds.map((id) => rules.get(id)).find((r): r is Rule => r !== undefined && ownedByYou(r) && !r.locked);
+  return (
+    <Row
+      icon={CAPABILITY_ICON[p.id] ?? Tag}
+      label={p.label}
+      state={p.access}
+      open={open}
+      onToggle={onToggle}
+      marks={
+        <>
+          {p.planned && <span className="shrink-0 text-[12px] leading-[16px] text-muted">soon</span>}
+          {p.limits.length > 0 && <span title="Has limits" className="size-1.5 shrink-0 rounded-full bg-ink-2/35" />}
+          {p.locked && <Lock aria-label="Locked" className="size-3.5 shrink-0 text-muted" />}
+        </>
+      }
+    >
+      {shown.map((g, i) => (
+        <Line key={g.a} state={g.a} text={[...g.texts, ...(i === shown.length - 1 ? rest : [])].join(" · ")} />
+      ))}
+      <WhoSetIt locked={p.locked} yours={yours} removal={yours ? removal(yours.id, "row") : null} />
+    </Row>
+  );
+}
+
+function WhoSetIt({ locked, yours, removal }: { locked: boolean; yours: Rule | undefined; removal: Removal | null }) {
+  const cls = "pt-[3px] text-[12.5px] leading-[18px] text-muted";
+  if (locked) return <p className={cls}>Locked: can&apos;t be loosened</p>;
+  if (!yours || !removal) return <p className={cls}>Default</p>;
+  const sentence = yours.reason ?? "This rule";
+  return (
+    <p className={cls}>
+      You ·{" "}
+      <span className="relative inline-block">
+        <button
+          type="button"
+          aria-expanded={removal.confirming}
+          onClick={removal.onAsk}
+          className={`tap -mx-1 rounded-full px-1 hover:bg-danger-wash hover:text-danger ${removal.confirming ? "bg-danger-wash text-danger" : ""}`}
+        >
+          remove
+        </button>
+        <AnimatePresence>
+          {removal.confirming && (
+            <RemoveConfirm align="left" sentence={sentence} busy={removal.busy} error={removal.error} onCancel={removal.onCancel} onConfirm={removal.onConfirm} />
+          )}
+        </AnimatePresence>
+      </span>
+    </p>
+  );
+}
+
+function DataRow({ g, open, onToggle }: { g: DataGuard; open: boolean; onToggle: () => void }) {
+  const shown = g.rules.length > 3 ? g.rules.slice(0, 2) : g.rules;
+  return (
+    <Row
+      icon={DATA_ICON[g.id] ?? Tag}
+      label={g.label}
+      state={GUARD_STATE[g.outcome]}
+      open={open}
+      onToggle={onToggle}
+      marks={g.locked && <Lock aria-label="Locked" className="size-3.5 shrink-0 text-muted" />}
+    >
+      {shown.map((r) => (
+        <Line key={r.ruleId} text={r.text} state={GUARD_STATE[r.outcome]} />
+      ))}
+      {g.rules.length > shown.length && <p className="pt-[3px] text-[12.5px] leading-[18px] text-muted">+{g.rules.length - shown.length} more</p>}
+    </Row>
+  );
+}
+
+/** "Mira can": capabilities in the agent's toolset, then the rest behind one collapsed row. */
+function Permissions({
+  name,
+  permissions,
+  rules,
+  open,
+  onToggle,
+  removal,
+}: {
+  name: string;
+  permissions: Permission[];
+  rules: Map<string, Rule>;
+  open: string | null;
+  onToggle: (key: string) => void;
+  removal: (id: string, where: string) => Removal;
+}) {
+  const [more, setMore] = useState(false);
+  const has = permissions.filter((p) => p.inToolset);
+  const lacks = permissions.filter((p) => !p.inToolset);
+  const rows = (ps: Permission[]) =>
+    ps.map((p) => <PermissionRow key={p.id} p={p} rules={rules} open={open === p.id} onToggle={() => onToggle(p.id)} removal={removal} />);
   return (
     <>
-      {GROUPS.map(({ kind, title }) => {
-        const rules = data.rules.filter((r) => r.kind === kind && !gone.has(r.id));
-        if (rules.length === 0) return null;
-        return (
-          <Section key={kind} title={title} aside={<span className="text-[12px] tabular-nums text-muted">{rules.length}</span>}>
-            <ul>
-              <AnimatePresence initial={false}>
-                {rules.map((r) => (
-                  <RuleRow
-                    key={r.id}
-                    rule={r}
-                    sentence={data.readBack[r.id] ?? r.reason ?? `A ${r.kind} rule`}
-                    fresh={fresh.has(r.id)}
-                    reveal={fresh.has(r.id) && saved.has(r.id)}
-                    removal={{
-                      confirming: confirm === r.id,
-                      busy: busy && confirm === r.id,
-                      error: confirm === r.id ? error : null,
-                      onAsk: () => {
-                        setError(null);
-                        setConfirm((c) => (c === r.id ? null : r.id));
-                      },
-                      onCancel: cancel,
-                      onConfirm: () => void remove(r.id),
-                    }}
-                  />
-                ))}
-              </AnimatePresence>
-            </ul>
-          </Section>
-        );
-      })}
+      {has.length > 0 && <Section title={`${name} can`}>{rows(has)}</Section>}
+      {lacks.length > 0 && (
+        <div className={has.length ? "mt-1.5" : "mt-6"}>
+          <button
+            type="button"
+            aria-expanded={more}
+            onClick={() => setMore((m) => !m)}
+            className="tap-soft flex items-center gap-1 rounded-full py-1 pl-1.5 pr-2.5 text-[13px] leading-[18px] text-muted hover:bg-black/[0.04] hover:text-ink-2"
+          >
+            <motion.span animate={{ rotate: more ? 90 : 0 }} transition={SPRING} className="grid place-items-center">
+              <ChevronRight className="size-3.5" />
+            </motion.span>
+            {lacks.length} more {name} doesn&apos;t have
+          </button>
+          <AnimatePresence initial={false}>
+            {more && (
+              <motion.div
+                key="more"
+                initial={{ height: 0, opacity: 0, overflow: "hidden" }}
+                animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
+                exit={{ height: 0, opacity: 0, overflow: "hidden" }}
+                transition={SPRING}
+              >
+                <Section className="pt-1.5">{rows(lacks)}</Section>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
     </>
   );
 }
+
+function YourRuleRow({ rule, sentence, fresh, reveal, removal }: { rule: Rule; sentence: string; fresh: boolean; reveal: boolean; removal: Removal }) {
+  const ref = useRef<HTMLLIElement>(null);
+  // A rule you just saved scrolls into view, so you see it pop in.
+  useEffect(() => {
+    if (!reveal) return;
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    ref.current?.scrollIntoView({ block: "nearest", behavior: calm ? "auto" : "smooth" });
+  }, [reveal]);
+  const state = stateOfRule(rule);
+  return (
+    <motion.li
+      ref={ref}
+      initial={fresh ? { opacity: 0, y: 12, scale: 0.97 } : false}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      // Fade first, then close the gap, so the leaving text never overlaps the row below.
+      exit={{ opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0, transition: { opacity: { duration: 0.08 }, default: SPRING } }}
+      transition={POP}
+      className="flex items-center gap-2 border-t border-line py-2 pl-4 pr-2.5 first:border-t-0"
+    >
+      <span className="min-w-0 flex-1 line-clamp-2 text-[14px] leading-[20px]" title={rule.source?.nl ?? sentence}>
+        {sentence}
+      </span>
+      {rule.mode === "shadow" && (
+        <span
+          title="Logged, never enforced"
+          className="shrink-0 whitespace-nowrap rounded-full border border-dashed border-ink-2/40 px-1.5 text-[11px] leading-[16px] text-ink-2"
+        >
+          Log only
+        </span>
+      )}
+      {state && <Pill state={state} />}
+      <span className="relative grid size-7 shrink-0 place-items-center text-muted">
+        {rule.locked ? (
+          <span role="img" aria-label="Locked" title="Locked: can't be loosened or removed here">
+            <Lock className="size-3.5" />
+          </span>
+        ) : (
+          <button
+            type="button"
+            aria-label={`Remove rule: ${sentence}`}
+            aria-expanded={removal.confirming}
+            title="Remove"
+            onClick={removal.onAsk}
+            className={`tap grid size-7 place-items-center rounded-full hover:bg-danger-wash hover:text-danger ${removal.confirming ? "bg-danger-wash text-danger" : ""}`}
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        )}
+        <AnimatePresence>
+          {removal.confirming && (
+            <RemoveConfirm align="right" sentence={sentence} busy={removal.busy} error={removal.error} onCancel={removal.onCancel} onConfirm={removal.onConfirm} />
+          )}
+        </AnimatePresence>
+      </span>
+    </motion.li>
+  );
+}
+
+/** One muted line: how many local detectors check the data, and whether each hosted check is on. */
+function DetectorLine({ detectors }: { detectors: DetectorSummary[] }) {
+  const local = detectors.filter((d) => d.configured === undefined).reduce((n, d) => n + d.rules, 0);
+  const hosted = detectors.filter((d) => d.configured !== undefined).map((d) => `${d.name.split(" ")[0]} ${d.configured ? "on" : "off"}`);
+  return <p className="mt-6 px-1 text-[12px] leading-[16px] text-muted">{[`Checked by ${local} local detectors`, ...hosted].join(" · ")}</p>;
+}
+
+// ---------- composer ----------
 
 const CONFLICT_LABEL: Record<RuleConflict["kind"], string> = {
   shadowed: "Already covered",
@@ -405,6 +553,17 @@ const CONFLICT_LABEL: Record<RuleConflict["kind"], string> = {
   revokes_grant: "Revokes a grant",
   duplicate: "Duplicate",
 };
+
+const TONE = {
+  danger: "bg-danger-wash text-danger",
+  ask: "bg-accent-wash text-accent",
+  caution: "bg-caution-wash text-caution",
+  neutral: "bg-bubble text-ink-2",
+} as const;
+
+function CountChip({ label, tone }: { label: string; tone: keyof typeof TONE }) {
+  return <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[12px] font-medium leading-[16px] ${TONE[tone]}`}>{label}</span>;
+}
 
 /** POST /api/rules { rules, mode }: the same two modes a rule carries. */
 type SaveMode = NonNullable<Rule["mode"]>;
@@ -442,7 +601,7 @@ function Proposal({
   onCancel: () => void;
 }) {
   const n = result.rules.length;
-  // readBack is a list, not keyed by id; when it lines up with the rules, each line gets its rule's chip.
+  // readBack is a list, not keyed by id; when it lines up with the rules, each line gets its rule's pill.
   const aligned = n === result.readBack.length;
   const d = result.dryRun;
   return (
@@ -455,7 +614,7 @@ function Proposal({
       className="mt-2 rounded-[20px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_8px_24px_rgba(0,0,0,0.06)]"
     >
       <div className="flex items-center gap-2">
-        <h3 className="text-[13px] font-medium text-muted">{n === 0 ? "Nothing new to add" : n === 1 ? "Proposed rule" : `Proposed rules (${n})`}</h3>
+        <h3 className="text-[13px] font-medium text-muted">{n === 0 ? "Nothing new to add" : n === 1 ? "Proposed rule" : "Proposed rules"}</h3>
         {busy === "compile" && (
           <span className="inline-flex items-center gap-1 text-[12px] text-muted">
             <Loader className="size-3 animate-spin motion-reduce:animate-none" />
@@ -471,16 +630,19 @@ function Proposal({
         transition={POP}
       >
         <ul className="mt-2 space-y-1.5">
-          {result.readBack.map((line, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <span className="min-w-0 flex-1 text-[14.5px] leading-[21px]">{line}</span>
-              {aligned && (
-                <span className="mt-0.5 flex">
-                  <OutcomeChip {...outcomeOf(result.rules[i])} />
-                </span>
-              )}
-            </li>
-          ))}
+          {result.readBack.map((line, i) => {
+            const state = aligned ? stateOfRule(result.rules[i]) : null;
+            return (
+              <li key={i} className="flex items-start gap-2">
+                <span className="min-w-0 flex-1 text-[14.5px] leading-[21px]">{line}</span>
+                {state && (
+                  <span className="mt-0.5 flex">
+                    <Pill state={state} />
+                  </span>
+                )}
+              </li>
+            );
+          })}
         </ul>
 
         {result.questions.map((q) => (
@@ -506,14 +668,9 @@ function Proposal({
         ))}
 
         {result.assumptions.length > 0 && (
-          <ul className="mt-3 space-y-0.5">
-            {result.assumptions.map((a) => (
-              <li key={a} className="flex gap-1.5 text-[12.5px] leading-[18px] text-ink-2">
-                <Info className="mt-[3px] size-3 shrink-0 text-muted" />
-                <span>Assumed: {a}</span>
-              </li>
-            ))}
-          </ul>
+          <p className="mt-3 truncate text-[12.5px] leading-[18px] text-muted" title={result.assumptions.join("\n")}>
+            Assumed: {result.assumptions.join("; ")}
+          </p>
         )}
 
         {result.conflicts.map((c) => (
@@ -530,19 +687,17 @@ function Proposal({
           </div>
         ))}
 
-        <div className="mt-3 border-t border-line pt-3 text-[13px] leading-[19px] text-ink-2">
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-line pt-3 text-[12.5px] leading-[18px] text-muted">
           {d ? (
             <>
-              <p>If it had been on for the last {plural(d.total, "recorded call")}:</p>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                <OutcomeChip label={`${d.block} blocked`} tone="danger" />
-                <OutcomeChip label={`${d.ask} asked`} tone="ask" />
-                <OutcomeChip label={`${d.redact} redacted`} tone="caution" />
-                <OutcomeChip label={`${d.allow} allowed`} tone="neutral" />
-              </div>
+              <span className="mr-1">Last {plural(d.total, "call")}</span>
+              <CountChip label={`${d.block} blocked`} tone="danger" />
+              <CountChip label={`${d.ask} asked`} tone="ask" />
+              <CountChip label={`${d.redact} redacted`} tone="caution" />
+              <CountChip label={`${d.allow} allowed`} tone="neutral" />
             </>
           ) : (
-            <p>No recorded tool calls yet, so there&apos;s nothing to test it on.</p>
+            <span>No recorded calls to test it on yet</span>
           )}
         </div>
       </motion.div>
@@ -564,7 +719,7 @@ function Proposal({
           title="Log what it would do, without enforcing it"
           className={`${btn} bg-white ring-1 ring-black/10 hover:bg-bubble disabled:opacity-50`}
         >
-          {busy === "shadow" ? "Saving…" : "Save as shadow"}
+          {busy === "shadow" ? "Saving…" : "Log only"}
         </button>
         <button type="button" onClick={onCancel} disabled={busy === "enforce" || busy === "shadow"} className={`${btn} text-ink-2 hover:bg-bubble`}>
           Cancel
@@ -574,7 +729,7 @@ function Proposal({
   );
 }
 
-/** "Describe a rule…": compiles the sentence, shows the proposal, saves it. */
+/** "Change a permission in plain words…": compiles the sentence, shows the proposal, saves it. */
 function RuleComposer({
   agentId,
   projectId,
@@ -672,8 +827,8 @@ function RuleComposer({
               void compile(text);
             }
           }}
-          placeholder="Describe a rule…"
-          aria-label="Describe a rule"
+          placeholder="Change a permission in plain words…"
+          aria-label="Change a permission"
           className="own-focus scroll-quiet field-sizing-content max-h-40 min-h-[34px] min-w-0 flex-1 resize-none bg-transparent py-[7px] text-[14.5px] leading-[20px] outline-none placeholder:text-muted"
         />
         <button
@@ -691,11 +846,7 @@ function RuleComposer({
           )}
         </button>
       </div>
-      {!result && (
-        <p className={`mt-1.5 px-4 text-[12.5px] leading-[18px] ${error ? "text-danger" : "text-muted"}`}>
-          {error ?? "Like “Never email Acme files to anyone outside acme.com.”"}
-        </p>
-      )}
+      {!result && error && <p className="mt-1.5 px-4 text-[12.5px] leading-[18px] text-danger">{error}</p>}
       <AnimatePresence initial={false}>
         {result && (
           <Proposal
@@ -717,31 +868,35 @@ function RuleComposer({
 }
 
 function LoadState({ error, onRetry }: { error: string | null; onRetry: () => void }) {
-  if (!error) return <p className="mt-6 text-center text-[13px] text-muted">Loading rules…</p>;
+  if (!error) return <p className="mt-6 text-center text-[13px] text-muted">Loading permissions…</p>;
   return (
-    <div className="mt-6 rounded-2xl bg-white px-4 py-6 text-center shadow-[0_0_0_1px_rgba(0,0,0,0.05)]">
-      <p className="text-[14.5px] font-medium">Couldn&apos;t load the rules</p>
-      <p className="mx-auto mt-1 max-w-[360px] text-[13px] leading-[19px] text-ink-2">{error}. Try again in a moment.</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="tap mt-3 rounded-full bg-white px-3.5 py-1.5 text-[13.5px] font-medium ring-1 ring-black/10 hover:bg-bubble"
-      >
+    <p className="mt-6 text-center text-[13px] text-ink-2">
+      Couldn&apos;t load permissions: {error}.{" "}
+      <button type="button" onClick={onRetry} className="tap rounded-full px-1.5 py-0.5 font-medium text-accent hover:bg-accent-wash">
         Try again
       </button>
-    </div>
+    </p>
   );
 }
 
-/** The Rules tab: `agentId` for an agent's panel, `projectId` for a team's. */
+/** The Permissions tab: `agentId` for an agent's panel, `projectId` for a team's (no capability list there yet). */
 export function RulesTab({ agentId, projectId, onNotify }: { agentId?: string; projectId?: string; onNotify: (text: string) => void }) {
   const query = agentId ? `agent=${encodeURIComponent(agentId)}` : `project=${encodeURIComponent(projectId ?? "")}`;
   const { data, fresh, error, reload } = useRules(`/api/rules?${query}`);
   const [saved, setSaved] = useState<ReadonlySet<string>>(new Set());
+  // One row open at a time keeps the tab short.
+  const [open, setOpen] = useState<string | null>(null);
+  const toggle = (key: string) => setOpen((o) => (o === key ? null : key));
+  const { gone, removal } = useRemoval(() => {
+    reload();
+    onNotify("Rule removed");
+  });
   if (!data) return <LoadState error={error} onRetry={reload} />;
-  const locked = data.rules.filter((r) => r.locked).length;
+
+  const byId = new Map(data.rules.map((r) => [r.id, r]));
+  const yours = data.rules.filter((r) => ownedByYou(r) && !gone.has(r.id));
   return (
-    <div className="@container">
+    <div>
       <RuleComposer
         agentId={agentId}
         projectId={projectId}
@@ -749,26 +904,43 @@ export function RulesTab({ agentId, projectId, onNotify }: { agentId?: string; p
         onSaved={(ids, mode) => {
           setSaved(new Set(ids));
           reload();
-          onNotify(`Saved ${plural(ids.length, "rule")}${mode === "shadow" ? " in shadow mode" : ""}`);
+          onNotify(`Saved ${plural(ids.length, "rule")}${mode === "shadow" ? ", log only" : ""}`);
         }}
       />
-      <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1.5 px-1">
-        <span className="mr-1 text-[13px] text-ink-2">
-          {plural(data.rules.length, "rule")} · {locked} locked
-        </span>
-        {data.detectors.map((d) => (
-          <DetectorChip key={d.id} d={d} />
-        ))}
-      </div>
-      <RulesList
-        data={data}
-        fresh={fresh}
-        saved={saved}
-        onRemoved={() => {
-          reload();
-          onNotify("Rule removed");
-        }}
-      />
+      {agentId && data.permissions && (
+        <Permissions
+          name={AGENTS[agentId]?.name ?? agentId}
+          permissions={data.permissions}
+          rules={byId}
+          open={open}
+          onToggle={toggle}
+          removal={removal}
+        />
+      )}
+      <Section title="Data">
+        {data.data.length === 0 ? (
+          <li className="px-4 py-2.5 text-[13px] text-muted">No data rules</li>
+        ) : (
+          data.data.map((g) => <DataRow key={g.id} g={g} open={open === `data:${g.id}`} onToggle={() => toggle(`data:${g.id}`)} />)
+        )}
+      </Section>
+      {yours.length > 0 && (
+        <Section title="Your rules">
+          <AnimatePresence initial={false}>
+            {yours.map((r) => (
+              <YourRuleRow
+                key={r.id}
+                rule={r}
+                sentence={data.readBack[r.id] ?? r.reason ?? "A rule you added"}
+                fresh={fresh.has(r.id)}
+                reveal={fresh.has(r.id) && saved.has(r.id)}
+                removal={removal(r.id, "list")}
+              />
+            ))}
+          </AnimatePresence>
+        </Section>
+      )}
+      <DetectorLine detectors={data.detectors} />
     </div>
   );
 }
