@@ -436,7 +436,8 @@ const CONFLICT_LABEL: Record<RuleConflict["kind"], string> = {
   duplicate: "Duplicate",
 };
 
-type SaveMode = "enforce" | "shadow";
+/** POST /api/rules { rules, mode }: the same two modes a rule carries. */
+type SaveMode = NonNullable<Rule["mode"]>;
 
 /** The server's own `{ error }` message when it sent one, else a plain fallback. */
 async function failure(res: Response, fallback: string) {
