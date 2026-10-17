@@ -9,11 +9,10 @@
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { BaseCheckpointSaver } from "@langchain/langgraph";
 import { createDeepAgent } from "deepagents";
+// The extension lets a plain `node` resolve it (the restart test); TS allows it (allowImportingTsExtensions).
+import { threadId } from "./threads.ts";
 
-/** One thread per agent × project (research D §1); a DM task is a one-member project. */
-export function threadId(agentId: string, projectId: string): string {
-  return `a:${agentId}:p:${projectId}`;
-}
+export { threadId };
 
 export type AgentSpec = {
   agentId: string;
