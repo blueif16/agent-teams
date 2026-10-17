@@ -418,7 +418,12 @@ export class Vault {
           else reject(new Error(`git ${args[0]} failed (${code}): ${(stderr || err?.message || "").trim()}`));
         },
       );
-      child.stdin?.end(opts.input ?? "");
+      // A git command that never reads stdin (log, diff --quiet) can exit before a write lands; the EPIPE that
+      // follows would be an uncaught exception. git's exit code above is what decides the result.
+      child.stdin?.on("error", (e: NodeJS.ErrnoException) => {
+        if (e.code !== "EPIPE") reject(e);
+      });
+      child.stdin?.end(opts.input);
     });
   }
 
