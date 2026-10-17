@@ -22,10 +22,12 @@ describe.skipIf(!LIVE)("live: Mira starts a team and the PM gets it rolling", ()
   let checkpointer: ReturnType<typeof openCheckpointer>;
   beforeAll(async () => {
     const keys = { c: process.env.CRUSOE_API_KEY, y: process.env.YDC_API_KEY };
+    // Before tempEnv: it moves the cwd to an empty folder.
+    const skills = path.join(process.cwd(), "skills");
     env = await tempEnv();
     process.env.CRUSOE_API_KEY = keys.c;
     if (keys.y) process.env.YDC_API_KEY = keys.y;
-    process.env.SKILLS_DIR = path.join(process.cwd(), "skills");
+    process.env.SKILLS_DIR = skills;
     db = getRuntimeDb();
     checkpointer = openCheckpointer(path.join(env.data, "checkpoints.db"));
     setRuntime(new Runtime({ db, checkpointer }));
