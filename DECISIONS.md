@@ -44,6 +44,8 @@ Details and evidence: `docs/design/team-setup.md`.
 - Q12 Engineers use You.com like everyone else; revisit if their docs lookups underperform.
 - Q13 Mira runs one research call per active project per day for news.
 - Privacy rules live in a Rules tab next to Performance.
+- The only primitives are **archetypes** and the **skill library**. A composition (archetype + skills for one role) is built by the orchestrator when staffing, or adapted from past compositions; there are no fixed default skills per archetype.
+- Each archetype has its own curated toolset, including presentation tools that render in the work pane (the analyst's charts; an infinite canvas for the designer). Agents inherit their archetype's toolset.
 
 ## Records and stats
 
