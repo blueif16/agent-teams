@@ -554,6 +554,19 @@ function parseWordDiff(out: string): DiffHunk[] {
   return hunks;
 }
 
+// The process's vault, kept on globalThis so dev reloads don't start a second queue on the same repo.
+const G = globalThis as { __agentTeamsVault?: Vault };
+
+/** The app's vault: `$VAULT_DIR`, else `.data/vault`. Every route and writer shares it. */
+export function getVault(): Vault {
+  return (G.__agentTeamsVault ??= new Vault({ dir: process.env.VAULT_DIR || undefined }));
+}
+
+/** Replace the app's vault (boot wiring with hooks, or a temp vault in tests); null resets to the default. */
+export function setVault(vault: Vault | null): void {
+  G.__agentTeamsVault = vault ?? undefined;
+}
+
 interface Job {
   files: { path: string; content: string }[];
   author: VaultAuthor;

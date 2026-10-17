@@ -3,9 +3,12 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VaultAuthor } from "@/lib/vault/types";
 import { OWNER, RUNTIME, Vault, VaultConflictError, VaultNotFoundError } from "./vault";
+
+// Real git, ~100 spawns in the queue test: a loaded machine blows through the 5 s default.
+vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 
 /*
  * The vault against real git in temp dirs. Every check reads the repo with the
