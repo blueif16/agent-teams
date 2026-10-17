@@ -25,6 +25,7 @@ import { Sidebar } from "./Sidebar";
 import { Conversation, type MessageHandlers } from "./Conversation";
 import { WorkspaceBody, WorkspaceTabs, type Tab } from "./Workspace";
 import type { Reaction } from "./MessageActions";
+import { useApprovals } from "./approvals";
 
 export type View = { kind: "channel"; teamId: string } | { kind: "dm"; agentId: string };
 
@@ -599,6 +600,8 @@ export function AgentTeams() {
   const local = convos[key];
   const messages = useMemo(() => (where ? viewMessages(rows, local ?? [], replies, viewThreads) : (local ?? [])), [where, rows, local, replies, viewThreads]);
   shownRef.current[key] = messages;
+  // R6: the runtime's approvals on this view, as approval cards after the messages (components/approvals.ts).
+  const approvals = useApprovals(where ?? null, MIRA_PROJECT);
   // Someone on the view with a run that hasn't said anything yet is typing.
   const quiet = inFlight(runs).find((r) => viewThreads.includes(r.thread) && !r.text.trim());
   const typingAgentId = typing[key] ?? (quiet ? agentOf(quiet.thread) : null);
@@ -838,7 +841,7 @@ export function AgentTeams() {
             <Conversation
               key={key}
               view={view}
-              messages={messages}
+              messages={approvals.cards.length ? [...messages, ...approvals.cards] : messages}
               typingAgentId={typingAgentId}
               onLoadEarlier={hasEarlier && where && rows[0] ? () => void loadEarlier(where, rows[0].id) : undefined}
               status={statusAll}
@@ -847,7 +850,7 @@ export function AgentTeams() {
               reactions={reactions}
               handlers={handlers}
               onSend={(text, images) => send(view, text, { images })}
-              onDecide={(id, d) => decide(key, id, d)}
+              onDecide={(id, d) => approvals.decide(id, d) || decide(key, id, d)}
               onOpenAgent={openAgent}
               onOpenTeam={openTeam}
               onMessageAgent={(agentId) => navigate({ kind: "dm", agentId })}
