@@ -1,14 +1,13 @@
 import { AnimatePresence, motion } from "motion/react";
-import { AtSign, Clock, House, LayoutGrid, PanelLeft } from "lucide-react";
+import { Clock, House, LayoutGrid, PanelLeft } from "lucide-react";
 import { ChiefButton } from "./Chief";
 import { IconButton, POP, SPRING } from "./ui";
 
-export type SideMode = "home" | "activity" | "mentions" | "agents";
+export type SideMode = "home" | "activity" | "agents";
 
 const ITEMS: { mode: SideMode; label: string; Icon: typeof House }[] = [
   { mode: "home", label: "Teams", Icon: House },
   { mode: "activity", label: "Activity", Icon: Clock },
-  { mode: "mentions", label: "Mentions", Icon: AtSign },
 ];
 
 export function Rail({

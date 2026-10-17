@@ -74,7 +74,6 @@ export type Message =
       text: string;
       /** Standing instruction or earlier message this one answers. */
       quote?: string;
-      mentionsYou?: boolean;
       /** LangSmith run id of a live reply, so reactions land as feedback on it. */
       traceId?: string;
       /** Set while the reply is still streaming in, so Markdown animates and charts show a skeleton. */

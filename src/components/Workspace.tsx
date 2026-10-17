@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, ArrowRight, Columns2, Ellipsis, Hash, RotateCw, X } from "lucide-react";
+import { Columns2, Ellipsis, Hash, X } from "lucide-react";
 import { AGENTS } from "@/lib/data";
 import { useOrg } from "./org";
 import type { AgentStatus, Team } from "@/lib/types";
@@ -13,14 +13,13 @@ export type Tab = { id: string } & (
   | { type: "team"; teamId: string }
 );
 
-function tabMeta(tab: Tab, teamsById: Record<string, Team>): { title: string; icon: React.ReactNode; url: string } {
+function tabMeta(tab: Tab, teamsById: Record<string, Team>): { title: string; icon: React.ReactNode } {
   switch (tab.type) {
     case "agent": {
       const a = AGENTS[tab.agentId];
       return {
         title: `${a.name}: activity`,
         icon: <Mascot look={a.look} size={17} />,
-        url: `agent-teams.app/agents/${a.id}`,
       };
     }
     case "team": {
@@ -28,7 +27,6 @@ function tabMeta(tab: Tab, teamsById: Record<string, Team>): { title: string; ic
       return {
         title: `#${t.channel} plan`,
         icon: <Hash className="size-[15px] text-ink-2" />,
-        url: `agent-teams.app/teams/${t.id}`,
       };
     }
   }
@@ -113,7 +111,6 @@ export function WorkspaceBody({
   status,
   doing,
   memories,
-  checkIns,
   onNotify,
   onOpenAgent,
   onMessage,
@@ -126,7 +123,6 @@ export function WorkspaceBody({
   status: Record<string, AgentStatus>;
   doing: Record<string, string>;
   memories: Record<string, string[]>;
-  checkIns: Record<string, string[]>;
   onNotify: (text: string) => void;
   onOpenAgent: (id: string) => void;
   onMessage: (agentId: string) => void;
@@ -135,39 +131,12 @@ export function WorkspaceBody({
   onCloseOthers: (id: string) => void;
   onCloseTab: (id: string) => void;
 }) {
-  const [reloads, setReloads] = useState(0);
   const [menu, setMenu] = useState(false);
-  const { teamsById } = useOrg();
   if (!tab) return null;
-  const meta = tabMeta(tab, teamsById);
 
   return (
     <>
-      <div className="flex h-[54px] shrink-0 items-center gap-2 px-2.5">
-        <div className={`${pill} p-0.5`}>
-          <IconButton label="Back" disabled className="rounded-full">
-            <ArrowLeft className="size-[17px]" strokeWidth={1.7} />
-          </IconButton>
-          <IconButton label="Forward" disabled className="rounded-full">
-            <ArrowRight className="size-[17px]" strokeWidth={1.7} />
-          </IconButton>
-        </div>
-        <div className={`${pill} p-0.5`}>
-          <IconButton label="Reload" onClick={() => setReloads((r) => r + 1)} className="rounded-full">
-            <motion.span
-              key={reloads}
-              className="grid place-items-center"
-              initial={{ rotate: reloads ? -300 : 0 }}
-              animate={{ rotate: 0 }}
-              transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
-            >
-              <RotateCw className="size-[16px]" strokeWidth={1.8} />
-            </motion.span>
-          </IconButton>
-        </div>
-        <div className={`${pill} h-9 min-w-0 flex-1 justify-center px-4 text-[14.5px] text-ink`}>
-          <span className="truncate">{meta.url}</span>
-        </div>
+      <div className="flex h-[54px] shrink-0 items-center justify-end gap-2 px-2.5">
         <div className="relative">
           <div className={`${pill} p-0.5`}>
             <IconButton label="More" onClick={() => setMenu((m) => !m)} className="rounded-full">
@@ -211,7 +180,7 @@ export function WorkspaceBody({
         </div>
       </div>
       <motion.div
-        key={`${tab.id}-${reloads}`}
+        key={tab.id}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
@@ -223,7 +192,6 @@ export function WorkspaceBody({
             status={status[tab.agentId]}
             doing={doing[tab.agentId]}
             memories={memories[tab.agentId] ?? []}
-            checkIns={checkIns[tab.agentId] ?? []}
             onMessage={onMessage}
             onToggleRun={onToggleRun}
             onOpenChannel={onOpenChannel}

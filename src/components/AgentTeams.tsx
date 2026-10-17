@@ -112,7 +112,6 @@ export function AgentTeams() {
   );
   const [reactions, setReactions] = useState<Record<string, Reaction[]>>({});
   const [memories, setMemories] = useState<Record<string, string[]>>({});
-  const [checkIns, setCheckIns] = useState<Record<string, string[]>>({});
   const [live, setLive] = useState<boolean | null>(null);
   const [prefill, setPrefill] = useState<{ key: string; text: string; nonce: number } | null>(null);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
@@ -473,13 +472,6 @@ export function AgentTeams() {
         replyQuote: `Handed over from ${from.name}`,
       });
     },
-    onCheckIn: (agentId, text, when) => {
-      const name = AGENTS[agentId].name;
-      const lower = when.charAt(0).toLowerCase() + when.slice(1);
-      setCheckIns((c) => ({ ...c, [agentId]: [...(c[agentId] ?? []), `${when}: check in on “${excerpt(plain(text), 60)}”`] }));
-      append(key, { id: uid(), kind: "status", at: now(), text: `${name} will check in on this ${lower}` });
-      notify(`Check-in set for ${name}`);
-    },
     onAsk: (agentId, text) => {
       const quote = `“${excerpt(plain(text), 80)}”`;
       const t = view.kind === "channel" ? `@${AGENTS[agentId].name} about ${quote}: ` : `About ${quote}: `;
@@ -525,7 +517,6 @@ export function AgentTeams() {
       status={status}
       doing={doing}
       memories={memories}
-      checkIns={checkIns}
       onNotify={notify}
       onOpenAgent={openAgent}
       onMessage={(agentId) => navigate({ kind: "dm", agentId })}

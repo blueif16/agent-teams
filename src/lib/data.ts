@@ -154,7 +154,6 @@ export const TEAMS: Team[] = [
         at: "9:27 AM",
         quote: "Read the brief in #aster-launch and keep an eye on updates. If anything affects our launch deck, tell me before you change it.",
         text: "Heads-up: the [new build](artifact:aster-build) renames “Your week” to “Today.” I'm holding the deck export until you pick Variant A or B.",
-        mentionsYou: true,
       },
       {
         id: "al-7",
@@ -237,7 +236,6 @@ export const TEAMS: Team[] = [
         from: "scout",
         at: "6:02 AM",
         text: "Lumen raised Pro from $12 to $15 and added a “Today” widget. Before and after in [Lumen pricing](artifact:radar-lumen).",
-        mentionsYou: true,
       },
       { id: "cr-3", kind: "handoff", from: "scout", to: "ledger", at: "6:03 AM", task: "Recompute price gaps with Lumen at $15" },
       {
@@ -327,7 +325,6 @@ export const TEAMS: Team[] = [
         from: "mabel",
         at: "8:00 AM",
         text: "Morning sweep: 63 new, 51 archived, 9 drafts waiting, 3 need you.",
-        mentionsYou: true,
       },
       {
         id: "it-2",
@@ -541,7 +538,6 @@ export const TEAMS: Team[] = [
         from: "marlo",
         at: "Mon 6:05 PM",
         text: "Two churn numbers disagree: the dashboard says 2.1%, the Stripe export says 2.4%. I'm using 2.4% until you say otherwise.",
-        mentionsYou: true,
       },
     ],
   }),
@@ -791,7 +787,6 @@ export const TEAMS: Team[] = [
           "The drop traces to the **Android 2.3.1** cohort. Its crash rate on launch doubled.\n\n```chart\n" +
           '{"type":"bar","title":"D7 retention by app version","subtitle":"Week of Oct 5","x":["iOS 5.2","iOS 5.1","Android 2.3.0","Android 2.3.1","Web"],"series":[{"name":"D7 retention","values":[45,44,43,31,40]}],"unit":"%","highlight":"Android 2.3.1"}' +
           "\n```",
-        mentionsYou: true,
       },
       {
         id: "dp-4",

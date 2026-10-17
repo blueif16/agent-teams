@@ -1,5 +1,5 @@
 import { Fragment, useState, type ReactNode } from "react";
-import { AlarmClock, CalendarClock, ChartColumn, Check, Fingerprint, Hash, List, Loader, Pause, Pin, Play } from "lucide-react";
+import { ChartColumn, Check, Fingerprint, Hash, List, Loader, Pause, Pin, Play } from "lucide-react";
 import { motion } from "motion/react";
 import { AGENTS, CHIEF_ID } from "@/lib/data";
 import type { AgentStatus } from "@/lib/types";
@@ -81,7 +81,6 @@ export function AgentPanel({
   status,
   doing,
   memories,
-  checkIns,
   onMessage,
   onToggleRun,
   onOpenChannel,
@@ -92,7 +91,6 @@ export function AgentPanel({
   /** The agent's "now" line, shared with the chat. */
   doing: string;
   memories: string[];
-  checkIns: string[];
   onMessage: (id: string) => void;
   onToggleRun: (id: string) => void;
   onOpenChannel: (teamId: string) => void;
@@ -227,28 +225,6 @@ export function AgentPanel({
                 >
                   <Pin className="mt-0.5 size-4 shrink-0 text-accent" />
                   {m}
-                </motion.div>
-              ))}
-            </Group>
-          )}
-
-          {(a.schedule?.length || checkIns.length > 0) && (
-            <Group title="Scheduled">
-              {(a.schedule ?? []).map((s) => (
-                <div key={s} className="flex items-center gap-3 border-t border-line px-4 py-2.5 text-[14px] first:border-t-0">
-                  <CalendarClock className="size-4 shrink-0 text-muted" />
-                  {s}
-                </div>
-              ))}
-              {checkIns.map((s, i) => (
-                <motion.div
-                  key={`${i}-${s}`}
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-3 border-t border-line px-4 py-2.5 text-[14px] first:border-t-0"
-                >
-                  <AlarmClock className="size-4 shrink-0 text-accent" />
-                  {s}
                 </motion.div>
               ))}
             </Group>

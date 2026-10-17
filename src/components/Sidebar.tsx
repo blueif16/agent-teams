@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { ChevronDown, Hash, Search } from "lucide-react";
-import { withChartSummaries } from "@/lib/charts";
+import { Hash, Search } from "lucide-react";
 import { AGENTS, CHIEF, CHIEF_ID } from "@/lib/data";
 import type { AgentStatus, Message } from "@/lib/types";
 import { Mascot } from "./Mascot";
@@ -15,7 +14,6 @@ type Pending = { key: string; msg: Extract<Message, { kind: "approval" }> };
 const TITLES: Record<SideMode, string> = {
   home: "Agent Teams",
   activity: "Activity",
-  mentions: "Mentions",
   agents: "All agents",
 };
 
@@ -103,15 +101,6 @@ export function Sidebar({
     : [];
   const showChief = !q || CHIEF.name.toLowerCase().includes(q) || "ceo".includes(q);
 
-  const mentions = useMemo(
-    () =>
-      Object.entries(convos).flatMap(([key, msgs]) =>
-        msgs
-          .filter((m): m is Extract<Message, { kind: "text" }> => m.kind === "text" && !!m.mentionsYou)
-          .map((m) => ({ key, msg: m })),
-      ),
-    [convos],
-  );
   const handoffs = useMemo(
     () =>
       Object.entries(convos).flatMap(([key, msgs]) =>
@@ -129,10 +118,7 @@ export function Sidebar({
   return (
     <aside className={`flex w-[252px] shrink-0 flex-col bg-frame ${className}`}>
       <div className="flex h-11 shrink-0 items-center px-3">
-        <span className="flex items-center gap-1 text-[15px] font-semibold tracking-[-0.01em]">
-          {TITLES[mode]}
-          {mode === "home" && <ChevronDown className="size-4 text-muted" />}
-        </span>
+        <span className="text-[15px] font-semibold tracking-[-0.01em]">{TITLES[mode]}</span>
       </div>
 
       <motion.div
@@ -257,27 +243,6 @@ export function Sidebar({
               ))}
             </Section>
           </>
-        )}
-
-        {mode === "mentions" && (
-          <Section title="Messages for you" count={mentions.length}>
-            {mentions.map(({ key, msg }) => {
-              const a = AGENTS[msg.from];
-              return (
-                <Row key={msg.id} onClick={() => goKey(key)}>
-                  <span className="squish-group mt-0.5 shrink-0 self-start">
-                      <Mascot look={a.look} size={22} />
-                    </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[12px] text-muted">
-                      {a.name} in #{teamOf(key).channel}
-                    </span>
-                    <span className="line-clamp-2 text-[13.5px] text-ink">{withChartSummaries(msg.text).replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/[*_`#>]+/g, "")}</span>
-                  </span>
-                </Row>
-              );
-            })}
-          </Section>
         )}
 
         {mode === "agents" && (

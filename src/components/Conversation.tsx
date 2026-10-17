@@ -30,7 +30,6 @@ const ENTER = { type: "spring", stiffness: 430, damping: 32 } as const;
 export interface MessageHandlers {
   onOrder: (msgId: string, agentId: string, text: string, key: OrderKey) => void;
   onHandOff: (fromAgentId: string, text: string, toAgentId: string) => void;
-  onCheckIn: (agentId: string, text: string, when: string) => void;
   onAsk: (agentId: string, text: string) => void;
   onCopy: (text: string) => void;
 }
@@ -424,10 +423,6 @@ export function Conversation({
             }}
             onHandOff={(to) => {
               handlers.onHandOff(menuAgent.id, menu.text, to);
-              closeMenu();
-            }}
-            onCheckIn={(when) => {
-              handlers.onCheckIn(menuAgent.id, menu.text, when);
               closeMenu();
             }}
             onProfile={() => {
