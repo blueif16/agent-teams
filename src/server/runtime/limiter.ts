@@ -16,6 +16,11 @@ export type LimiterOptions = {
   /** Tokens per minute per model. Crusoe without a payment method: 500K. */
   tpm?: number;
   windowMs?: number;
+  /**
+   * Count cached prompt tokens toward TPM. Whether Crusoe does is UNVERIFIED
+   * (F §4), so they count unless its remaining-tokens headers show otherwise.
+   */
+  countCachedTokens?: boolean;
 };
 
 /** What a bucket's window holds: one request each, or usage only Crusoe saw (`requests` > 1 or 0). */
@@ -29,6 +34,14 @@ type Bucket = {
   timer?: ReturnType<typeof setTimeout>;
 };
 
+/** The `usage` of an OpenAI-compatible chat completion. */
+export type Usage = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  prompt_tokens_details?: { cached_tokens?: number };
+};
+
 /** A granted request; hand it back to `observe` with the response. */
 export type Reservation = { readonly bucket: Bucket; readonly entry: Entry };
 
@@ -36,12 +49,14 @@ export class Limiter {
   private readonly rpm: number;
   private readonly tpm: number;
   private readonly windowMs: number;
+  private readonly countCachedTokens: boolean;
   private readonly buckets = new Map<string, Bucket>();
 
   constructor(opts: LimiterOptions = {}) {
     this.rpm = opts.rpm ?? 30;
     this.tpm = opts.tpm ?? 500_000;
     this.windowMs = opts.windowMs ?? 60_000;
+    this.countCachedTokens = opts.countCachedTokens ?? true;
   }
 
   /**
@@ -64,7 +79,12 @@ export class Limiter {
    * our window (D §7 assumes Crusoe's minute starts with the first request in it;
    * Crusoe documents no reset header). A 429 records the whole rest as used.
    */
-  observe({ bucket: b }: Reservation, res: { status: number; headers: Headers }) {
+  observe({ bucket: b, entry }: Reservation, res: { status: number; headers: Headers }, usage?: Usage) {
+    // The estimate only saw the prompt; the usage has the real total, output included.
+    if (usage?.total_tokens !== undefined) {
+      const cached = this.countCachedTokens ? 0 : (usage.prompt_tokens_details?.cached_tokens ?? 0);
+      entry.tokens = usage.total_tokens - cached;
+    }
     const now = Date.now();
     this.prune(b, now);
     const start = b.log[0]?.at ?? now;
@@ -157,6 +177,20 @@ function modelOf(body: string): string {
 }
 
 /**
+ * The usage of a JSON response, read from a clone so the caller still gets the body.
+ * A streamed (SSE) response is left alone: reading it would hold the stream until it
+ * ends. Its headers still calibrate the bucket; its own count stays the estimate.
+ */
+async function usageOf(res: Response): Promise<Usage | undefined> {
+  if (!res.headers.get("content-type")?.includes("application/json")) return undefined;
+  try {
+    return ((await res.clone().json()) as { usage?: Usage }).usage;
+  } catch {
+    return undefined; // an empty or garbled body: the caller deals with it, the status still counts
+  }
+}
+
+/**
  * A `fetch` for `ChatOpenAI({ configuration: { fetch } })` that waits on the limiter
  * before each request and corrects it from the response. It wraps `baseFetch`
  * rather than calling the global fetch, so it can sit anywhere in a chain of fetch
@@ -167,7 +201,7 @@ export function limitFetch(baseFetch: typeof fetch = fetch, limiter: Limiter = g
     const body = typeof init?.body === "string" ? init.body : "";
     const reservation = await limiter.acquire(modelOf(body), Math.ceil(body.length / 4));
     const res = await baseFetch(input, init);
-    limiter.observe(reservation, res);
+    limiter.observe(reservation, res, await usageOf(res));
     return res;
   };
 }

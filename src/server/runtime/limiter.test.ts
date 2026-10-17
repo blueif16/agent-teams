@@ -7,9 +7,9 @@ const ADVISOR = MODELS.advisor;
 const URL = "https://api.inference.crusoecloud.com/v1/chat/completions";
 
 /** A chat-completions request as ChatOpenAI sends it, padded so the limiter estimates `estTokens` (chars / 4). */
-function post(model: string, estTokens: number): RequestInit {
+function post(model: string, estTokens: number, stream = false): RequestInit {
   const shape = (content: string) =>
-    JSON.stringify({ model, messages: [{ role: "user", content }], max_tokens: 1024, stream: false });
+    JSON.stringify({ model, messages: [{ role: "user", content }], max_tokens: 1024, stream });
   return {
     method: "POST",
     headers: { "content-type": "application/json", authorization: "Bearer test-key" },
@@ -149,6 +149,29 @@ describe("limitFetch", () => {
 
     expect(out).toBe(res);
   });
+
+  it("returns a streamed response as soon as it starts, without waiting for the stream to end", async () => {
+    const enc = new TextEncoder();
+    const chunk = (extra: object) =>
+      enc.encode(`data: ${JSON.stringify({ id: "chatcmpl-test", object: "chat.completion.chunk", created: 1_760_000_000, model: MAIN, ...extra })}\n\n`);
+    let finish = () => {};
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(chunk({ choices: [{ index: 0, delta: { role: "assistant", content: "hi" }, finish_reason: null }] }));
+        finish = () => {
+          c.enqueue(chunk({ choices: [], usage: SMALL_USAGE }));
+          c.enqueue(enc.encode("data: [DONE]\n\n"));
+          c.close();
+        };
+      },
+    });
+    const res = new Response(body, { status: 200, headers: { "content-type": "text/event-stream", ...ROOMY } });
+
+    const out = track(limitFetch(async () => res, new Limiter())(URL, post(MAIN, 100, true)));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(out.done).toBe(true);
+    finish();
+  });
 });
 
 describe("calibration from responses", () => {
@@ -217,5 +240,45 @@ describe("calibration from responses", () => {
     expect(reached.n).toBe(2);
     await vi.advanceTimersByTimeAsync(1); // t = 60 s
     expect(next.done).toBe(true);
+  });
+
+  it("still returns and observes a response labelled JSON whose body doesn't parse, such as an empty 429", async () => {
+    const empty429 = () => new Response("", { status: 429, headers: { "content-type": "application/json" } });
+    const { f, reached } = crusoe(new Limiter(), empty429);
+
+    await expect(f(URL, post(MAIN, 100))).resolves.toMatchObject({ status: 429 });
+    const next = track(f(URL, post(MAIN, 100)));
+    await vi.advanceTimersByTimeAsync(59_999);
+    expect(next.done).toBe(false);
+    expect(reached.n).toBe(1);
+  });
+
+  // The next two responses carry no x-ratelimit headers, so only the body's usage can correct the count.
+  const BIG_USAGE: Usage = { prompt_tokens: 6_000, completion_tokens: 1_500, total_tokens: 7_500, prompt_tokens_details: { cached_tokens: 5_000 } };
+
+  it("counts a JSON response's real usage, output included, in place of the request's estimate", async () => {
+    const limiter = new Limiter({ tpm: 10_000 });
+    const { f } = crusoe(limiter, () => completion(MAIN, { usage: BIG_USAGE, headers: {} }));
+    await f(URL, post(MAIN, 100)); // estimated 100, really 7.5K
+
+    const next = track(limiter.acquire(MAIN, 3_000)); // fits beside 100, not beside 7.5K
+    await vi.advanceTimersByTimeAsync(59_999);
+    expect(next.done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(next.done).toBe(true);
+  });
+
+  it("counts cached prompt tokens toward TPM unless countCachedTokens is false", async () => {
+    // Whether Crusoe counts cached tokens is UNVERIFIED (F §4), so they count by default.
+    const nextGoesAtOnce = async (opts: { countCachedTokens?: boolean }) => {
+      const limiter = new Limiter({ tpm: 10_000, ...opts });
+      const { f } = crusoe(limiter, () => completion(MAIN, { usage: BIG_USAGE, headers: {} }));
+      await f(URL, post(MAIN, 100));
+      const next = track(limiter.acquire(MAIN, 5_000)); // 7.5K + 5K > 10K; (7.5K - 5K cached) + 5K fits
+      await vi.advanceTimersByTimeAsync(0);
+      return next.done;
+    };
+    expect(await nextGoesAtOnce({})).toBe(false);
+    expect(await nextGoesAtOnce({ countCachedTokens: false })).toBe(true);
   });
 });
