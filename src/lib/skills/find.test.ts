@@ -184,3 +184,34 @@ describe("findSkill: vetting in code", () => {
     expect(without.gh[0].headers.get("authorization")).toBeNull();
   });
 });
+
+describe("findSkill: calibrated on the curated library (skills/index.json)", () => {
+  // Scores on the 55-skill index, 2026-10-17: needs it covers score ≥ 0.326, needs it doesn't ≤ 0.224.
+  const real = async () => {
+    const { loadLibrary } = await import("./library");
+    const f = fakes();
+    return { f, deps: { ...f.deps, search: createSearchSkills((await loadLibrary()).index.skills) } };
+  };
+
+  it("goes to the web for a ClickHouse need, though the library's sql-queries skill partly matches", async () => {
+    const { f, deps } = await real();
+    const result = await findSkill("design ClickHouse table schemas and write fast analytical queries", { archetype: "analyst" }, deps);
+    expect(result.source).toBe("web");
+    expect(f.you).toHaveLength(1);
+  });
+
+  it("goes to the web for a patent application, though the library's docx skill partly matches", async () => {
+    const { f, deps } = await real();
+    const result = await findSkill("file a patent application", { archetype: "writer" }, deps);
+    expect(result.source).toBe("web");
+    expect(f.you).toHaveLength(1);
+  });
+
+  it("stays in the library for the weakest need it does cover, a revenue chart", async () => {
+    const { f, deps } = await real();
+    const result = await findSkill("build a chart of monthly revenue", { archetype: "analyst" }, deps);
+    expect(result.source).toBe("library");
+    if (result.source === "library") expect(result.hits[0].entry.id).toBe("anthropics/data-visualization");
+    expect(f.you).toHaveLength(0);
+  });
+});
