@@ -38,7 +38,7 @@ interface Reply {
 function fakeUpstream(replies: Reply[]) {
   const calls: { url: string; init?: RequestInit }[] = [];
   const state = { finished: 0, cancelled: 0 };
-  const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+  const serve = (async (input: string | URL | Request, init?: RequestInit) => {
     calls.push({ url: String(input), init });
     const r = replies[calls.length - 1];
     if (!r) throw new Error(`fake upstream: no reply for call ${calls.length}`);
@@ -62,7 +62,7 @@ function fakeUpstream(replies: Reply[]) {
       headers: { "content-type": "text/event-stream", ...r.headers },
     });
   }) as typeof fetch;
-  return { fetch, calls, state };
+  return { fetch: serve, calls, state };
 }
 
 /** Fails the test if replay ever reaches for the network. */
