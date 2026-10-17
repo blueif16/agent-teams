@@ -54,6 +54,17 @@ describe("tiers (E §6)", () => {
     expect(tierOf("zz_unknown_tool")).toBeUndefined();
   });
 
+  // Registry calls that no TIERS entry lists fall back to their ToolDef's tier, instead of asking as unknown.
+  it.each([
+    ["canvas_edit", "T1"],
+    ["dispatch", "T1"],
+    ["canvas_read", "T0"],
+    ["fetch_image", "T3"],
+    ["run_tests", "T7"],
+  ])("falls back to the registry for %s: %s", (tool, tier) => {
+    expect(tierOf(tool)?.tier).toBe(tier);
+  });
+
   it("puts every catalog tool in a tier", () => {
     const orphans = Object.keys(TOOL_CATALOG).filter((tool) => !TIERS.some((t) => t.tools.some((p) => globMatch(p, tool))));
     expect(Object.keys(TOOL_CATALOG).length).toBeGreaterThan(10);
@@ -75,6 +86,15 @@ describe("decide: tier defaults when no tool rule matches", () => {
 
   it("denies execute by default", () => {
     expect(decide(ev("execute"), [], [], NOW).effect).toBe("deny");
+  });
+
+  it("allows a registry call whose ToolDef tier is T1, though no tier lists it", () => {
+    expect(TIERS.some((t) => t.tools.includes("canvas_edit"))).toBe(false);
+    expect(decide(ev("canvas_edit"), [], [], NOW).effect).toBe("allow");
+  });
+
+  it("denies a registry call whose ToolDef tier is T7", () => {
+    expect(decide(ev("run_tests"), [], [], NOW).effect).toBe("deny");
   });
 
   it("a matching tool rule replaces the tier default", () => {

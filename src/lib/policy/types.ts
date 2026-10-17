@@ -172,8 +172,10 @@ export interface RulesResponse {
   readBack: Record<string, string>;
   tiers: TierDefault[];
   detectors: DetectorSummary[];
-  /** When `agent` is given: the effective default per tier for that agent after its rules. */
-  capabilities?: { tier: Tier; name: string; effect: ToolEffect; firedRuleIds: string[] }[];
+  /** When `agent` is given: each capability for that agent after its rules, with whether its toolset has it. */
+  permissions?: Permission[];
+  /** The flow rules in force, grouped by what they protect. */
+  data: DataGuard[];
 }
 
 export interface RuleConflict {
@@ -202,3 +204,39 @@ export interface SaveRulesResponse {
 
 /** DELETE /api/rules/[id] → 200 { ok: true }, or 400 { error } for locked and default rules. */
 export type DeleteRuleResponse = { ok: true } | { error: string };
+
+/** Plain-language access, the only three states the Permissions view shows for a capability. */
+export type Access = "allow" | "ask" | "deny";
+
+/** One capability ("Send email") for one agent: its access with no special conditions, and what can tighten it. */
+export interface Permission {
+  /** Stable capability id, e.g. "email". */
+  id: string;
+  /** "Send email". */
+  label: string;
+  /** Strictest decide() over its tools for this agent, no labels, no args. */
+  access: Access;
+  /** The agent's toolset has ≥ 1 of its tools. */
+  inToolset: boolean;
+  /** Every one of its tools in the toolset is status "planned" (shows "soon"). */
+  planned: boolean;
+  /** A locked rule decided `access`. */
+  locked: boolean;
+  /** Conditional rules (args / when) that can apply. */
+  limits: { text: string; access: Access; ruleId: string }[];
+  /** Rules that decided `access` (fired), for "who set it". */
+  ruleIds: string[];
+}
+
+/** Flow rules grouped by what they protect ("Secrets and keys"), for the Data section. */
+export interface DataGuard {
+  /** Family id: "secret" | "pii" | "project" | "owner_private" | the raw label. */
+  id: string;
+  /** "Secrets and keys". */
+  label: string;
+  /** Strictest across the family. */
+  outcome: "block" | "ask" | "hidden" | "allow";
+  /** Any locked rule in the family. */
+  locked: boolean;
+  rules: { ruleId: string; text: string; outcome: "block" | "ask" | "hidden" | "allow"; locked: boolean }[];
+}

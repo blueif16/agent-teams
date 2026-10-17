@@ -1,8 +1,9 @@
 /*
  * Tool tiers (design §6, E §6): the default outcome when no tool rule matches. Flow rules still apply on top.
- * A tool in no tier asks. The tool catalog says where each tool's data can go (its possible sinks) and which args
+ * A call no tier lists takes its registry ToolDef's tier; a tool in neither asks. The tool catalog says where each tool's data can go (its possible sinks) and which args
  * it takes; the NL compiler sees it as trusted context and the conflict check enumerates it.
  */
+import { REGISTRY } from "../tools/registry";
 import { globMatch } from "./glob";
 import type { Sink, TierDefault } from "./types";
 
@@ -47,11 +48,18 @@ export const TIERS: TierDefault[] = [
 const rank = { deny: 0, ask: 1, allow: 2 } as const;
 const tierCache = new Map<string, TierDefault | undefined>();
 
-/** The tier a tool falls in; when two tiers claim it, the stricter one. */
+const stricter = (hits: TierDefault[]) => hits.sort((a, b) => rank[a.effect] - rank[b.effect])[0];
+
+/**
+ * The tier a tool falls in; when two tiers claim it, the stricter one. A call no tier lists falls back to the tier
+ * of the registry ToolDef that provides it (canvas_edit → T1), so registry tools don't ask just for being new.
+ */
 export function tierOf(tool: string): TierDefault | undefined {
   if (tierCache.has(tool)) return tierCache.get(tool);
   if (tierCache.size > 2000) tierCache.clear();
-  const hit = TIERS.filter((t) => t.tools.some((p) => globMatch(p, tool))).sort((a, b) => rank[a.effect] - rank[b.effect])[0];
+  const hit =
+    stricter(TIERS.filter((t) => t.tools.some((p) => globMatch(p, tool)))) ??
+    stricter(REGISTRY.filter((d) => d.calls.includes(tool)).flatMap((d) => TIERS.filter((t) => t.tier === d.tier)));
   tierCache.set(tool, hit);
   return hit;
 }

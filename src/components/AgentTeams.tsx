@@ -12,6 +12,7 @@ import type { AgentStatus, Message, OrgSnapshot, PlanStep, Team } from "@/lib/ty
 import { ChiefMenu } from "./Chief";
 import { identityOf } from "./Identity";
 import { agentStats } from "./Performance";
+import { rulesOf } from "./Rules";
 import { Mascot } from "./Mascot";
 import { OrgContext } from "./org";
 import { IconButton, Toast } from "./ui";
@@ -149,6 +150,7 @@ export function AgentTeams() {
   useEffect(() => {
     void prefetch(agentStats(CHIEF_ID));
     void prefetch(identityOf(CHIEF_ID));
+    void prefetch(rulesOf({ agentId: CHIEF_ID }));
   }, []);
 
   const notify = useCallback((text: string) => {

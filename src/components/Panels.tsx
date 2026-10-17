@@ -171,7 +171,7 @@ export function AgentPanel({
         items={[
           { key: "overview", label: "Overview", icon: <List className={icon} /> },
           { key: "performance", label: "Performance", icon: <ChartColumn className={icon} /> },
-          { key: "rules", label: "Rules", icon: <Shield className={icon} /> },
+          { key: "rules", label: "Permissions", icon: <Shield className={icon} /> },
           { key: "skills", label: "Skills", icon: <Puzzle className={icon} /> },
           { key: "identity", label: "Soul and memory", icon: <Fingerprint className={icon} /> },
         ]}
@@ -309,7 +309,7 @@ export function TeamPanel({
         items={[
           { key: "overview", label: "Overview", icon: <List className={icon} /> },
           { key: "performance", label: "Performance", icon: <ChartColumn className={icon} /> },
-          { key: "rules", label: "Rules", icon: <Shield className={icon} /> },
+          { key: "rules", label: "Permissions", icon: <Shield className={icon} /> },
         ]}
       />
 
