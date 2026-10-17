@@ -33,7 +33,7 @@ function fakeYou(reply: (url: string, method: string, body: Record<string, unkno
 function setup(you = fakeYou(() => ({ body: LITE })), over: Partial<ResearchToolDeps> = {}) {
   const rows: ToolEvent[] = [];
   const research = researchTool({ agentId: "rex", team: "acme" }, { apiKey: "ydc-test-key", fetch: you.fetch, record: async (e) => void rows.push(e), ...over });
-  const run = (input: Record<string, unknown>) => research.invoke(input) as Promise<string>;
+  const run = (input: Record<string, unknown>) => research.invoke(input as Parameters<typeof research.invoke>[0]) as Promise<string>;
   return { run, rows, you };
 }
 
