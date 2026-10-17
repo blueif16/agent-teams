@@ -20,7 +20,9 @@ A fixed set. Nothing outside it is called.
 
 ## Runtime
 
-- Agents run on LangChain Deep Agents JS inside the Next.js server, with `ChatOpenAI` pointed at Crusoe.
+- Agents run on LangChain Deep Agents JS inside the Next.js server, with `ChatOpenAI` pointed at Crusoe. As of 2026-10-17 none do yet: replies are single chat completions, and the runtime is being built.
+- **Local first:** runs execute in the local Node server with state on disk. A hosted store comes later.
+- **One persistent Deep Agent per worker** (own thread and checkpointer), not a `task` sub-agent of the lead, so a DM reaches the agent doing the work.
 - NemoClaw (Nemo Cloud) is optional, only for running agent code in a sandbox.
 - LangChain throws on a 429 with no retry header, so every agent gets retry with backoff before its fallback.
 
@@ -41,7 +43,7 @@ A fixed set. Nothing outside it is called.
 
 ## Deploy
 
-- Vercel project `agent-teams` (blueif16's projects): https://agent-teams-mu.vercel.app. Deploy with `vercel deploy --prod`. Until there are real users, deploy to production after every change without asking; the owner will say when to stop. Env vars are set for Production only. `.vercelignore` keeps `.env*.local` and `.data` out.
+- Vercel project `agent-teams` (blueif16's projects): https://agent-teams-mu.vercel.app. Deploy with `vercel deploy --prod`. Paused on 2026-10-17 while the runtime is built local-first: don't deploy without asking. The live URL still serves the hackathon demo. Pushing to GitHub doesn't deploy. Env vars are set for Production only. `.vercelignore` keeps `.env*.local` and `.data` out.
 - Vercel's disk is read-only except `/tmp`, and each instance has its own. So on Vercel the ledger, 📌 and SOUL/MEMORY edits are temporary and differ between instances. The Performance tabs can show different numbers on refresh. The fix is a durable store; not done yet.
 - LangSmith traces are complete on Vercel: replies flush their trace inside `after()`.
 - The site is public, and so is the chat API that spends the Crusoe key (expires 2026-10-18).
@@ -56,7 +58,8 @@ A fixed set. Nothing outside it is called.
   - Her DM is pinned first.
 - **What she knows:** her prompt (`src/lib/chief-prompt.ts`) gets the live state the browser shows (statuses, "now" lines, pending approvals), ledger stats per team, and a roster to staff from.
 - **Starting a project:**
-  - She replies with a ` ```project ` JSON block, which becomes a proposal card: the A-team, assignments and a spec.
+  - Being redesigned (2026-10-17). A fresh company is just you and Mira, with no fixed roster. For a project, Mira sets up a PM. The PM sets the goal and each role's qualifications, then staffs the team with domain experts built from an archetype, past workers' memory and a config. A small task goes to one expert in a DM. Until the PM exists, Start a project has no one to staff.
+  - Today she replies with a ` ```project ` JSON block, which becomes a proposal card: the A-team, assignments and a spec.
   - **Launch** creates the channel, puts the members to work on it, and the lead posts a live kickoff.
   - Launched teams live only in the browser and are lost on refresh. They send their context with every message.
 - **Heartbeat:** 25 s after load, then every 20 min while the tab is visible.
@@ -69,7 +72,7 @@ A fixed set. Nothing outside it is called.
 
 ## Replies: Markdown and charts
 
-- **Markdown:** agent replies render with Streamdown (`src/components/Markdown.tsx`). It's built for streamed AI text, so a half-open `**`, a table mid-row or an unclosed fence still renders cleanly. Code blocks use `@streamdown/code` (Shiki). `[label](artifact:id)` links still open in the workspace; the sanitizer is told to allow `artifact:`. Your own bubbles stay plain.
+- **Markdown:** agent replies render with Streamdown (`src/components/Markdown.tsx`). It's built for streamed AI text, so a half-open `**`, a table mid-row or an unclosed fence still renders cleanly. Code blocks use `@streamdown/code` (Shiki). Your own bubbles stay plain.
 - **The chart tool:** an agent writes a ` ```chart ` block holding one small JSON object, and the app draws it from a fixed template:
   - The six templates are stats, bar, line/area, breakdown, progress and timeline (`src/lib/charts.ts`, `src/components/Charts.tsx`).
   - The model supplies data, never drawing code. Every agent's prompt, Mira's included, carries `CHARTS_NOTE`.
@@ -80,7 +83,6 @@ A fixed set. Nothing outside it is called.
   - Thin marks, a legend for 2+ series, and the table view on every plotted chart.
   - Each chart uses one unit. Metrics in different units go in stats: on 2026-10-17 Gus put DAU and percentages on one axis, so the prompt now says this.
 - Recharts draws bar, line and area; everything else is plain React and SVG. Recharts needs `react-is` matching React (19.3.0).
-- `#data-pulse` seeds three charts (stats, a highlighted bar, a two-series line) so the demo shows them without a live call.
 
 ## Agent identity (`agents/<id>/`, after Muse)
 
@@ -93,7 +95,8 @@ A fixed set. Nothing outside it is called.
 
 ## Product
 
-- 8 teams. Reactions are orders: 👍 go, 👀 dig in, 🔁 redo, ✋ hold, 📌 remember.
+- No demo data since 2026-10-17: no seed teams, agents, artifacts or scripted messages. Plan and approvals are empty shells for the runtime to fill.
+- Reactions are orders: 👍 go, 👀 dig in, 🔁 redo, ✋ hold, 📌 remember.
 - The UI copies OpenAI dots and Meta Muse, and every click gets feedback.
 - A mascot always opens that agent; only `#channel` opens the team panel.
 - Each agent's status and "now" line live in one place (`AgentTeams` state). The chat, side panel and sidebar all read it, so their mascots and chips always match.
