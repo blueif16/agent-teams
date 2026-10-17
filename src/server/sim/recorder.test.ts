@@ -74,6 +74,15 @@ describe("the recorder", () => {
     expect(activeRecording()).toBeUndefined();
   });
 
+  it("removes its bus listener when it stops", async () => {
+    const { bus } = getServerCache();
+    const baseline = bus.listenerCount();
+    const id = await startRecording(recordingInput({ tapeId: "rec-1" }));
+    expect(bus.listenerCount()).toBe(baseline + 1);
+    await stopRecording(id);
+    expect(bus.listenerCount()).toBe(baseline);
+  });
+
   it("refuses a second start while one is recording, and keeps the first", async () => {
     const id = await startRecording(recordingInput({ tapeId: "rec-1" }));
     await expect(startRecording(recordingInput({ tapeId: "rec-2" }))).rejects.toBeInstanceOf(RecordingActiveError);
