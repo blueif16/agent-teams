@@ -12,7 +12,7 @@
  * - Most restrictive wins (OUTCOME_ORDER). When no tool rule matches, the default is "ask".
  */
 import { OUTCOME_ORDER } from "./types";
-import type { ArgConstraint, Condition, Decide, Decision, FlowRule, Label, Outcome, PolicyEvent, Rule, Scope, ToolRule } from "./types";
+import type { ArgConstraint, Condition, Decide, Decision, FlowRule, GrantRule, Label, Outcome, PolicyEvent, Rule, Scope, ToolRule } from "./types";
 
 type Transform = Decision["transforms"][number];
 type Rewrite = Transform["action"];
@@ -253,22 +253,40 @@ function compareTransforms(a: Transform, b: Transform): number {
   return a.path < b.path ? -1 : a.path > b.path ? 1 : a.start - b.start || a.end - b.end || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
 }
 
-export function explain(e: PolicyEvent, rules: Rule[]): Explanation {
+/** Expired at `now`. A grant whose date can't be read counts as expired (fail closed); any other rule stays on. */
+export function isExpired(r: Rule, now: Date): boolean {
+  if (!r.expiresAt) return false;
+  const t = Date.parse(r.expiresAt);
+  if (Number.isNaN(t)) return r.kind === "grant";
+  return t <= now.getTime();
+}
+
+const usesLeft = (g: GrantRule) => (g.uses?.used ?? 0) < (g.uses?.max ?? (g.grantScope === "once" ? 1 : Infinity));
+
+export function grantApplies(g: GrantRule, e: PolicyEvent): boolean {
+  return inScope(g.scope, e) && globMatch(g.tool, e.tool) && allHold(g.args, e.args, true) && usesLeft(g);
+}
+
+export function explain(e: PolicyEvent, rules: Rule[], grants: GrantRule[], now: Date): Explanation {
   const contributions: Contribution[] = [];
   const fired = new Set<string>();
   const rewrites = new Map<string, Transform>();
   let toolMatched = false;
+  const live = rules.filter((r) => !isExpired(r, now));
 
-  for (const r of rules) {
+  for (const r of live) {
+    const shadow = r.mode === "shadow";
     if (r.kind === "tool") {
       if (!toolRuleMatches(r, e)) continue;
       fired.add(r.id);
+      if (shadow) continue;
       contributions.push({ ruleId: r.id, outcome: r.effect, locked: Boolean(r.locked) });
       toolMatched = true;
     } else if (r.kind === "flow") {
       const spans = flowRuleHits(r, e);
       if (!spans) continue;
       fired.add(r.id);
+      if (shadow) continue;
       contributions.push({ ruleId: r.id, outcome: r.action, locked: Boolean(r.locked) });
       if (!REWRITES.has(r.action)) continue;
       for (const s of spans) {
@@ -282,7 +300,21 @@ export function explain(e: PolicyEvent, rules: Rule[]): Explanation {
 
   if (!toolMatched) contributions.push({ ruleId: null, outcome: "ask", locked: false });
 
-  const effect = contributions.reduce<Outcome>((acc, c) => strictest(acc, c.outcome), "allow");
+  let effect = contributions.reduce<Outcome>((acc, c) => strictest(acc, c.outcome), "allow");
+
+  // A grant lifts every ask when none of them is locked; whatever else applied (a rewrite) still applies.
+  if (effect === "ask" && !contributions.some((c) => c.outcome === "ask" && c.locked)) {
+    const candidates = [...live.filter((r): r is GrantRule => r.kind === "grant"), ...grants]
+      .filter((g) => !isExpired(g, now) && grantApplies(g, e))
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    for (const g of candidates.filter((g) => g.mode === "shadow")) fired.add(g.id);
+    const used = candidates.find((g) => g.mode !== "shadow");
+    if (used) {
+      fired.add(used.id);
+      effect = contributions.filter((c) => c.outcome !== "ask").reduce<Outcome>((acc, c) => strictest(acc, c.outcome), "allow");
+    }
+  }
+
   const labels = [...new Set([...e.argSpans.map((s) => s.label), ...e.contextLabels])].sort();
   return {
     decision: { effect, transforms: [...rewrites.values()].sort(compareTransforms), firedRuleIds: [...fired].sort(), labels },
@@ -290,4 +322,4 @@ export function explain(e: PolicyEvent, rules: Rule[]): Explanation {
   };
 }
 
-export const decide: Decide = (event, rules) => explain(event, rules).decision;
+export const decide: Decide = (event, rules, grants, now) => explain(event, rules, grants, now).decision;

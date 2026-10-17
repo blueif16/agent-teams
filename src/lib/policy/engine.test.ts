@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { decide } from "@/lib/policy/engine";
-import type { ArgConstraint, FlowRule, PolicyEvent, ToolRule } from "@/lib/policy/types";
+import type { ArgConstraint, FlowRule, GrantRule, PolicyEvent, ToolRule } from "@/lib/policy/types";
 
 const NOW = new Date("2026-10-17T12:00:00Z");
 
@@ -300,5 +300,134 @@ describe("decide: combining", () => {
   it("reports the labels in the args and the context", () => {
     const d = decide(ev({ argSpans: [{ path: "a", start: 0, end: 1, label: "pii.email" }], contextLabels: ["untrusted", "pii.email"] }), [], [], NOW);
     expect(d.labels).toEqual(["pii.email", "untrusted"]);
+  });
+});
+
+function grant(over: Partial<GrantRule> = {}): GrantRule {
+  return {
+    id: "r_grant1",
+    kind: "grant",
+    scope: {},
+    tool: "send_email",
+    args: [{ path: "to[*]", op: "in", value: ["sam@acme.com"] }],
+    grantScope: "project",
+    createdBy: "approval",
+    ...over,
+  };
+}
+
+describe("decide: grants", () => {
+  const askMail = toolRule({ id: "r_mail01", match: { tools: ["send_email"] }, effect: "ask" });
+  const mail = (to: string[], over: Partial<PolicyEvent> = {}) => ev({ tool: "send_email", args: { to }, sinks: ["email"], ...over });
+
+  it("turns ask into allow and reports the grant", () => {
+    const d = decide(mail(["sam@acme.com"]), [askMail], [grant()], NOW);
+    expect(d.effect).toBe("allow");
+    expect(d.firedRuleIds).toEqual(["r_grant1", "r_mail01"]);
+  });
+
+  it("needs every value to satisfy its constraints", () => {
+    expect(decide(mail(["sam@acme.com"]), [askMail], [grant()], NOW).effect).toBe("allow");
+    expect(decide(mail(["sam@acme.com", "eve@evil.example"]), [askMail], [grant()], NOW).effect).toBe("ask");
+  });
+
+  it("does not relax a locked ask", () => {
+    const locked = { ...askMail, locked: true };
+    const d = decide(mail(["sam@acme.com"]), [locked], [grant()], NOW);
+    expect(d.effect).toBe("ask");
+    expect(d.firedRuleIds).toEqual(["r_mail01"]);
+  });
+
+  it("does not relax a locked flow ask either", () => {
+    const allow = toolRule({ effect: "allow" });
+    const lockedFlow = flowRule({ labels: ["project:*"], sinks: ["email"], action: "ask", locked: true });
+    const e = mail(["sam@acme.com"], { contextLabels: ["project:acme"] });
+    expect(decide(e, [allow, lockedFlow], [grant()], NOW).effect).toBe("ask");
+    expect(decide(e, [allow, { ...lockedFlow, locked: false }], [grant()], NOW).effect).toBe("allow");
+  });
+
+  it("does not relax a deny", () => {
+    const deny = toolRule({ id: "r_mail01", match: { tools: ["send_email"] }, effect: "deny" });
+    expect(decide(mail(["sam@acme.com"]), [deny], [grant()], NOW).effect).toBe("deny");
+  });
+
+  it("does not relax a block", () => {
+    const block = flowRule({ labels: ["secret.*"], sinks: ["email"] });
+    const e = mail(["sam@acme.com"], { argSpans: [{ path: "body", start: 0, end: 4, label: "secret.aws" }] });
+    expect(decide(e, [askMail, block], [grant()], NOW).effect).toBe("block");
+  });
+
+  it("lifts the ask but keeps a rewrite that still applies", () => {
+    const mask = flowRule({ labels: ["pii.phone"], sinks: ["email"], action: "mask" });
+    const span = { path: "body", start: 0, end: 4, label: "pii.phone" };
+    const d = decide(mail(["sam@acme.com"], { argSpans: [span] }), [askMail, mask], [grant()], NOW);
+    expect(d.effect).toBe("mask");
+    expect(d.transforms).toEqual([{ ...span, action: "mask" }]);
+  });
+
+  it("lifts the default ask of a tool no rule covers", () => {
+    const e = ev({ tool: "zz_unknown_tool" });
+    expect(decide(e, [], [grant({ tool: "zz_unknown_tool", args: undefined })], NOW).effect).toBe("allow");
+  });
+
+  it("applies only within its own scope and tool", () => {
+    const e = mail(["sam@acme.com"]);
+    expect(decide(e, [askMail], [grant({ scope: { agents: ["rex"] } })], NOW).effect).toBe("ask");
+    expect(decide(e, [askMail], [grant({ tool: "post_message" })], NOW).effect).toBe("ask");
+    expect(decide(e, [askMail], [grant({ scope: { agents: ["pip"], projects: ["acme"] } })], NOW).effect).toBe("allow");
+  });
+
+  it("is ignored once its uses are spent; a once grant has one use", () => {
+    const e = mail(["sam@acme.com"]);
+    expect(decide(e, [askMail], [grant({ uses: { max: 2, used: 2 } })], NOW).effect).toBe("ask");
+    expect(decide(e, [askMail], [grant({ uses: { max: 2, used: 1 } })], NOW).effect).toBe("allow");
+    expect(decide(e, [askMail], [grant({ grantScope: "once" })], NOW).effect).toBe("allow");
+    expect(decide(e, [askMail], [grant({ grantScope: "once", uses: { used: 1 } })], NOW).effect).toBe("ask");
+  });
+
+  it("is ignored once expired", () => {
+    const e = mail(["sam@acme.com"]);
+    expect(decide(e, [askMail], [grant({ expiresAt: "2026-10-17T11:59:59Z" })], NOW).effect).toBe("ask");
+    expect(decide(e, [askMail], [grant({ expiresAt: "2026-10-17T12:00:01Z" })], NOW).effect).toBe("allow");
+  });
+
+  it("works when passed among the rules", () => {
+    expect(decide(mail(["sam@acme.com"]), [askMail, grant()], [], NOW).effect).toBe("allow");
+  });
+});
+
+describe("decide: shadow mode and expiry", () => {
+  it("a shadow rule is reported but never changes the effect", () => {
+    const e = ev({ tool: "zz_unknown_tool" });
+    const d = decide(e, [toolRule({ effect: "deny", mode: "shadow" })], [], NOW);
+    expect(d.effect).toBe("ask");
+    expect(d.firedRuleIds).toEqual(["r_tool01"]);
+  });
+
+  it("a shadow allow does not replace the default", () => {
+    const e = ev({ tool: "zz_unknown_tool" });
+    expect(decide(e, [toolRule({ effect: "allow", mode: "shadow" })], [], NOW).effect).toBe("ask");
+  });
+
+  it("a shadow rewrite emits no transform", () => {
+    const r = flowRule({ labels: ["secret.*"], sinks: ["model:crusoe"], action: "tokenize", mode: "shadow" });
+    const d = decide(ev({ argSpans: [{ path: "p", start: 0, end: 4, label: "secret.aws" }], sinks: ["model:crusoe"] }), [r], [], NOW);
+    expect(d.transforms).toEqual([]);
+    expect(d.firedRuleIds).toEqual(["r_flow01"]);
+  });
+
+  it("a shadow grant is reported but does not lift the ask", () => {
+    const askMail = toolRule({ id: "r_mail01", match: { tools: ["send_email"] }, effect: "ask" });
+    const d = decide(ev({ tool: "send_email", args: { to: ["sam@acme.com"] } }), [askMail], [grant({ mode: "shadow" })], NOW);
+    expect(d.effect).toBe("ask");
+    expect(d.firedRuleIds).toEqual(["r_grant1", "r_mail01"]);
+  });
+
+  it("an expired rule is ignored", () => {
+    const e = ev({ tool: "zz_unknown_tool" });
+    const past = toolRule({ effect: "deny", expiresAt: "2026-10-01T00:00:00Z" });
+    const future = toolRule({ effect: "deny", expiresAt: "2026-11-01T00:00:00Z" });
+    expect(decide(e, [past], [], NOW)).toEqual(decide(e, [], [], NOW));
+    expect(decide(e, [future], [], NOW).effect).toBe("deny");
   });
 });
