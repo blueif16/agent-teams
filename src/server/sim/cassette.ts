@@ -3,8 +3,14 @@
  * `fetch` seam. `record` passes every request through and stores the exchange; `replay` serves stored
  * exchanges and never calls the network; `update` replays what it has and records the rest.
  *
- * The file is JSONL: a header line, then one entry per finished exchange. An entry keeps the canonical
- * request (no host, no headers) and the response as raw chunks with their timing.
+ * An exchange is found by (key, n): the key hashes the method, the path and the JSON body with dates,
+ * timestamps and UUIDs masked (never headers), and n counts requests with that key from when each starts,
+ * so parallel calls match in any order and retries replay in order. A replay miss fails closed with a 598
+ * and a diff against the closest recording.
+ *
+ * The file is JSONL: a header line, then one entry per finished exchange, appended synchronously so a
+ * finished stream is on disk before its caller sees the end. An entry keeps the canonical request and the
+ * response as the raw chunks read, each with its gap, so a replay hands parsers the same boundaries.
  */
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
