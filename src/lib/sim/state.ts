@@ -10,7 +10,8 @@ import { splitCharts } from "../charts";
 import type { OrderKey } from "../orders";
 import { globMatch } from "../policy/glob";
 import type { Archetype } from "../policy/types";
-import type { Deliverable, Scenario } from "./scenario";
+import type { CheckContext, CheckFn, CheckRegistry, CheckResult, DeliverableVersion } from "./checks/types";
+import { CHECKS, type CheckName, type Deliverable, type RubricItem, type Scenario } from "./scenario";
 import type { CardType, Decision, Member, OwnerAction, Place, SimNote, StopReason, TapeEvent, TapeKind, Usage } from "./types";
 
 export interface TeamRec {
@@ -295,4 +296,43 @@ export function step(state: RunState, e: TapeEvent): RunState {
 
 export function foldRun(events: readonly TapeEvent[], scenario: Scenario): RunState {
   return events.reduce(step, initialState(scenario));
+}
+
+export const isActivity = (kind: TapeKind): boolean => ACTIVITY.has(kind);
+
+/**
+ * What a deliverable check reads. `textOf` gives a version's text (artifacts come from the vault, charts carry
+ * theirs). current() is the accepted version, else the latest; `review` makes one version current instead (the one
+ * the owner is reacting to).
+ */
+export function checkContext(s: RunState, deliverable: Deliverable, textOf: (v: VersionRec) => string, facts: Record<string, string>, review?: VersionRec): CheckContext {
+  const view = (v: VersionRec): DeliverableVersion => ({ version: v.version, path: v.path, text: textOf(v), agentId: v.agentId, t: v.t, ...(v.commit ? { commit: v.commit } : {}) });
+  const current = (id: string): DeliverableVersion | null => {
+    if (review && review.deliverable === id) return view(review);
+    const list = s.versions[id] ?? [];
+    const accepted = s.accepted[id];
+    const v = (accepted && list.find((x) => x.version === accepted.version)) || list.at(-1);
+    return v ? view(v) : null;
+  };
+  return {
+    deliverable,
+    current,
+    versions: (id) => (s.versions[id] ?? []).map(view),
+    fetched: s.fetched,
+    facts,
+    charts: s.charts.map((c) => ({ agentId: c.agentId, spec: c.spec, t: c.t })),
+  };
+}
+
+type CodeItem = Extract<RubricItem, { kind: "code" }>;
+
+/** One code rubric item through its named check, params defaulted; a check that throws fails with the error. */
+export function runCheck(checks: CheckRegistry, item: CodeItem, ctx: CheckContext): CheckResult {
+  try {
+    const name = item.check as CheckName;
+    const params: unknown = CHECKS[name].parse(item.params);
+    return (checks[name] as CheckFn<unknown>)(ctx, params);
+  } catch (e) {
+    return { pass: false, evidence: [`the check could not run: ${(e as Error).message}`] };
+  }
 }
