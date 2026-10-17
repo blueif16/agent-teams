@@ -86,3 +86,33 @@ export class Limiter {
     }
   }
 }
+
+/** The one limiter per process (D §7), kept on globalThis so dev-server module reloads don't make a second one. */
+export function getLimiter(): Limiter {
+  const g = globalThis as { __agentTeamsLimiter?: Limiter };
+  return (g.__agentTeamsLimiter ??= new Limiter());
+}
+
+/** The `model` field of a chat-completions body, or "unknown" when the body isn't one. */
+function modelOf(body: string): string {
+  try {
+    const model = (JSON.parse(body) as { model?: unknown }).model;
+    return typeof model === "string" ? model : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * A `fetch` for `ChatOpenAI({ configuration: { fetch } })` that waits on the limiter
+ * before each request. It wraps `baseFetch` rather than calling the global fetch,
+ * so it can sit anywhere in a chain of fetch wrappers (a privacy scrubber, say),
+ * and it returns the inner response as is.
+ */
+export function limitFetch(baseFetch: typeof fetch = fetch, limiter: Limiter = getLimiter()): typeof fetch {
+  return async (input, init) => {
+    const body = typeof init?.body === "string" ? init.body : "";
+    await limiter.acquire(modelOf(body), Math.ceil(body.length / 4));
+    return baseFetch(input, init);
+  };
+}
