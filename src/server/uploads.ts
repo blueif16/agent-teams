@@ -214,3 +214,19 @@ export async function attachUploads(ids: unknown, projectId: string): Promise<{ 
   const inputs = await copyInputs(list, projectId);
   return { blocks: inputs.map(attachmentBlock).join("\n\n"), images, uploads: list };
 }
+
+/**
+ * Text documents for a model with no project folder (/api/chat): each inlined as an <attachment> block, cut at
+ * 20,000 characters. Throws UploadError (400) for an id that isn't a stored text document.
+ */
+export async function inlineTexts(ids: string[]): Promise<string> {
+  const blocks = [];
+  for (const id of ids) {
+    const file = await readUpload(String(id));
+    if (!file?.name) throw new UploadError(`Couldn't find the attached file "${String(id).slice(0, 80)}". Attach it again.`, 400);
+    const text = file.bytes.toString("utf8");
+    const cut = text.length > MAX_INLINE_CHARS ? `${text.slice(0, MAX_INLINE_CHARS)}\n(cut at ${MAX_INLINE_CHARS} of ${text.length} characters)` : text;
+    blocks.push(`<attachment name="${file.name}">\n${cut}\n</attachment>`);
+  }
+  return blocks.join("\n\n");
+}
