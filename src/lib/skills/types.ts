@@ -70,7 +70,7 @@ export interface ArchetypeDef {
   summary: string;
   /** The Inherent section of SOUL.md: how this type does the job best. */
   inherent: string[];
-  /** Tool names it gets (policy tiers still apply). */
+  /** Registry tool ids (src/lib/tools/types.ts) in prompt order, beyond the base set every archetype gets. */
   tools: string[];
   modelTier: "main" | "cheap" | "advisor" | "vision";
   /** Words the PM's qualifications are matched against when staffing. */
@@ -92,6 +92,8 @@ export interface Composition {
   source: "orchestrator" | "history";
   /** Past compositions this one was adapted from. */
   basedOn?: string[];
+  /** Registry tool ids beyond the archetype's set (≤ 3), approved on the launch card. */
+  extraTools?: { id: string; why: string }[];
   /** ISO date. */
   createdAt: string;
 }

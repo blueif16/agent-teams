@@ -22,6 +22,12 @@
   --color-sky: #d5f0ff;
   --color-amber: #f59e0b;
   --color-mint: #22a06b;
+  /* Rule outcome chips (Rules tab): block/deny red, the redact/tokenize amber. The same values the error text and
+     the "Needs you" chip already use, named once. */
+  --color-danger: #c4321b;
+  --color-danger-wash: #fdecea;
+  --color-caution: #9a5b00;
+  --color-caution-wash: #fff4de;
 
   /* The shadcn-style names Streamdown's built-in pieces (code blocks, copy buttons) read. */
   --color-background: #ffffff;
@@ -54,8 +60,9 @@ body {
   outline-offset: 2px;
 }
 
-/* The composer pill draws its own focus ring. */
-#composer:focus-visible {
+/* The composer pill and the rule box draw their own focus ring. */
+#composer:focus-visible,
+.own-focus:focus-visible {
   outline: none;
 }
 

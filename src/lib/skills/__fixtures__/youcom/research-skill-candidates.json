@@ -1,0 +1,95 @@
+{
+  "output": {
+    "content": {
+      "candidates": [
+        {
+          "skill_name": "clickhouse-best-practices",
+          "repo_url": "https://github.com/ClickHouse/agent-skills/tree/main/skills/clickhouse-best-practices",
+          "publisher": "ClickHouse",
+          "is_official_publisher": true,
+          "install_command": "npx skills add ClickHouse/agent-skills",
+          "last_updated": "2026-10-02",
+          "why_it_fits": "Published by ClickHouse; covers table engines, ORDER BY and partition key design, and query optimization."
+        },
+        {
+          "skill_name": "clickhouse-agent-skills",
+          "repo_url": "https://github.com/vybenetwork/clickhouse-agent-skills",
+          "publisher": "vybenetwork",
+          "is_official_publisher": true,
+          "install_command": "npx skills add vybenetwork/clickhouse-agent-skills",
+          "last_updated": "2026-03-17",
+          "why_it_fits": "Titled \"The official Agent Skills for ClickHouse\"; schema and query guidance."
+        },
+        {
+          "skill_name": "database-schema-design",
+          "repo_url": "https://github.com/addyosmani/agent-skills/tree/main/skills/database-schema-design",
+          "publisher": "addyosmani",
+          "is_official_publisher": false,
+          "install_command": "npx skills add addyosmani/agent-skills",
+          "last_updated": "2026-09-28",
+          "why_it_fits": "General schema design workflow for analytical and transactional databases, including ClickHouse."
+        },
+        {
+          "skill_name": "clickhouse-query-helper",
+          "repo_url": "https://github.com/olap-tools/clickhouse-skill",
+          "publisher": "ClickHouse",
+          "is_official_publisher": true,
+          "install_command": "npx skills add olap-tools/clickhouse-skill",
+          "last_updated": "2026-08-11",
+          "why_it_fits": "Writes and tunes ClickHouse SQL queries."
+        },
+        {
+          "skill_name": "clickhouse-sql",
+          "repo_url": "https://github.com/legacy-data/clickhouse-sql-skill",
+          "publisher": "legacy-data",
+          "is_official_publisher": false,
+          "install_command": "npx skills add legacy-data/clickhouse-sql-skill",
+          "last_updated": "2025-01-20",
+          "why_it_fits": "ClickHouse SQL reference for agents."
+        },
+        {
+          "skill_name": "chdb-datastore",
+          "repo_url": "https://skills.sh/ClickHouse/agent-skills/chdb-datastore",
+          "publisher": "ClickHouse",
+          "is_official_publisher": true,
+          "install_command": "npx skills add ClickHouse/agent-skills",
+          "last_updated": "2026-10-02",
+          "why_it_fits": "Runs ClickHouse queries in-process with chDB for local analysis."
+        },
+        {
+          "skill_name": "clickhouse",
+          "repo_url": "https://cookiesforai.com/skills/clickhouse",
+          "publisher": "cookiesforai",
+          "is_official_publisher": false,
+          "install_command": "npx skills add ClickHouse/agent-skills",
+          "last_updated": "2026-09-01",
+          "why_it_fits": "Directory listing of ClickHouse skills."
+        }
+      ]
+    },
+    "content_type": "object",
+    "sources": [
+      {
+        "url": "https://github.com/ClickHouse/agent-skills",
+        "title": "GitHub - ClickHouse/agent-skills: Agent Skills for ClickHouse",
+        "snippets": ["Official Agent Skills for ClickHouse: best practices for schema design, query optimization and chDB."]
+      },
+      {
+        "url": "https://skills.sh/ClickHouse/agent-skills/chdb-datastore",
+        "title": "chdb-datastore by ClickHouse | skills.sh",
+        "snippets": ["npx skills add ClickHouse/agent-skills"]
+      },
+      {
+        "url": "https://github.com/vybenetwork/clickhouse-agent-skills",
+        "title": "vybenetwork/clickhouse-agent-skills: The official Agent Skills for ClickHouse",
+        "snippets": ["The official Agent Skills for ClickHouse."]
+      },
+      {
+        "url": "https://github.com/addyosmani/agent-skills",
+        "title": "GitHub - addyosmani/agent-skills",
+        "snippets": ["A collection of agent skills for engineering workflows."]
+      }
+    ]
+  },
+  "warnings": []
+}

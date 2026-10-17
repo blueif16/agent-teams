@@ -1,0 +1,1166 @@
+{
+  "$comment": "Skill library curation (docs/design/team-setup.md §3b). Repo metadata is the `gh api repos/<repo>` snapshot at curatedAt; `node scripts/skills/import.mts` applies the criteria in scripts/skills/schema.ts, fetches each pick at its commit, scans it and writes index.json, SOURCES.md and LICENSES/skills/.",
+  "version": 1,
+  "curatedAt": "2026-10-17",
+  "repos": {
+    "Claudefarid/claude-ceo-skill": {
+      "publisher": "Farid Swadhin",
+      "official": false,
+      "stars": 4,
+      "license": "NOASSERTION",
+      "licenseFile": null,
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-06-27"
+    },
+    "Dammyjay93/interface-design": {
+      "publisher": "Damola Akinleye (Dammyjay93)",
+      "official": false,
+      "stars": 5815,
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-06-20"
+    },
+    "K-Dense-AI/scientific-agent-skills": {
+      "publisher": "K-Dense AI",
+      "official": false,
+      "stars": 52168,
+      "license": "MIT",
+      "licenseFile": "LICENSE.md",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-15"
+    },
+    "addyosmani/agent-skills": {
+      "publisher": "Addy Osmani",
+      "official": false,
+      "stars": 107803,
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-13"
+    },
+    "anthropics/knowledge-work-plugins": {
+      "publisher": "Anthropic",
+      "official": true,
+      "stars": 29992,
+      "license": "Apache-2.0",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-17"
+    },
+    "anthropics/skills": {
+      "publisher": "Anthropic",
+      "official": true,
+      "stars": 181766,
+      "license": "NOASSERTION",
+      "licenseFile": null,
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-09",
+      "note": "No root license: each skill folder carries its own LICENSE.txt (Apache-2.0 for most; docx/pdf/pptx/xlsx are source-available, not open source). The README says 'Many skills in this repo are open source (Apache 2.0)'."
+    },
+    "blader/humanizer": {
+      "publisher": "blader (Siqi Chen)",
+      "official": false,
+      "stars": 57811,
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-16"
+    },
+    "bytedance/deer-flow": {
+      "publisher": "ByteDance (DeerFlow)",
+      "official": false,
+      "stars": 84022,
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-17"
+    },
+    "coreyhaines31/marketingskills": {
+      "publisher": "Corey Haines",
+      "official": false,
+      "stars": 55238,
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-15"
+    },
+    "getsentry/skills": {
+      "publisher": "Sentry",
+      "official": false,
+      "stars": 1066,
+      "license": "Apache-2.0",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-16"
+    },
+    "jakubkrehel/skills": {
+      "publisher": "Jakub Krehel",
+      "official": false,
+      "stars": 7999,
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-13"
+    },
+    "kingmoeng/agent-team-skills": {
+      "publisher": "kingmoeng",
+      "official": false,
+      "stars": 0,
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-09-19",
+      "note": "You.com Research returned it with is_official_publisher: true; it has 0 stars."
+    },
+    "magnus919/agent-skills": {
+      "publisher": "Magnus Hedemark (magnus919)",
+      "official": false,
+      "stars": 133,
+      "license": "MIT",
+      "licenseFile": "LICENSE.md",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-16"
+    },
+    "mattpocock/skills": {
+      "publisher": "Matt Pocock",
+      "official": false,
+      "stars": 294992,
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-13"
+    },
+    "nextlevelbuilder/ui-ux-pro-max-skill": {
+      "publisher": "Next Level Builder",
+      "official": false,
+      "stars": 136854,
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-15"
+    },
+    "obra/superpowers": {
+      "publisher": "Jesse Vincent (obra)",
+      "official": false,
+      "stars": 301155,
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-10"
+    },
+    "obra/the-elements-of-style": {
+      "publisher": "Jesse Vincent (obra)",
+      "official": false,
+      "stars": 600,
+      "license": "NOASSERTION",
+      "licenseFile": null,
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-08-12",
+      "note": "No LICENSE file; README says only that Strunk's 1918 text is public domain, so the skill prose is unlicensed."
+    },
+    "pbakaus/impeccable": {
+      "publisher": "Paul Bakaus",
+      "official": false,
+      "stars": 82328,
+      "license": "Apache-2.0",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-17"
+    },
+    "phuryn/pm-skills": {
+      "publisher": "Pawel Huryn",
+      "official": false,
+      "stars": 27145,
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-16"
+    },
+    "trailofbits/skills": {
+      "publisher": "Trail of Bits",
+      "official": false,
+      "stars": 7618,
+      "license": "CC-BY-SA-4.0",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-15"
+    },
+    "youdotcom-oss/agent-skills": {
+      "publisher": "You.com",
+      "official": true,
+      "stars": 91,
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "fork": false,
+      "archived": false,
+      "pushedAt": "2026-10-13",
+      "note": "Official You.com org; below 100 stars, admitted on the official-publisher rule."
+    }
+  },
+  "skills": [
+    {
+      "repo": "obra/superpowers",
+      "path": "skills/systematic-debugging",
+      "commit": "bb92a77741419a4ab5f06e711a283343f1ada0c3",
+      "archetypes": [
+        "engineer"
+      ],
+      "tags": [
+        "debugging",
+        "root-cause",
+        "needs-shell"
+      ],
+      "why": "The canonical root-cause-before-fix debugging method (301k stars); matches the engineer's 'reproduce first' rule."
+    },
+    {
+      "repo": "obra/superpowers",
+      "path": "skills/test-driven-development",
+      "commit": "bb92a77741419a4ab5f06e711a283343f1ada0c3",
+      "archetypes": [
+        "engineer"
+      ],
+      "tags": [
+        "testing",
+        "tdd",
+        "needs-shell"
+      ],
+      "why": "Red-green-refactor with the 'watch it fail' discipline; the most installed TDD skill."
+    },
+    {
+      "repo": "obra/superpowers",
+      "path": "skills/verification-before-completion",
+      "commit": "bb92a77741419a4ab5f06e711a283343f1ada0c3",
+      "archetypes": [
+        "engineer",
+        "lead"
+      ],
+      "tags": [
+        "verification",
+        "evidence",
+        "needs-shell"
+      ],
+      "why": "Evidence before any 'done' claim; also how a lead accepts work."
+    },
+    {
+      "repo": "obra/superpowers",
+      "path": "skills/receiving-code-review",
+      "commit": "bb92a77741419a4ab5f06e711a283343f1ada0c3",
+      "archetypes": [
+        "engineer"
+      ],
+      "tags": [
+        "code-review",
+        "feedback"
+      ],
+      "why": "Verify review feedback against the code before acting; no performative agreement."
+    },
+    {
+      "repo": "addyosmani/agent-skills",
+      "path": "skills/code-review-and-quality",
+      "commit": "aeac41d4d005999432bb7312f7ff06383a91d59d",
+      "archetypes": [
+        "engineer"
+      ],
+      "tags": [
+        "code-review",
+        "quality"
+      ],
+      "why": "A multi-axis review checklist (correctness, readability, security, performance) without assuming a tool stack."
+    },
+    {
+      "repo": "addyosmani/agent-skills",
+      "path": "skills/security-and-hardening",
+      "commit": "aeac41d4d005999432bb7312f7ff06383a91d59d",
+      "archetypes": [
+        "engineer"
+      ],
+      "tags": [
+        "security",
+        "hardening"
+      ],
+      "why": "OWASP-style hardening checklist for code that touches input, auth or secrets."
+    },
+    {
+      "repo": "getsentry/skills",
+      "path": "skills/find-bugs",
+      "commit": "f57ada2d0b640406ea7e25b11d636c530e77c58b",
+      "archetypes": [
+        "engineer"
+      ],
+      "tags": [
+        "code-review",
+        "bugs",
+        "security",
+        "needs-shell"
+      ],
+      "why": "Sentry's own bug-hunting pass over a change set: short, concrete, review-shaped output."
+    },
+    {
+      "repo": "anthropics/skills",
+      "path": "skills/webapp-testing",
+      "commit": "dbd4588f9e1033efb41dad4bef2f7947c8993d44",
+      "archetypes": [
+        "engineer"
+      ],
+      "tags": [
+        "testing",
+        "e2e",
+        "needs-shell",
+        "needs-browser"
+      ],
+      "why": "Anthropic's Playwright recipe for testing local web apps; kept for when shell + browser tools land.",
+      "license": "Apache-2.0",
+      "licenseFile": "skills/webapp-testing/LICENSE.txt"
+    },
+    {
+      "repo": "anthropics/skills",
+      "path": "skills/frontend-design",
+      "commit": "dbd4588f9e1033efb41dad4bef2f7947c8993d44",
+      "archetypes": [
+        "designer",
+        "engineer"
+      ],
+      "tags": [
+        "ui-design",
+        "visual-design",
+        "frontend"
+      ],
+      "why": "Anthropic's skill for distinctive, non-generic interfaces; the most installed design skill.",
+      "license": "Apache-2.0",
+      "licenseFile": "skills/frontend-design/LICENSE.txt"
+    },
+    {
+      "repo": "Dammyjay93/interface-design",
+      "path": ".claude/skills/interface-design",
+      "commit": "2f9be3206855bcb2d1d0af262c8bae25cba6658d",
+      "archetypes": [
+        "designer"
+      ],
+      "tags": [
+        "ui-design",
+        "product-ui",
+        "design-system"
+      ],
+      "why": "Craft rules for dashboards and app UI (not marketing pages), with a memory of design decisions."
+    },
+    {
+      "repo": "jakubkrehel/skills",
+      "path": "skills/better-ui",
+      "commit": "4c66b1fa86e9ab70187b43d7da9b6fdb29f2ef63",
+      "archetypes": [
+        "designer"
+      ],
+      "tags": [
+        "ui-design",
+        "visual-design",
+        "polish"
+      ],
+      "why": "Exact values for radius, shadows, icon states and motion: concrete polish rather than taste words."
+    },
+    {
+      "repo": "jakubkrehel/skills",
+      "path": "skills/better-typography",
+      "commit": "4c66b1fa86e9ab70187b43d7da9b6fdb29f2ef63",
+      "archetypes": [
+        "designer"
+      ],
+      "tags": [
+        "typography",
+        "ui-design"
+      ],
+      "why": "Type scale, spacing, wrapping and truncation rules for product UI."
+    },
+    {
+      "repo": "jakubkrehel/skills",
+      "path": "skills/better-colors",
+      "commit": "4c66b1fa86e9ab70187b43d7da9b6fdb29f2ef63",
+      "archetypes": [
+        "designer"
+      ],
+      "tags": [
+        "color",
+        "ui-design",
+        "accessibility"
+      ],
+      "why": "Color systems and contrast for interfaces."
+    },
+    {
+      "repo": "jakubkrehel/skills",
+      "path": "skills/better-accessibility",
+      "commit": "4c66b1fa86e9ab70187b43d7da9b6fdb29f2ef63",
+      "archetypes": [
+        "designer",
+        "engineer"
+      ],
+      "tags": [
+        "accessibility",
+        "wcag"
+      ],
+      "why": "WCAG 2.2 review and fixes: focus, ARIA, names, forms, motion."
+    },
+    {
+      "repo": "jakubkrehel/skills",
+      "path": "skills/interface-review",
+      "commit": "4c66b1fa86e9ab70187b43d7da9b6fdb29f2ef63",
+      "archetypes": [
+        "designer"
+      ],
+      "tags": [
+        "ui-review",
+        "critique",
+        "needs-shell",
+        "claude-code-specific"
+      ],
+      "why": "Reviews a change for the interface problems it introduced, across a11y, layout, writing, type and color."
+    },
+    {
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "design/skills/design-critique",
+      "commit": "33eeda1e8fd856455b05479d13a0f85b5f803744",
+      "archetypes": [
+        "designer"
+      ],
+      "tags": [
+        "critique",
+        "ux",
+        "claude-code-specific"
+      ],
+      "why": "Anthropic's structured design-feedback rubric (usability, hierarchy, consistency)."
+    },
+    {
+      "repo": "anthropics/skills",
+      "path": "skills/theme-factory",
+      "commit": "dbd4588f9e1033efb41dad4bef2f7947c8993d44",
+      "archetypes": [
+        "designer"
+      ],
+      "tags": [
+        "themes",
+        "visual-design"
+      ],
+      "why": "Ten ready color/type themes to style decks, docs and pages consistently.",
+      "license": "Apache-2.0",
+      "licenseFile": "skills/theme-factory/LICENSE.txt"
+    },
+    {
+      "repo": "pbakaus/impeccable",
+      "path": ".agents/skills/impeccable",
+      "commit": "08d5b470495d242ca0470f4aeae1956c3a074f83",
+      "archetypes": [
+        "designer"
+      ],
+      "tags": [
+        "ui-design",
+        "critique",
+        "needs-shell",
+        "needs-browser"
+      ],
+      "why": "Popular design-quality skill (82k stars); its folder ships a CLI and browser tooling, so link-only."
+    },
+    {
+      "repo": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "path": ".claude/skills/ui-ux-pro-max",
+      "commit": "56ea9cf174ed86786187daa9de0e6247cb0747e4",
+      "archetypes": [
+        "designer"
+      ],
+      "tags": [
+        "ui-design",
+        "design-system",
+        "needs-shell"
+      ],
+      "why": "Most-starred UI/UX skill (137k); a searchable style database run through Python, so link-only."
+    },
+    {
+      "repo": "youdotcom-oss/agent-skills",
+      "path": "skills/you-research",
+      "commit": "4030574fc7438b20c4c91fb108c0cb63300806fb",
+      "archetypes": [
+        "researcher",
+        "analyst"
+      ],
+      "tags": [
+        "web-research",
+        "citations",
+        "you.com",
+        "needs-mcp"
+      ],
+      "why": "Official You.com skill: when to use one-shot cited research vs an agent-led search loop."
+    },
+    {
+      "repo": "youdotcom-oss/agent-skills",
+      "path": "skills/you-web",
+      "commit": "4030574fc7438b20c4c91fb108c0cb63300806fb",
+      "archetypes": [
+        "researcher"
+      ],
+      "tags": [
+        "web-research",
+        "search",
+        "you.com",
+        "needs-mcp"
+      ],
+      "why": "Official You.com search + contents loop: read sources before relying on them, cite real URLs."
+    },
+    {
+      "repo": "bytedance/deer-flow",
+      "path": "skills/public/deep-research",
+      "commit": "7e22e42365cccc30d3473d3c2c120e2b13ce163c",
+      "archetypes": [
+        "researcher"
+      ],
+      "tags": [
+        "research-method",
+        "web-research"
+      ],
+      "why": "A multi-angle research method (broad, then deep, then verify) from DeerFlow (84k stars)."
+    },
+    {
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "enterprise-search/skills/search-strategy",
+      "commit": "33eeda1e8fd856455b05479d13a0f85b5f803744",
+      "archetypes": [
+        "researcher"
+      ],
+      "tags": [
+        "research-method",
+        "query-planning",
+        "claude-code-specific"
+      ],
+      "why": "Decompose a question into targeted queries per source, rank and dedupe results."
+    },
+    {
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "enterprise-search/skills/knowledge-synthesis",
+      "commit": "33eeda1e8fd856455b05479d13a0f85b5f803744",
+      "archetypes": [
+        "researcher",
+        "analyst"
+      ],
+      "tags": [
+        "synthesis",
+        "citations",
+        "confidence"
+      ],
+      "why": "Merge results into one answer with source attribution and freshness/authority confidence."
+    },
+    {
+      "repo": "K-Dense-AI/scientific-agent-skills",
+      "path": "skills/scientific-critical-thinking",
+      "commit": "a1043ef544e3a100c28e70a736b6cf32554d0677",
+      "archetypes": [
+        "researcher",
+        "analyst"
+      ],
+      "tags": [
+        "evidence",
+        "critical-thinking",
+        "bias"
+      ],
+      "why": "Grade evidence quality, spot bias and weak methods before trusting a claim."
+    },
+    {
+      "repo": "mattpocock/skills",
+      "path": "skills/engineering/research",
+      "commit": "49dd158d1076134a641b33efb035946536778336",
+      "archetypes": [
+        "researcher",
+        "engineer"
+      ],
+      "tags": [
+        "research-method",
+        "primary-sources",
+        "citations"
+      ],
+      "why": "Primary sources only, every claim cited, findings written to a file: our researcher's playbook in 10 lines."
+    },
+    {
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "data/skills/data-visualization",
+      "commit": "33eeda1e8fd856455b05479d13a0f85b5f803744",
+      "archetypes": [
+        "analyst"
+      ],
+      "tags": [
+        "charts",
+        "data-visualization"
+      ],
+      "why": "Chart choice by data relationship, accessibility and color rules (13k installs)."
+    },
+    {
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "data/skills/statistical-analysis",
+      "commit": "33eeda1e8fd856455b05479d13a0f85b5f803744",
+      "archetypes": [
+        "analyst"
+      ],
+      "tags": [
+        "statistics",
+        "sanity-check"
+      ],
+      "why": "Descriptive stats, trends, outliers and when to distrust a statistical claim."
+    },
+    {
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "data/skills/sql-queries",
+      "commit": "33eeda1e8fd856455b05479d13a0f85b5f803744",
+      "archetypes": [
+        "analyst",
+        "engineer"
+      ],
+      "tags": [
+        "sql",
+        "data-analysis"
+      ],
+      "why": "Correct, dialect-aware SQL with CTEs and window functions."
+    },
+    {
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "data/skills/explore-data",
+      "commit": "33eeda1e8fd856455b05479d13a0f85b5f803744",
+      "archetypes": [
+        "analyst"
+      ],
+      "tags": [
+        "data-analysis",
+        "profiling",
+        "claude-code-specific"
+      ],
+      "why": "Profile a new table or file: shape, nulls, distributions, quality issues."
+    },
+    {
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "data/skills/validate-data",
+      "commit": "33eeda1e8fd856455b05479d13a0f85b5f803744",
+      "archetypes": [
+        "analyst"
+      ],
+      "tags": [
+        "qa",
+        "sanity-check",
+        "claude-code-specific"
+      ],
+      "why": "QA an analysis before sharing: methodology, accuracy and bias checks."
+    },
+    {
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "product-management/skills/metrics-review",
+      "commit": "33eeda1e8fd856455b05479d13a0f85b5f803744",
+      "archetypes": [
+        "analyst",
+        "lead",
+        "chief"
+      ],
+      "tags": [
+        "metrics",
+        "kpi",
+        "claude-code-specific"
+      ],
+      "why": "Review product metrics with definitions, trends and the so-what."
+    },
+    {
+      "repo": "anthropics/skills",
+      "path": "skills/xlsx",
+      "commit": "dbd4588f9e1033efb41dad4bef2f7947c8993d44",
+      "archetypes": [
+        "analyst"
+      ],
+      "tags": [
+        "spreadsheets",
+        "excel",
+        "needs-shell"
+      ],
+      "why": "Anthropic's production spreadsheet skill (formulas, formatting, recalculation); source-available, so link-only.",
+      "license": "LicenseRef-Anthropic-source-available",
+      "licenseFile": "skills/xlsx/LICENSE.txt"
+    },
+    {
+      "repo": "anthropics/skills",
+      "path": "skills/docx",
+      "commit": "dbd4588f9e1033efb41dad4bef2f7947c8993d44",
+      "archetypes": [
+        "writer"
+      ],
+      "tags": [
+        "documents",
+        "word",
+        "needs-shell"
+      ],
+      "why": "Anthropic's production Word-document skill (tracked changes, comments, formatting); source-available, so link-only.",
+      "license": "LicenseRef-Anthropic-source-available",
+      "licenseFile": "skills/docx/LICENSE.txt"
+    },
+    {
+      "repo": "coreyhaines31/marketingskills",
+      "path": "skills/copy-editing",
+      "commit": "365b412152b9542499ca1439426f7fc3cc92bb65",
+      "archetypes": [
+        "writer"
+      ],
+      "tags": [
+        "editing",
+        "copy"
+      ],
+      "why": "Systematic multi-pass copy editing (144k installs, the most used editing skill)."
+    },
+    {
+      "repo": "coreyhaines31/marketingskills",
+      "path": "skills/copywriting",
+      "commit": "365b412152b9542499ca1439426f7fc3cc92bb65",
+      "archetypes": [
+        "writer"
+      ],
+      "tags": [
+        "copywriting",
+        "marketing"
+      ],
+      "why": "Conversion copy for pages and launches: clarity over cleverness, benefits over features."
+    },
+    {
+      "repo": "blader/humanizer",
+      "path": "",
+      "commit": "8c307f367c91bd974002f10f2be2965d642c13df",
+      "archetypes": [
+        "writer"
+      ],
+      "tags": [
+        "editing",
+        "ai-tells",
+        "voice"
+      ],
+      "why": "Removes AI-writing tells (based on Wikipedia's 'Signs of AI writing'); 58k stars.",
+      "include": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "repo": "anthropics/skills",
+      "path": "skills/internal-comms",
+      "commit": "dbd4588f9e1033efb41dad4bef2f7947c8993d44",
+      "archetypes": [
+        "writer",
+        "chief",
+        "lead"
+      ],
+      "tags": [
+        "internal-comms",
+        "status",
+        "announcements"
+      ],
+      "why": "Anthropic's formats for status reports, leadership updates, newsletters and FAQs.",
+      "license": "Apache-2.0",
+      "licenseFile": "skills/internal-comms/LICENSE.txt"
+    },
+    {
+      "repo": "addyosmani/agent-skills",
+      "path": "skills/documentation-and-adrs",
+      "commit": "aeac41d4d005999432bb7312f7ff06383a91d59d",
+      "archetypes": [
+        "writer",
+        "engineer"
+      ],
+      "tags": [
+        "docs",
+        "adr"
+      ],
+      "why": "Document decisions and APIs: ADRs, READMEs, the why not just the what."
+    },
+    {
+      "repo": "jakubkrehel/skills",
+      "path": "skills/better-writing",
+      "commit": "4c66b1fa86e9ab70187b43d7da9b6fdb29f2ef63",
+      "archetypes": [
+        "writer",
+        "designer"
+      ],
+      "tags": [
+        "ux-writing",
+        "microcopy"
+      ],
+      "why": "Interface copy that matches the product voice and says what to do next."
+    },
+    {
+      "repo": "anthropics/skills",
+      "path": "skills/doc-coauthoring",
+      "commit": "dbd4588f9e1033efb41dad4bef2f7947c8993d44",
+      "archetypes": [
+        "writer",
+        "lead"
+      ],
+      "tags": [
+        "docs",
+        "specs",
+        "collaboration"
+      ],
+      "why": "Anthropic's context-gathering then reader-testing workflow for docs and proposals; no license file, so link-only.",
+      "license": "NOASSERTION"
+    },
+    {
+      "repo": "obra/the-elements-of-style",
+      "path": "skills/writing-clearly-and-concisely",
+      "commit": "05fc4f0d2b97b7c042dd9949ad658568e4a1324e",
+      "archetypes": [
+        "writer"
+      ],
+      "tags": [
+        "editing",
+        "style"
+      ],
+      "why": "Strunk's rules as a skill (the canonical original); unlicensed, so link-only."
+    },
+    {
+      "repo": "addyosmani/agent-skills",
+      "path": "skills/planning-and-task-breakdown",
+      "commit": "aeac41d4d005999432bb7312f7ff06383a91d59d",
+      "archetypes": [
+        "lead"
+      ],
+      "tags": [
+        "planning",
+        "task-breakdown"
+      ],
+      "why": "Break a goal into small verifiable tasks with acceptance criteria and order."
+    },
+    {
+      "repo": "addyosmani/agent-skills",
+      "path": "skills/spec-driven-development",
+      "commit": "aeac41d4d005999432bb7312f7ff06383a91d59d",
+      "archetypes": [
+        "lead",
+        "engineer"
+      ],
+      "tags": [
+        "specs",
+        "planning"
+      ],
+      "why": "Write the spec before the work: objectives, boundaries, success criteria."
+    },
+    {
+      "repo": "obra/superpowers",
+      "path": "skills/writing-plans",
+      "commit": "bb92a77741419a4ab5f06e711a283343f1ada0c3",
+      "archetypes": [
+        "lead",
+        "engineer"
+      ],
+      "tags": [
+        "planning",
+        "briefs"
+      ],
+      "why": "Plans a zero-context executor can follow: exact files, steps, checks."
+    },
+    {
+      "repo": "obra/superpowers",
+      "path": "skills/dispatching-parallel-agents",
+      "commit": "bb92a77741419a4ab5f06e711a283343f1ada0c3",
+      "archetypes": [
+        "lead",
+        "chief"
+      ],
+      "tags": [
+        "delegation",
+        "parallel-work"
+      ],
+      "why": "When and how to split independent work across agents with focused briefs."
+    },
+    {
+      "repo": "mattpocock/skills",
+      "path": "skills/productivity/writing-for-agents",
+      "commit": "49dd158d1076134a641b33efb035946536778336",
+      "archetypes": [
+        "lead",
+        "chief",
+        "writer"
+      ],
+      "tags": [
+        "briefs",
+        "prompting",
+        "delegation"
+      ],
+      "why": "How to write anything an agent reads (briefs, skills, AGENTS.md) so it behaves predictably."
+    },
+    {
+      "repo": "mattpocock/skills",
+      "path": "skills/productivity/grilling",
+      "commit": "49dd158d1076134a641b33efb035946536778336",
+      "archetypes": [
+        "lead",
+        "chief"
+      ],
+      "tags": [
+        "alignment",
+        "requirements"
+      ],
+      "why": "Interview the requester until the plan is shared and explicit, before work starts."
+    },
+    {
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "product-management/skills/write-spec",
+      "commit": "33eeda1e8fd856455b05479d13a0f85b5f803744",
+      "archetypes": [
+        "lead",
+        "chief"
+      ],
+      "tags": [
+        "specs",
+        "prd",
+        "claude-code-specific"
+      ],
+      "why": "Turn a vague ask into a spec with goals, non-goals, metrics and acceptance criteria."
+    },
+    {
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "product-management/skills/stakeholder-update",
+      "commit": "33eeda1e8fd856455b05479d13a0f85b5f803744",
+      "archetypes": [
+        "lead",
+        "chief",
+        "writer"
+      ],
+      "tags": [
+        "status",
+        "updates",
+        "claude-code-specific"
+      ],
+      "why": "Status updates tailored to audience: exec brief, engineering detail, customer-facing."
+    },
+    {
+      "repo": "phuryn/pm-skills",
+      "path": "pm-execution/skills/pre-mortem",
+      "commit": "07b34f64ee828df08953f505b7f747aef85ae7c6",
+      "archetypes": [
+        "lead",
+        "chief"
+      ],
+      "tags": [
+        "risk",
+        "planning",
+        "claude-code-specific"
+      ],
+      "why": "Imagine the launch failed and work back to the real risks (Tigers, Paper Tigers, Elephants)."
+    },
+    {
+      "repo": "magnus919/agent-skills",
+      "path": "chief-of-staff-methodology",
+      "commit": "06ca706ecaa80f6afb31ae28eb160d39372b7267",
+      "archetypes": [
+        "chief"
+      ],
+      "tags": [
+        "executive",
+        "briefing",
+        "triage",
+        "decision-memo"
+      ],
+      "why": "Executive briefing, triage and decision prep without assuming the leader's authority: Mira's job."
+    },
+    {
+      "repo": "magnus919/agent-skills",
+      "path": "strategy-frameworks",
+      "commit": "06ca706ecaa80f6afb31ae28eb160d39372b7267",
+      "archetypes": [
+        "chief",
+        "lead"
+      ],
+      "tags": [
+        "strategy",
+        "frameworks"
+      ],
+      "why": "When to use which strategy framework, and how not to misuse it."
+    },
+    {
+      "repo": "phuryn/pm-skills",
+      "path": "pm-execution/skills/prioritization-frameworks",
+      "commit": "07b34f64ee828df08953f505b7f747aef85ae7c6",
+      "archetypes": [
+        "chief",
+        "lead"
+      ],
+      "tags": [
+        "prioritization",
+        "frameworks"
+      ],
+      "why": "RICE, ICE, Kano, MoSCoW and Opportunity Score with when-to-use guidance."
+    },
+    {
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "operations/skills/status-report",
+      "commit": "33eeda1e8fd856455b05479d13a0f85b5f803744",
+      "archetypes": [
+        "chief",
+        "lead"
+      ],
+      "tags": [
+        "status",
+        "kpi",
+        "risks",
+        "claude-code-specific"
+      ],
+      "why": "Company status with KPIs, red/yellow/green, risks and decisions needed."
+    },
+    {
+      "repo": "kingmoeng/agent-team-skills",
+      "path": "skills/team-lead",
+      "commit": "160e723477d4a1d5110d8ef4a6e743c46c59ac9e",
+      "archetypes": [
+        "lead"
+      ],
+      "tags": [
+        "delegation"
+      ],
+      "why": "You.com Research's #5 lead pick, flagged official by it; checked against the criteria."
+    },
+    {
+      "repo": "Claudefarid/claude-ceo-skill",
+      "path": "",
+      "commit": "65cc5f98fcabbb9205eb0c4b9ce32f5f3cc9b06f",
+      "archetypes": [
+        "chief"
+      ],
+      "tags": [
+        "executive"
+      ],
+      "why": "You.com Research's CEO-assistant pick; checked against the criteria.",
+      "include": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "repo": "trailofbits/skills",
+      "path": "plugins/differential-review/skills/differential-review",
+      "commit": "5c99c03fb8a9ea568432ecbcba5d86e9f4ac2bf0",
+      "archetypes": [
+        "engineer"
+      ],
+      "tags": [
+        "security",
+        "code-review",
+        "needs-shell"
+      ],
+      "why": "Trail of Bits' security-focused diff review; CC-BY-SA-4.0, so link-only at most."
+    }
+  ],
+  "rejected": [
+    {
+      "repo": "vercel-labs/agent-skills",
+      "path": "skills/web-design-guidelines",
+      "reason": "No license file, and the skill fetches its rules and output format from a remote URL at run time (unpinned instructions we can't vet)."
+    },
+    {
+      "repo": "vercel-labs/agent-skills",
+      "path": "skills/writing-guidelines",
+      "reason": "No license file, and it fetches its rules from a remote URL at run time, like web-design-guidelines."
+    },
+    {
+      "repo": "softaworks/agent-toolkit",
+      "path": "skills/writing-clearly-and-concisely",
+      "reason": "Derivative of obra/the-elements-of-style, which has no license; the MIT relicense is not ours to rely on. The original is listed link-only."
+    },
+    {
+      "repo": "softaworks/agent-toolkit",
+      "path": "skills/humanizer",
+      "reason": "A copy of blader/humanizer; the canonical repo is used."
+    },
+    {
+      "repo": "sickn33/agentic-awesome-skills",
+      "path": "skills/copy-editing",
+      "reason": "You.com Research's writer pick #3 is an aggregator copy of coreyhaines31/marketingskills copy-editing; the canonical repo is used."
+    },
+    {
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/research/grounded-citations",
+      "reason": "Returned by You.com Research; the path does not exist at the default-branch HEAD (e6f5742)."
+    },
+    {
+      "repo": "mattpocock/skills",
+      "path": "skills/in-progress/chief-of-staff",
+      "reason": "Lives under in-progress/ (unstable by the author's own label)."
+    },
+    {
+      "repo": "mohitagw15856/pm-claude-skills",
+      "path": "skills/delegation-brief",
+      "reason": "You.com Research's lead pick; the repo is a mass-produced catalog of hundreds of one-file skills (houseplant care, wedding planning), a weak curation signal despite 1.5k stars."
+    },
+    {
+      "repo": "nimrodfisher/data-analytics-skills",
+      "reason": "All 7 of You.com Research's analyst picks came from this repo (479 stars, MIT, passes the criteria); Anthropic's official data plugin covers the same needs, so not added."
+    },
+    {
+      "repo": "conorbronsdon/avoid-ai-writing",
+      "path": "skills/avoid-ai-writing",
+      "reason": "Overlaps blader/humanizer and ships a 400 KB JS detector; one AI-tell skill is enough."
+    },
+    {
+      "repo": "K-Dense-AI/scientific-agent-skills",
+      "path": "skills/literature-review",
+      "reason": "Academic-database workflow driven by Python scripts; scientific-critical-thinking covers our researcher's need without a shell."
+    },
+    {
+      "repo": "affaan-m/ECC",
+      "path": "skills/deep-research",
+      "reason": "Aggregator repo; bytedance/deer-flow's deep-research is used for the same need."
+    },
+    {
+      "repo": "deanpeters/Product-Manager-Skills",
+      "reason": "License is NOASSERTION (custom terms); PM needs are covered by Anthropic's product-management plugin and phuryn/pm-skills."
+    },
+    {
+      "repo": "Imbad0202/academic-research-skills",
+      "reason": "License is NOASSERTION; academic-paper focus."
+    },
+    {
+      "repo": "dr-spook/ui-ux-designer-skill",
+      "reason": "2 stars, not an official publisher (You.com Research designer pick)."
+    },
+    {
+      "repo": "Xialiang98/design-visual-frontend",
+      "reason": "18 stars, not an official publisher (You.com Research designer pick)."
+    },
+    {
+      "repo": "skydashnet/material-design-3-ui-skill",
+      "reason": "Material Design 3 only; not general enough for the designer archetype (You.com Research returned it twice)."
+    },
+    {
+      "repo": "B143KC47/deep-research-skill",
+      "reason": "2 stars, not an official publisher (You.com Research researcher pick)."
+    },
+    {
+      "repo": "EnkrateiaLucca/research-report-skill",
+      "reason": "0 stars, not an official publisher (You.com Research researcher pick)."
+    },
+    {
+      "repo": "MathRoda/release-notes-skill",
+      "reason": "0 stars and no license (You.com Research writer pick)."
+    },
+    {
+      "repo": "adewale/good-readme",
+      "reason": "9 stars, not an official publisher (You.com Research writer pick)."
+    },
+    {
+      "repo": "anthropics/skills",
+      "path": "skills/canvas-design",
+      "reason": "5.5 MB of bundled fonts; theme-factory and frontend-design cover the visual-design need."
+    }
+  ]
+}

@@ -1,13 +1,15 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, Heart, Pencil } from "lucide-react";
+import { cache, useCached, type Resource } from "@/lib/client-cache";
 import { AGENTS } from "@/lib/data";
 import { IconButton, inline, POP, SPRING } from "./ui";
 
 /*
  * An agent's SOUL.md and MEMORY.md, after Muse's identity tab: two textured
  * cards that open into the file. SOUL is how the agent works; MEMORY is what
- * it has learned by doing.
+ * it has learned by doing. Read through the client cache, so they paint at
+ * once and refresh when the server announces files:agent:<id>.
  */
 type Which = "soul" | "memory";
 interface FileInfo {
@@ -209,24 +211,39 @@ function FileView({
   );
 }
 
+export const identityOf = (agentId: string): Resource => ({ key: `/api/agents/${agentId}/identity`, topic: `files:agent:${agentId}` });
+
+/** Only the first-ever open shows this; after that the cache has the files. */
+function IdentitySkeleton({ name }: { name: string }) {
+  const bar = "animate-pulse bg-[#f0f0f0]";
+  return (
+    <div className="mt-5" aria-busy="true" aria-label={`Loading ${name}'s files`}>
+      <div className="rounded-[22px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,0.05)]">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[16px] font-semibold">{name}</span>
+          <span className={`h-3 w-14 rounded-full ${bar}`} />
+        </div>
+        <div className={`mt-3 h-10 w-full rounded-full ${bar}`} />
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        {[0, 1].map((i) => (
+          <div key={i} className={`aspect-[1.12] w-full rounded-[26px] ${bar}`} style={{ animationDelay: `${i * 90}ms` }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function IdentityTab({ agentId, onNotify }: { agentId: string; onNotify: (text: string) => void }) {
-  const [data, setData] = useState<Identity | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const resource = identityOf(agentId);
+  const { data, error } = useCached<Identity>(resource);
   const [open, setOpen] = useState<{ which: Which; edit: boolean } | null>(null);
   const agent = AGENTS[agentId];
 
-  useEffect(() => {
-    let alive = true;
-    fetch(`/api/agents/${agentId}/identity`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`Couldn't load ${agent.name}'s files (${r.status})`))))
-      .then((d: Identity) => alive && setData(d))
-      .catch((e: Error) => alive && setError(e.message));
-    return () => {
-      alive = false;
-    };
-  }, [agentId, agent.name]);
-
-  if (!data) return <p className="mt-6 text-center text-[13px] text-muted">{error ?? "Loading…"}</p>;
+  if (!data) {
+    if (!error) return <IdentitySkeleton name={agent.name} />;
+    return <p className="mt-6 text-center text-[13px] text-muted">Couldn&apos;t load {agent.name}&apos;s files ({error})</p>;
+  }
 
   return (
     <AnimatePresence mode="wait" initial={false}>
@@ -239,7 +256,7 @@ export function IdentityTab({ agentId, onNotify }: { agentId: string; onNotify: 
             startEditing={open.edit}
             onBack={() => setOpen(null)}
             onSaved={(f) => {
-              setData((d) => (d ? { ...d, [open.which]: f } : d));
+              cache.mutate<Identity>(resource.key, (d) => (d ? { ...d, [open.which]: f } : d));
               onNotify(`Saved ${agent.name}'s ${CARDS[open.which].file}`);
             }}
           />

@@ -1,8 +1,13 @@
+import { connection } from "next/server";
 import { agentType, readAgentFiles, writeAgentFile, type AgentFile } from "@/lib/agent-files";
 import { AGENTS } from "@/lib/data";
 
-/** An agent's SOUL.md and MEMORY.md. GET creates them from templates on first read. */
+/**
+ * An agent's SOUL.md and MEMORY.md. GET creates them from templates on first read.
+ * Served from the file cache, so connection() keeps it at request time under Cache Components.
+ */
 export async function GET(_req: Request, ctx: RouteContext<"/api/agents/[id]/identity">) {
+  await connection();
   const { id } = await ctx.params;
   if (!AGENTS[id]) return Response.json({ error: `Unknown agent "${id}".` }, { status: 404 });
   return Response.json({ type: agentType(AGENTS[id]), ...(await readAgentFiles(id)) });
