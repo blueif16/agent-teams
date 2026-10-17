@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -84,10 +84,10 @@ describe("DATA_DIR moves", () => {
     await readAgentFiles("mira");
     expect(existsSync(soul)).toBe(true);
 
-    // The cache watches the vault under DATA_DIR: an outside edit there is announced.
-    await new Promise((r) => setTimeout(r, 300));
-    const changed = nextChange(getServerCache().bus, "files:agent:mira", 5000);
-    await writeFile(soul, "# Mira's soul\n\nEdited outside the app.\n");
+    // The cache's agent roots are the vault's agents/ under DATA_DIR: a file written there is announced as
+    // that agent's (a file outside every root is announced as nobody's).
+    const changed = nextChange(getServerCache().bus, "files:agent:mira", 2000);
+    await getServerCache().files.write(path.join(data, "vault", "agents", "mira", "notes.md"), "- a note\n");
     await changed;
     expect(existsSync(path.join(cwdDir, ".data"))).toBe(false);
   });
