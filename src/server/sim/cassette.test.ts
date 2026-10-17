@@ -335,3 +335,130 @@ describe("occurrences", () => {
     expect(await answer.text()).toContain("Café");
   });
 });
+
+// The volatile text a real prompt carries: the date line chat/route.ts builds, ISO dates and times, a uuid7 trace id.
+const SYSTEM = [
+  "You are Mira, the chief of staff.",
+  "Today is Fri, Oct 17, 2026.",
+  "The sprint ends 2026-10-31.",
+  "Last check-in 2026-10-17T22:04:05.123Z.",
+  "Trace 0199f3c2-7d1e-7a3b-9c4d-5e6f7a8b9c0d.",
+].join("\n");
+
+interface MissBody {
+  error: string;
+  key: string;
+  n: number;
+  closest: { key: string; n: number } | null;
+  diff: string[];
+}
+
+describe("the key", () => {
+  it.each([
+    ["a weekday date", "Today is Fri, Oct 17, 2026.", "Today is Sat, Oct 18, 2026."],
+    ["an ISO date", "2026-10-31", "2026-11-07"],
+    ["an ISO timestamp", "2026-10-17T22:04:05.123Z", "2026-10-18T09:15:00Z"],
+    ["a UUID", "0199f3c2-7d1e-7a3b-9c4d-5e6f7a8b9c0d", "0199F3C3-0000-7FFF-8ABC-123456789ABC"],
+  ])("is the same when the prompt has another %s", async (_, recorded, now) => {
+    await recordAll([chat("Draft the launch plan", SYSTEM)], [text("answer")]);
+
+    const play = createCassette({ file, mode: "replay", upstream: offline });
+    const res = await post(play.fetch, chat("Draft the launch plan", SYSTEM.replace(recorded, now)));
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("answer");
+  });
+
+  it("differs when the user's message differs", async () => {
+    await recordAll([chat("Draft the launch plan", SYSTEM)], [text("answer")]);
+
+    const play = createCassette({ file, mode: "replay", upstream: offline });
+    const res = await post(play.fetch, chat("Draft the pricing page", SYSTEM));
+
+    expect(res.status).toBe(598);
+  });
+
+  it("goes through the canonicalize hook, for volatile text only this project knows", async () => {
+    // Like the chief prompt's ledger block: numbers that move between runs.
+    const maskCalls = (c: { method: string; path: string; body: unknown }) =>
+      JSON.parse(JSON.stringify(c).replace(/Calls this week: \d+/g, "Calls this week: <N>"));
+    const up = fakeUpstream([text("answer")]);
+    const rec = createCassette({ file, mode: "record", upstream: up.fetch, canonicalize: maskCalls });
+    await bytesOf(await post(rec.fetch, chat("Draft the launch plan", "Calls this week: 41")));
+
+    const play = createCassette({ file, mode: "replay", upstream: offline, canonicalize: maskCalls });
+    const res = await post(play.fetch, chat("Draft the launch plan", "Calls this week: 57"));
+
+    expect(res.status).toBe(200);
+  });
+});
+
+describe("a miss in replay", () => {
+  it("returns 598 with the key, the occurrence and a diff naming the changed line", async () => {
+    const rec = await recordAll([chat("Draft the launch plan")], [text("answer")]);
+    const recorded = rec.entries()[0];
+
+    const play = createCassette({ file, mode: "replay", upstream: offline });
+    const res = await post(play.fetch, chat("Draft the pricing page"));
+    const body = (await res.json()) as MissBody;
+
+    expect(res.status).toBe(598);
+    expect(body.error).toBe("cassette miss");
+    expect(body.key).toMatch(/^[0-9a-f]{64}$/);
+    expect(body.key).not.toBe(recorded.key);
+    expect(body.n).toBe(1);
+    expect(body.closest).toEqual({ key: recorded.key, n: 1 });
+    expect(body.diff).toContain('- "content": "Draft the launch plan"');
+    expect(body.diff).toContain('+ "content": "Draft the pricing page"');
+    expect(body.diff).toHaveLength(2); // only the lines that differ
+  });
+
+  it("lists the miss in misses() and never calls the upstream", async () => {
+    await recordAll([chat("Draft the launch plan")], [text("answer")]);
+    const up = fakeUpstream([text("live answer")]);
+
+    const play = createCassette({ file, mode: "replay", upstream: up.fetch });
+    const body = (await (await post(play.fetch, chat("Draft the pricing page"))).json()) as MissBody;
+
+    expect(up.calls).toHaveLength(0);
+    expect(play.misses()).toHaveLength(1);
+    expect(play.misses()[0]).toMatchObject({ key: body.key, n: 1, request: { path: "/v1/chat/completions", model: MODEL } });
+  });
+
+  it("diffs against an entry for the same model, even when another model's is closer", async () => {
+    const rec = await recordAll(
+      [chat("Draft the launch plan", undefined, "model-a"), chat("Draft the pricing page", undefined, "model-b")],
+      [text("a"), text("b")],
+    );
+    const [a] = rec.entries();
+
+    const play = createCassette({ file, mode: "replay", upstream: offline });
+    const body = (await (await post(play.fetch, chat("Draft the pricing page", undefined, "model-a"))).json()) as MissBody;
+
+    expect(body.closest).toEqual({ key: a.key, n: 1 });
+  });
+
+  it("diffs against the most similar entry when several share the model", async () => {
+    const rec = await recordAll(
+      [chat("Size the market", "You are Kai, the analyst."), chat("Draft the launch plan", "You are Mira.")],
+      [text("kai"), text("mira")],
+    );
+    const mira = rec.entries()[1];
+
+    const play = createCassette({ file, mode: "replay", upstream: offline });
+    const body = (await (await post(play.fetch, chat("Draft the pricing page", "You are Mira."))).json()) as MissBody;
+
+    expect(body.closest).toEqual({ key: mira.key, n: 1 });
+    expect(body.diff).toHaveLength(2);
+  });
+
+  it("caps the diff at 20 lines", async () => {
+    const many = (word: string) => ({ ...chat(""), messages: Array.from({ length: 30 }, (_, i) => ({ role: "user", content: `${word} ${i}` })) });
+    await recordAll([many("before")], [text("answer")]);
+
+    const play = createCassette({ file, mode: "replay", upstream: offline });
+    const body = (await (await post(play.fetch, many("after"))).json()) as MissBody;
+
+    expect(body.diff).toHaveLength(20);
+  });
+});
