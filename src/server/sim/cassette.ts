@@ -76,12 +76,27 @@ export interface Cassette {
 
 type Input = string | URL | Request;
 
-/** Sorted keys all the way down, so equal requests serialize equally. */
-function sortKeys(v: unknown): unknown {
-  if (Array.isArray(v)) return v.map(sortKeys);
+/**
+ * Text that changes between runs without changing the answer (research K, Determinism hazards).
+ * UUIDs first, then timestamps before bare dates, so a timestamp isn't half-masked as a date.
+ */
+const VOLATILE: [RegExp, string][] = [
+  [/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, "<UUID>"],
+  [/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?/g, "<TS>"],
+  [/\b\d{4}-\d{2}-\d{2}\b/g, "<DATE>"],
+  // "Fri, Oct 17, 2026": toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+  [/\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}\b/g, "<DATE>"],
+];
+
+const mask = (s: string) => VOLATILE.reduce((t, [re, to]) => t.replace(re, to), s);
+
+/** Sorted keys all the way down (so equal requests serialize equally), strings masked when asked. */
+function normalize(v: unknown, masking: boolean): unknown {
+  if (typeof v === "string") return masking ? mask(v) : v;
+  if (Array.isArray(v)) return v.map((x) => normalize(x, masking));
   if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
-    return Object.fromEntries(Object.keys(o).sort().map((k) => [k, sortKeys(o[k])]));
+    return Object.fromEntries(Object.keys(o).sort().map((k) => [k, normalize(o[k], masking)]));
   }
   return v;
 }
@@ -93,7 +108,7 @@ function bodyText(input: Input, init?: RequestInit): string | undefined {
   throw new TypeError("cassette: only string request bodies can be keyed");
 }
 
-function canonicalOf(input: Input, init?: RequestInit) {
+function canonicalOf(input: Input, init: RequestInit | undefined, hook: CassetteOptions["canonicalize"]) {
   const url = new URL(input instanceof Request ? input.url : String(input));
   const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
   const text = bodyText(input, init);
@@ -104,13 +119,61 @@ function canonicalOf(input: Input, init?: RequestInit) {
     // Not JSON: key on the text.
   }
   const reqPath = url.pathname + url.search;
-  const canonical = sortKeys({ method, path: reqPath, body }) as CanonicalRequest;
+  const masked = normalize({ method, path: reqPath, body }, true) as CanonicalRequest;
+  // Sorted again, in case the hook added keys.
+  const canonical = (hook ? normalize(hook(masked), false) : masked) as CanonicalRequest;
   const model = body && typeof body === "object" && typeof (body as { model?: unknown }).model === "string" ? (body as { model: string }).model : null;
   return {
     canonical,
     key: createHash("sha256").update(JSON.stringify(canonical)).digest("hex"),
     request: { method, path: reqPath, model },
   };
+}
+
+const linesOf = (c: CanonicalRequest) => JSON.stringify(c, null, 2).split("\n");
+
+/** How alike two line lists are: shared lines (as a multiset) over all lines, 0–1. */
+function likeness(a: string[], b: string[]): number {
+  const left = new Map<string, number>();
+  for (const l of a) left.set(l, (left.get(l) ?? 0) + 1);
+  let shared = 0;
+  for (const l of b) {
+    const k = left.get(l);
+    if (k) {
+      shared++;
+      left.set(l, k - 1);
+    }
+  }
+  return (2 * shared) / (a.length + b.length);
+}
+
+/** The first `max` lines only in `a` (`- `) or only in `b` (`+ `), in order, by longest common subsequence. */
+function lineDiff(a: string[], b: string[], max = 20): string[] {
+  // Prompts share most of their lines, so trim the common ends before the quadratic part.
+  let s = 0;
+  while (s < a.length && s < b.length && a[s] === b[s]) s++;
+  let ea = a.length;
+  let eb = b.length;
+  while (ea > s && eb > s && a[ea - 1] === b[eb - 1]) {
+    ea--;
+    eb--;
+  }
+  const x = a.slice(s, ea);
+  const y = b.slice(s, eb);
+  const lcs = Array.from({ length: x.length + 1 }, () => new Uint32Array(y.length + 1));
+  for (let i = x.length - 1; i >= 0; i--)
+    for (let j = y.length - 1; j >= 0; j--) lcs[i][j] = x[i] === y[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+  const out: string[] = [];
+  let i = 0;
+  let j = 0;
+  while ((i < x.length || j < y.length) && out.length < max) {
+    if (i < x.length && j < y.length && x[i] === y[j]) {
+      i++;
+      j++;
+    } else if (j >= y.length || (i < x.length && lcs[i + 1][j] >= lcs[i][j + 1])) out.push(`- ${x[i++].trim()}`);
+    else out.push(`+ ${y[j++].trim()}`);
+  }
+  return out;
 }
 
 function load(file: string): CassetteEntry[] {
@@ -208,15 +271,33 @@ export function createCassette(opts: CassetteOptions): Cassette {
     keep(entry);
   };
 
+  const missed: CassetteMiss[] = [];
+  /** Fails closed: a 598 naming the request and how it differs from the closest recording. */
+  const miss = (key: string, n: number, canonical: CanonicalRequest, request: CassetteEntry["request"]): Response => {
+    const mine = linesOf(canonical);
+    let best: { entry: CassetteEntry; lines: string[]; score: number } | undefined;
+    for (const entry of all) {
+      if (entry.request.path !== request.path || entry.request.model !== request.model) continue;
+      const lines = linesOf(entry.canonical);
+      const score = likeness(lines, mine);
+      if (!best || score > best.score) best = { entry, lines, score };
+    }
+    const closest = best ? { key: best.entry.key, n: best.entry.n } : null;
+    const diff = best ? lineDiff(best.lines, mine) : [];
+    missed.push({ key, n, request, closest, diff });
+    return Response.json({ error: "cassette miss", key, n, closest, diff }, { status: 598 });
+  };
+
   const cassetteFetch = async (input: Input, init?: RequestInit): Promise<Response> => {
     const t0 = performance.now();
-    const { canonical, key, request } = canonicalOf(input, init);
+    const { canonical, key, request } = canonicalOf(input, init, opts.canonicalize);
     // Before any await, so the n-th call to start is the n-th occurrence whatever finishes first.
     const n = (started.get(key) ?? 0) + 1;
     started.set(key, n);
     if (mode !== "record") {
       const hit = byId.get(id(key, n));
       if (hit) return replay(hit);
+      if (mode === "replay") return miss(key, n, canonical, request);
     }
     const res = await upstream(input, init);
     return record(res, t0, (response) => append({ v: 1, key, n, canonical, request, response, recordedAt: new Date().toISOString() }));
@@ -224,7 +305,7 @@ export function createCassette(opts: CassetteOptions): Cassette {
 
   return {
     fetch: cassetteFetch as typeof fetch,
-    misses: () => [],
+    misses: () => [...missed],
     entries: () => [...all],
   };
 }
