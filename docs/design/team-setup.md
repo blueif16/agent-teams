@@ -60,9 +60,16 @@ E privacy · F orchestrator memory); cited as `[D §7]`.
 
 ## 2. Agents: identity, files, threads
 
-- **Archetypes:** lead, writer, researcher, analyst, engineer, coordinator (+ chief for Mira). Each has an Inherent
-  section (existing `INHERENT` in `src/lib/agent-files.ts`) and a SKILL.md for step-by-step procedure, so briefs stay
-  short [B 4].
+- **Two primitives (owner, 2026-10-17): archetypes and the skill library.** Everything else is built on them.
+  - **Archetype** (`ArchetypeDef` in `src/lib/skills/types.ts`): chief, lead (PM), engineer, designer, researcher,
+    analyst, writer. Each has an Inherent section, qualifications vocabulary, and its own **curated toolset** of the
+    high-quality tools it uses most, including **presentation tools** that render in the work pane (the analyst's
+    charts today; an infinite canvas and its tools for the designer). An agent built from an archetype inherits the
+    toolset and its renderers. Toolsets per archetype: `docs/research/H-archetype-toolsets.md` (pending).
+  - **Skill library** (`skills/index.json`, `skills/library/<id>/`): curated SKILL.md packages from the open
+    ecosystem, permissively licensed, vetted, scanned. Orchestrators search it first; only a miss goes to You.com.
+  - **Composition** (not a primitive): an archetype plus the skills chosen for one role. The orchestrator composes it
+    when staffing, or adapts one from the history of past compositions and their outcomes. No fixed default skills.
 - **Home files** (`agents/<id>/`, editable in the profile): `SOUL.md` (Inherent + per-project section + 📌 standing
   instructions) and `MEMORY.md` (Mistakes, Best approaches). **Q7 (decided):** drop MEMORY.md's "Done" section for a
   **Track record** line computed by code from the ledger; four products keep task progress out of memory [B 5].
