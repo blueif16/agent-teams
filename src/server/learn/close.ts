@@ -416,11 +416,14 @@ async function ownCopies(vault: Vault, home: string): Promise<Map<string, string
 
 async function compositionStep(ctx: Ctx, retroKind?: string): Promise<void> {
   const { pid, table } = ctx;
+  // A retry's retro step is skipped, so its kind is unknown: look for a note this project already wrote, of any kind.
+  for (const k of await list(ctx.vault, "company/compositions")) {
+    if (isKind(k) && (await gitBlobOf(ctx.vault, compositionPath(k, pid))) !== null) return;
+  }
   let kind = isKind(ctx.opts.kind) ? ctx.opts.kind : (retroKind ?? "general");
   // The kind names a folder every later project reads: it must not carry this client's facts either.
   if (await leakProblem("", kind, ctx.facts, { prices: true })) kind = "general";
   const file = compositionPath(kind, pid);
-  if ((await gitBlobOf(ctx.vault, file)) !== null) return;
 
   const refs = compositionRefs(pid, table.items);
   const note = renderComposition({
