@@ -72,6 +72,7 @@ export async function executeRun(ctx: RunContext, threadId: string, runId: strin
   const deactivate = ctx.activate(runId);
   const ledger = new LedgerCallbacks({ thread: threadId, run: runId, ...ctx.ledger, onCall: (c) => db.runs.addCall(runId, c.cost) });
   const emit = (e: ThreadEvent) => events.emit(threadId, e);
+  emit({ type: "start", run: runId });
   try {
     await withLane(run.lane, async () => {
       // runId (the LangSmith root run) is a RunnableConfig field the agent passes through but doesn't type.
