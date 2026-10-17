@@ -28,7 +28,8 @@ export function versionOf(ctx: CheckContext, id = ctx.deliverable.id): Deliverab
   return ctx.current(id) ?? neverWritten(id);
 }
 
-export const isResult = (v: DeliverableVersion | CheckResult): v is CheckResult => "pass" in v;
+/** Readers return what they read or a failing result; this tells them apart. */
+export const isResult = <T extends object>(v: T | CheckResult): v is CheckResult => "pass" in v && "evidence" in v;
 
 export type Format = "html" | "canvas" | "markdown" | "csv" | "text";
 
