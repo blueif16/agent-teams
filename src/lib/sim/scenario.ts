@@ -192,6 +192,8 @@ const ScenarioSchema = z
     /** Markdown files next to the scenario: the owner's studio, and the client with its facts F1…Fn. */
     story: z.string().min(1),
     brief: z.string().min(1),
+    /** The facts file (lines "F1. …"): what the copy may claim, and what cites_facts checks against. */
+    facts: z.string().min(1).optional(),
     /** Files handed to the team at the start (relative to the scenario), with data labels. */
     inputs: z.array(z.strictObject({ path: z.string().min(1), label: z.enum(["owner_private", "public"]).default("public"), note: z.string().optional() })).default([]),
     /** Grader-only notes; never shown to an agent or the owner model. */
