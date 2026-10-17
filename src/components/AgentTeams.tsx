@@ -8,6 +8,7 @@ import { excerpt, orderText, ORDERS_BY_KEY, type OrderKey } from "@/lib/orders";
 import { parseProject, PROJECT_FENCE, START_PROJECT, visibleText } from "@/lib/project";
 import { withChartSummaries } from "@/lib/charts";
 import { prefetch, useCached, type Resource } from "@/lib/client-cache";
+import { sendToThread } from "@/lib/thread-client";
 import type { AgentStatus, Message, OrgSnapshot, PlanStep, Team } from "@/lib/types";
 import { ChiefMenu } from "./Chief";
 import { identityOf } from "./Identity";
@@ -36,6 +37,8 @@ const plain = (text: string) => text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
 const PANEL = { type: "spring", stiffness: 380, damping: 38 } as const;
 
 const CHIEF_VIEW: View = { kind: "dm", agentId: CHIEF_ID };
+/** Her DM's thread on the runtime (src/server/runtime/db.ts seeds it). */
+const MIRA_THREAD = `a:${CHIEF_ID}:p:dm`;
 
 /**
  * GET /api/chat says whether CRUSOE_API_KEY is set: server config, not chat state. It changes only with a
@@ -43,12 +46,16 @@ const CHIEF_VIEW: View = { kind: "dm", agentId: CHIEF_ID };
  */
 const LIVE_REPLIES: Resource = { key: "/api/chat", topic: "config" };
 
+/** A note that images came with a message; only the newest message's images go to the model. */
+const withImages = (text: string, images?: string[]) =>
+  images?.length ? `${text}${text ? "\n\n" : ""}(${images.length === 1 ? "an image" : `${images.length} images`} attached)` : text;
+
 /** What a model sees of a thread: text, plus a line for each of the chief's proposals. */
 const toHistory = (msgs: Message[]) =>
   msgs
     .flatMap((m) =>
       m.kind === "text"
-        ? [{ from: m.from, text: m.text }]
+        ? [{ from: m.from, text: withImages(m.text, m.images) }]
         : m.kind === "proposal"
           ? [{ from: m.from, text: `(Proposed the ${m.project.name} project as #${m.project.channel}; ${m.state === "launched" ? "the owner launched it" : "waiting for the owner"}.)` }]
           : [],
@@ -76,6 +83,8 @@ interface SendOptions {
   replyQuote?: string;
   /** This message is a reaction order; the server records it as a performance signal. */
   order?: { key: OrderKey; text: string; trace?: string };
+  /** Upload ids attached to this message (at most 4). */
+  images?: string[];
 }
 
 export function AgentTeams() {
@@ -290,7 +299,8 @@ export function AgentTeams() {
       spec: launched.launched.spec,
     };
 
-    const userMsg: Message = { id: uid(), kind: "text", from: "you", at: now(), text };
+    const images = opts.images?.length ? opts.images : undefined;
+    const userMsg: Message = { id: uid(), kind: "text", from: "you", at: now(), text, images };
     const history = toHistory([...(convosRef.current[key] ?? []), userMsg]);
 
     const shown = opts.shown === undefined ? userMsg : opts.shown;
@@ -298,45 +308,35 @@ export function AgentTeams() {
     setTyping((t) => ({ ...t, [key]: agentId }));
 
     const replyId = uid();
+    let started = false;
+    let traceId: string | undefined;
+    /** Shows the reply so far: a new bubble on the first text, then updates it in place. */
+    const show = (acc: string) => {
+      if (!acc.trim()) return;
+      // A project block streams as JSON; show the sentence before it and a placeholder for the rest.
+      const shownText = visibleText(acc) || "Putting the team together…";
+      const reply: Message = { id: replyId, kind: "text", from: agentId, at: now(), text: shownText, quote: opts.replyQuote, traceId, streaming: true };
+      if (!started) {
+        started = true;
+        setTyping((t) => ({ ...t, [key]: null }));
+        setConvos((c) => ({ ...c, [key]: [...(c[key] ?? []), reply] }));
+      } else {
+        setConvos((c) => ({ ...c, [key]: c[key].map((m) => (m.id === replyId ? reply : m)) }));
+      }
+    };
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          agentId,
-          teamId,
-          mode: target.kind,
-          history,
-          order: opts.order,
-          org: chief ? snapshot() : undefined,
-          project: project || undefined,
-        }),
-      });
-      if (!res.ok || !res.body) {
-        const err = await res.json().catch(() => ({ error: `Request failed (${res.status})` }));
-        throw new Error(err.error);
-      }
-      const traceId = res.headers.get("X-Trace-Id") ?? undefined;
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
       let acc = "";
-      let started = false;
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        acc += decoder.decode(value, { stream: true });
-        if (!acc.trim()) continue;
-        // A project block streams as JSON; show the sentence before it and a placeholder for the rest.
-        const shownText = visibleText(acc) || "Putting the team together…";
-        const reply: Message = { id: replyId, kind: "text", from: agentId, at: now(), text: shownText, quote: opts.replyQuote, traceId, streaming: true };
-        if (!started) {
-          started = true;
-          setTyping((t) => ({ ...t, [key]: null }));
-          setConvos((c) => ({ ...c, [key]: [...(c[key] ?? []), reply] }));
-        } else {
-          setConvos((c) => ({ ...c, [key]: c[key].map((m) => (m.id === replyId ? reply : m)) }));
-        }
-      }
+      if (chief && target.kind === "dm" && !opts.order && !images) {
+        // Mira's DM runs on her persistent agent (src/server/runtime): her thread keeps the conversation,
+        // so no history rides along; the reply and her "now" line stream from the run. A message with
+        // images still goes through /api/chat until the runtime takes uploads.
+        acc = await sendToThread(MIRA_THREAD, text, {
+          text: show,
+          now: (line) => setActivity(CHIEF_ID, "working", line),
+        });
+        show(acc);
+        setActivity(CHIEF_ID, "working", "Watching the company");
+      } else acc = await streamChat();
       if (!started) throw new Error(`${AGENTS[agentId].name} returned an empty reply. Try again, or pick a different model.`);
       if (chief && acc.includes(PROJECT_FENCE)) {
         const proposal = parseProject(acc);
@@ -358,7 +358,40 @@ export function AgentTeams() {
       // Settle the reply, even if the stream broke off, so it stops animating and draws its charts.
       setConvos((c) => ({ ...c, [key]: (c[key] ?? []).map((m) => (m.id === replyId && m.kind === "text" && m.streaming ? { ...m, streaming: false } : m)) }));
     }
-  }, [snapshot]);
+
+    /** A single chat completion through /api/chat, streamed; returns the whole text. */
+    async function streamChat(): Promise<string> {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agentId,
+          teamId,
+          mode: target.kind,
+          history,
+          uploads: images,
+          order: opts.order,
+          org: chief ? snapshot() : undefined,
+          project: project || undefined,
+        }),
+      });
+      if (!res.ok || !res.body) {
+        const err = await res.json().catch(() => ({ error: `Request failed (${res.status})` }));
+        throw new Error(err.error);
+      }
+      traceId = res.headers.get("X-Trace-Id") ?? undefined;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        show(acc);
+      }
+      return acc;
+    }
+  }, [snapshot, setActivity]);
 
   // The chief speaks up on her own, like dots' dreamer: a quiet check-in that stays silent unless
   // something is worth your attention. Once shortly after load, then every 20 minutes while visible.
@@ -686,7 +719,7 @@ export function AgentTeams() {
               prefill={prefill?.key === key ? prefill : null}
               reactions={reactions}
               handlers={handlers}
-              onSend={(text) => send(view, text)}
+              onSend={(text, images) => send(view, text, { images })}
               onDecide={(id, d) => decide(key, id, d)}
               onOpenAgent={openAgent}
               onOpenTeam={openTeam}

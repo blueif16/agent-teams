@@ -9,6 +9,8 @@ import { excerpt, type OrderKey } from "@/lib/orders";
 import { systemPrompt, toChatMessages, type ProjectContext, type Turn } from "@/lib/prompt";
 import { endLLMRun, orderFeedback, startLLMRun } from "@/lib/tracing";
 import type { AgentStatus, OrgSnapshot } from "@/lib/types";
+import { modelFetch } from "@/server/sim/model-fetch";
+import { imageParts, type ImagePart } from "@/server/uploads";
 
 const BASE_URL = process.env.CRUSOE_BASE_URL ?? "https://api.inference.crusoecloud.com/v1";
 
@@ -19,7 +21,7 @@ export async function GET() {
 async function callCrusoe(body: unknown, signal: AbortSignal, retries = 2): Promise<Response> {
   // Backoff on 429/503 per Crusoe guidance: ~1s, doubling, with jitter.
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(`${BASE_URL}/chat/completions`, {
+    const res = await modelFetch()(`${BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.CRUSOE_API_KEY}`,
@@ -86,6 +88,8 @@ export async function POST(req: Request) {
     history: Turn[];
     /** Image URLs (https or data:) attached to the newest message. */
     images?: string[];
+    /** Ids from POST /api/uploads attached to the newest message (at most 4); sent to the model as data: URLs. */
+    uploads?: string[];
     /** Set when this message is a reaction order on one of the agent's replies. */
     order?: { key: OrderKey; text: string; trace?: string };
     /** For the chief: every team's live state, as the app shows it. */
@@ -98,6 +102,13 @@ export async function POST(req: Request) {
   const { agentId, mode, history, images = [], order } = body;
   const agent = AGENTS[agentId];
   if (!agent) return Response.json({ error: `Unknown agent "${agentId}".` }, { status: 400 });
+  // Uploads reach the model inline: Crusoe can't fetch this machine's /api/uploads.
+  let uploaded: ImagePart[];
+  try {
+    uploaded = await imageParts(Array.isArray(body.uploads) ? body.uploads : []);
+  } catch (e) {
+    return Response.json({ error: (e as Error).message }, { status: 400 });
+  }
   const chief = agentId === CHIEF_ID;
   const project = chief ? undefined : cleanProject(body.project);
   const teamId = project?.id ?? agent.teamId;
@@ -119,15 +130,11 @@ export async function POST(req: Request) {
   const turns = history.slice(-16);
   if (chief && body.heartbeat) turns.push({ from: "you", text: HEARTBEAT });
   const messages: { role: string; content: unknown }[] = [{ role: "system", content: system }, ...toChatMessages(agentId, turns)];
-  // Images ride on the newest user turn as OpenAI-style content parts.
+  // Images ride on the newest user turn as OpenAI-style content parts: ready-made URLs first, then uploads.
+  const parts = [...images.map((url) => ({ type: "image_url", image_url: { url } })), ...uploaded];
   const lastUser = messages.findLast((m) => m.role === "user");
-  if (images.length && lastUser) {
-    lastUser.content = [
-      { type: "text", text: lastUser.content },
-      ...images.map((url) => ({ type: "image_url", image_url: { url } })),
-    ];
-  }
-  const hasImage = images.length > 0;
+  if (parts.length && lastUser) lastUser.content = [{ type: "text", text: lastUser.content }, ...parts];
+  const hasImage = parts.length > 0;
 
   // Chat replies are short, so reasoning stays off and the whole budget goes to the answer.
   const request = (model: string) => ({

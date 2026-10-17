@@ -6,6 +6,7 @@
  * once and kept in memory by the server cache (src/server/cache).
  */
 import { getServerCache } from "@/server/cache";
+import { tapLedger } from "@/server/sim/taps";
 import type { OrderKey } from "./orders";
 
 interface Base {
@@ -34,6 +35,9 @@ export interface CallEvent extends Base {
   vision?: boolean;
   /** LangSmith run id. */
   trace?: string;
+  /** For kind "run": the agent's thread (`a:{agent}:p:{project}`) and the runtime run the call was part of. */
+  thread?: string;
+  run?: string;
 }
 
 export interface OrderEvent extends Base {
@@ -68,6 +72,7 @@ export type LedgerEvent = CallEvent | OrderEvent | ApprovalEvent | ToolEvent;
 /** Appends to the file and to memory, and announces the change to stats listeners. */
 export async function record(event: LedgerEvent): Promise<void> {
   await getServerCache().ledger.append(event);
+  tapLedger(event);
 }
 
 /** Every event so far, from memory. */

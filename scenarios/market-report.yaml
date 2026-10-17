@@ -1,0 +1,101 @@
+# Market report: a pricing study for Tern (catalog case C3, made small). Researcher → analyst → writer.
+# Every field is read by code (src/lib/sim/scenario.ts). Changing anything here starts a new series at run 1.
+id: market-report
+family: market-report
+title: Pricing study for Tern
+summary: >-
+  The owner asks Mira what a new client, Tern, should charge. A PM staffs a researcher, an analyst and a writer;
+  they benchmark public pricing pages, cost them per usage profile, and write a short memo with a price per tier.
+  Mid-project the owner adds a usage profile and asks the analyst a direct question.
+
+story: studio.md
+brief: clients/tern/brief.md
+facts: clients/tern/facts.md
+inputs:
+  - { path: clients/tern/spec.md, note: what the client needs }
+  - { path: clients/tern/facts.md, note: product facts to cite }
+  - { path: clients/tern/packages.md, label: owner_private, note: "draft tiers, confidential" }
+
+request:
+  text: >-
+    Hi Mira. New client project: Tern makes AI meeting notes for sales reps who meet customers in person. Before
+    they launch they need to know what to charge. Can you get me a pricing benchmark of the meeting-notes market
+    and a short memo saying what Tern should charge per tier? What they need, their product facts and their draft
+    tiers (confidential) are attached.
+
+owner:
+  persona: >-
+    Runs a small product studio. Short, plain messages. Decides fast, judges work by evidence, doesn't explain
+    twice.
+  known:
+    - It's due in two days.
+    - Keep model spend for this project under $1.50.
+    - Price everything in USD per user per month.
+    - Include Otter and Fireflies for sure; pick the other vendors yourselves.
+    - Video-call notetakers count as competitors, even though Tern isn't one.
+    - Public pricing pages only; don't contact vendors or buy data.
+    - The memo is for Tern's two founders, and they'll read the first three sentences closely.
+
+expect:
+  triage: project
+  maxExperts: 3
+  archetypes: [researcher, analyst, writer]
+  deliverables:
+    - { id: plans, title: Pricing table (plans.csv), type: table, by: researcher, path: "**/plans*" }
+    - { id: costs, title: Cost per profile (costs.csv), type: table, by: analyst, path: "**/costs*" }
+    - { id: memo, title: Pricing memo (memo.md), type: doc, by: writer, path: "**/memo*" }
+  mustHappen: [triage, pm_created, launch_card, launch, kickoff_by_pm, post_by_each_expert, all_accepted, project_closed, learned]
+
+beats:
+  - id: status
+    why: The PM answers for the team with owners and dates, without pulling experts off their work.
+    when: { on: team.created }
+    do: { send: { place: channel, to: lead, text: "Who's doing what, and when do I see the first numbers?" } }
+  - id: new-profile
+    why: A mid-project requirement change has to reach the analyst's table.
+    when: { on: deliverable, id: plans }
+    do: { send: { place: channel, to: lead, text: "Update from Tern: 15-rep teams are their sweet spot. Add a team-15 profile (15 users) to the cost table." } }
+  - id: ask-analyst
+    why: A direct question to an expert gets a direct answer from that expert, not a relay.
+    when: { on: deliverable, id: costs }
+    do: { send: { place: channel, to: analyst, text: "Quick one: for a 5-rep team, which vendor is cheapest and what does it cost a month?" } }
+
+gates:
+  launch: { sequence: [{ decision: approve }] }
+  approval:
+    default: approve
+    rules:
+      - { match: "[Ee]xhaustive|[Ff]rontier", decision: decline, note: Too expensive for this project. }
+      - { match: "[Rr]esearch", decision: approve, maxUsd: 0.3 }
+
+reactions:
+  - { deliverable: plans, maxRedos: 1 }
+  - { deliverable: costs, maxRedos: 1 }
+  - { deliverable: memo, maxRedos: 1 }
+
+rubric:
+  - id: plans-rows
+    deliverable: plans
+    kind: code
+    check: table_rows
+    params: { min: 12, columns: [vendor, plan, price_usd, url, accessed, price_quote], distinct: { column: vendor, min: 8 } }
+    label: "At least 12 plans from at least 8 vendors, no blank cells"
+  - { id: plans-sources, deliverable: plans, kind: code, check: sources_cited, params: { urlColumn: url, dateColumn: accessed }, label: Every plan has its pricing page and the date it was read }
+  - { id: plans-quotes, deliverable: plans, kind: code, check: verbatim_quote, params: { quoteColumn: price_quote }, label: Every price quote is word for word from a page the team fetched }
+  - id: costs-rows
+    deliverable: costs
+    kind: code
+    check: table_rows
+    params: { min: 24, columns: [vendor, plan, profile, price_usd, users, monthly_usd], distinct: { column: vendor, min: 8 } }
+    label: Every vendor is costed for every profile
+  - { id: costs-math, deliverable: costs, kind: code, check: recompute, params: { price: price_usd, quantity: users, total: monthly_usd }, label: "monthly_usd = price_usd × users in every row" }
+  - { id: costs-new-profile, deliverable: costs, kind: code, check: mentions, params: { all: [solo, team-5, team-15] }, label: The team-15 profile the owner added is in the table }
+  - { id: memo-sections, deliverable: memo, kind: code, check: sections, params: { headings: [Recommendation, Market, Evidence] }, label: "Recommendation, Market and Evidence sections, in order" }
+  - { id: memo-tiers, deliverable: memo, kind: code, check: monotonic_tiers, params: { tier: tier, price: price_usd, features: features }, label: Each tier costs more and includes the tier below }
+  - { id: memo-prices, deliverable: memo, kind: code, check: prices_supported, params: { table: plans, column: price_usd }, label: Every price in the memo is backed by the pricing table }
+  - { id: memo-length, deliverable: memo, kind: code, check: max_words, params: { max: 500 }, label: At most 500 words }
+  - { id: memo-answer-first, deliverable: memo, kind: judge, question: "Do the memo's first three sentences tell the client what to charge for each tier?", label: The answer comes first }
+
+stop: { when: all_accepted, maxOwnerActions: 20, maxWallMin: 30, idleMin: 8 }
+budget: { maxUsd: 1.5, maxTokens: 3000000 }
+trials: 3
