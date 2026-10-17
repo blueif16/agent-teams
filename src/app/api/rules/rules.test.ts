@@ -63,27 +63,26 @@ describe("GET /api/rules", () => {
     expect(body.tiers.map((t) => t.tier)).toEqual(["T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7"]);
     expect(body.detectors).toEqual(listDetectors());
     expect(body).not.toHaveProperty("capabilities");
+    expect(body).not.toHaveProperty("permissions");
+    expect(body.data?.find((g) => g.label === "Secrets and keys")).toMatchObject({ outcome: "block", locked: true });
   });
 
-  it("gives an agent's effective default per tier after its rules", async () => {
+  it("gives an agent's permissions after its rules", async () => {
     expect((await post({ rules: [rule({ scope: { agents: ["mira"] } })], mode: "enforce" })).status).toBe(201);
     const res = await get("?agent=mira");
     expect(res.status).toBe(200);
     const body = (await res.json()) as RulesResponse;
-    const cap = Object.fromEntries(body.capabilities!.map((c) => [c.tier, c]));
-    expect(body.capabilities).toHaveLength(8);
-    expect(cap.T0.effect).toBe("allow");
-    expect(cap.T3).toMatchObject({ effect: "deny", firedRuleIds: ["r_own001"] });
-    expect(cap.T4.effect).toBe("ask");
-    expect(cap.T6.effect).toBe("ask");
-    expect(cap.T7.effect).toBe("deny");
+    const perm = Object.fromEntries((body.permissions ?? []).map((p) => [p.id, p]));
+    expect(perm["web.search"]).toMatchObject({ access: "deny", ruleIds: ["r_own001"] });
+    expect(perm.email?.access).toBe("ask");
+    expect(perm.code?.access).toBe("deny");
   });
 
   it("404s an unknown agent unless its archetype is given", async () => {
     expect((await get("?agent=zed")).status).toBe(404);
     const res = await get("?agent=zed&archetype=researcher");
     expect(res.status).toBe(200);
-    expect(((await res.json()) as RulesResponse).capabilities).toHaveLength(8);
+    expect(((await res.json()) as RulesResponse).permissions).toHaveLength(15);
   });
 
   it("lists only the rules that can apply to the agent and project asked about", async () => {
