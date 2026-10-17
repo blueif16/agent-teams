@@ -1,0 +1,99 @@
+# Launch kit: a landing page for Bookbird (catalog case C2, made small). Researcher → writer → designer.
+# Every field is read by code (src/lib/sim/scenario.ts). Changing anything here starts a new series at run 1.
+id: launch-kit
+family: launch-kit
+title: Landing page for Bookbird
+summary: >-
+  The owner asks Mira for a launch landing page for a new client, Bookbird. A PM staffs a researcher, a writer
+  and a designer; they tear down competitor pages, write the copy and build an HTML mockup. Mid-project the
+  client adds a free plan, the owner pins a voice rule for the writer and asks the designer for the phone view.
+
+story: studio.md
+brief: clients/bookbird/brief.md
+facts: clients/bookbird/facts.md
+inputs:
+  - { path: clients/bookbird/spec.md, note: what the client needs }
+  - { path: clients/bookbird/facts.md, note: product facts to cite }
+
+request:
+  text: >-
+    Hi Mira. New client: Bookbird, online booking and reminders for small independent clinics. They launch in two
+    weeks and need a landing page: who it's for, the copy, and an HTML mockup their developer can build from.
+    What they need and their product facts are attached.
+
+owner:
+  persona: >-
+    Runs a small product studio. Short, plain messages. Decides fast, judges work by evidence, doesn't explain
+    twice.
+  known:
+    - The copy and the mockup are due in two days.
+    - Keep model spend for this project under $1.50.
+    - "Audience: owners and office managers of clinics with 1 to 10 practitioners. Not hospitals."
+    - "Voice: plain and warm, short sentences, no hype words."
+    - Look at Jane App and Cliniko for sure; pick the other pages yourselves.
+    - No testimonials, no clinic logos and no prices on the page.
+    - The developer needs one HTML file that works offline.
+
+expect:
+  triage: project
+  maxExperts: 3
+  archetypes: [researcher, writer, designer]
+  deliverables:
+    - { id: teardown, title: Competitor teardown (teardown.csv), type: table, by: researcher, path: "**/teardown*" }
+    - { id: copy, title: Landing copy (copy.md), type: doc, by: writer, path: "**/copy*" }
+    - { id: mockup, title: HTML mockup (mockup.html), type: mockup, by: designer, path: "**/mockup*" }
+  mustHappen: [triage, pm_created, launch_card, launch, kickoff_by_pm, post_by_each_expert, all_accepted, project_closed, learned]
+
+beats:
+  - id: status
+    why: The PM answers for the team with owners and dates, without pulling experts off their work.
+    when: { on: team.created }
+    do: { send: { place: channel, to: lead, text: "What's the plan, and when do I see the copy?" } }
+  - id: free-plan
+    why: A mid-project requirement change has to reach both the copy and the mockup.
+    when: { on: deliverable, id: teardown }
+    do: { send: { place: channel, to: lead, text: "Change from Bookbird: they now have a free plan for solo practitioners. The main button should say \"Start free\" everywhere." } }
+  - id: pin-voice
+    why: A 📌 becomes a standing instruction the writer keeps on the next project.
+    when: { on: accepted, id: copy }
+    do: { order: { on: writer, order: pin, note: "Plain words only: never \"seamless\", \"effortless\" or \"revolutionary\"." } }
+  - id: phone-view
+    why: A DM to an expert reaches that expert directly, mid-project.
+    when: { on: deliverable, id: mockup }
+    do: { send: { place: dm, to: designer, text: "How does the hero look on a phone?" } }
+
+gates:
+  launch: { sequence: [{ decision: approve }] }
+  approval:
+    default: approve
+    rules:
+      - { match: "[Ee]xhaustive|[Ff]rontier", decision: decline, note: Too expensive for this project. }
+
+reactions:
+  - { deliverable: teardown, maxRedos: 1 }
+  - { deliverable: copy, maxRedos: 1 }
+  - { deliverable: mockup, maxRedos: 1 }
+
+rubric:
+  - id: teardown-rows
+    deliverable: teardown
+    kind: code
+    check: table_rows
+    params: { min: 4, columns: [page, url, accessed, headline, cta_label, proof_type], distinct: { column: page, min: 4 } }
+    label: "At least 4 competitor pages, no blank cells"
+  - { id: teardown-sources, deliverable: teardown, kind: code, check: sources_cited, params: { urlColumn: url, dateColumn: accessed }, label: Every page has its URL and the date it was read }
+  - { id: copy-facts, deliverable: copy, kind: code, check: cites_facts, label: Every number comes from the facts and carries its tag }
+  - { id: copy-sections, deliverable: copy, kind: code, check: sections, params: { headings: [Positioning, S1, S2, S3, S4, S5] }, label: "Positioning and sections S1–S5, in order" }
+  - { id: copy-start-free, deliverable: copy, kind: code, check: mentions, params: { all: [Start free] }, label: The new "Start free" button made it into the copy }
+  - { id: copy-plain, deliverable: copy, kind: code, check: excludes, params: { none: [seamless, effortless, revolutionary, game-changing, cutting-edge] }, label: No hype words }
+  - { id: copy-length, deliverable: copy, kind: code, check: max_words, params: { max: 600 }, label: At most 600 words }
+  - { id: copy-hero, deliverable: copy, kind: judge, question: "From the hero section alone, can a reader tell who the product is for and what it does?", label: The hero says who it's for and what it does }
+  - { id: mockup-headlines, deliverable: mockup, kind: code, check: verbatim_in, params: { from: copy, unit: headline }, label: Every headline from the copy appears word for word }
+  - { id: mockup-own-copy, deliverable: mockup, kind: code, check: no_foreign_text, params: { source: copy, minRun: 40 }, label: The designer didn't rewrite the copy }
+  - { id: mockup-cta, deliverable: mockup, kind: code, check: single_cta, label: "One primary button, same label everywhere" }
+  - { id: mockup-offline, deliverable: mockup, kind: code, check: offline, label: Loads nothing from the internet }
+  - { id: mockup-start-free, deliverable: mockup, kind: code, check: mentions, params: { all: [Start free] }, label: The new "Start free" button made it into the mockup }
+
+stop: { when: all_accepted, maxOwnerActions: 20, maxWallMin: 30, idleMin: 8 }
+budget: { maxUsd: 1.5, maxTokens: 3000000 }
+trials: 3
