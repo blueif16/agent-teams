@@ -6,6 +6,7 @@
  * picked (a LaunchPlan). Shared by the client and the server: no I/O.
  */
 import type { Composition } from "./skills/types";
+import type { Message } from "./types";
 
 export const PROJECT_FENCE = "```project";
 
@@ -266,6 +267,17 @@ export interface LaunchPlan {
   option?: { label: string; summary: string; etaDays?: number };
   /** Upload ids from the conversation that led here; its text documents become the project's /project/inputs/. */
   uploads?: string[];
+}
+
+/**
+ * What a launch carries into the project: the owner's upload ids from the conversation that led to the card
+ * `cardId`, i.e. since the last launched card before it, each once.
+ */
+export function openingUploads(msgs: Message[], cardId: string): string[] {
+  const at = msgs.findIndex((m) => m.id === cardId);
+  const opening = msgs.slice(0, at === -1 ? msgs.length : at);
+  const since = opening.findLastIndex((m) => m.kind === "proposal" && m.state === "launched") + 1;
+  return [...new Set(opening.slice(since).flatMap((m) => (m.kind === "text" && m.from === "you" ? (m.images ?? []) : [])))];
 }
 
 /** The LaunchPlan for one option card, with the owner's edits to the shared charter and the budget. */

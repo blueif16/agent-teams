@@ -5,7 +5,7 @@ import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { ArrowLeft, ArrowRight, Columns2, Hash, ListChecks, SquarePen } from "lucide-react";
 import { AGENTS, CHIEF, CHIEF_ID, HQ, TEAMS } from "@/lib/data";
 import { excerpt, orderText, ORDERS_BY_KEY, type OrderKey } from "@/lib/orders";
-import { launchPlanOf, parseProject, PROJECT_FENCE, START_PROJECT, visibleText, type LaunchOptions } from "@/lib/project";
+import { launchPlanOf, openingUploads, parseProject, PROJECT_FENCE, START_PROJECT, visibleText, type LaunchOptions } from "@/lib/project";
 import { withChartSummaries } from "@/lib/charts";
 import { cache, prefetch, useCached, type Resource } from "@/lib/client-cache";
 import { sendToThread } from "@/lib/thread-client";
@@ -496,7 +496,7 @@ export function AgentTeams() {
     const msg = convosRef.current[key]?.find((m) => m.id === msgId);
     if (msg?.kind !== "proposal" || msg.state !== "ready" || !msg.plan) return;
     updateCard(key, msgId, (m) => ({ ...m, state: "launching", error: undefined }));
-    const plan = launchPlanOf(msg.plan, msg.picked, msg.edits);
+    const plan = { ...launchPlanOf(msg.plan, msg.picked, msg.edits), uploads: openingUploads(convosRef.current[key] ?? [], msgId) };
     const solo = plan.charter.kind === "solo";
     try {
       const res = await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan, nonce: msg.nonce }) });
