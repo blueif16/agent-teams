@@ -2,13 +2,17 @@ import { after } from "next/server";
 import { uuid7 } from "langsmith";
 import { addStandingInstruction, readAgentFiles } from "@/lib/agent-files";
 import { chiefPrompt, HEARTBEAT } from "@/lib/chief-prompt";
-import { AGENTS, CHIEF_ID } from "@/lib/data";
+import { CHIEF_ID } from "@/lib/data";
 import { readLedger, record } from "@/lib/ledger";
 import { costOf, modelChain, reasoningFields } from "@/lib/models";
 import { excerpt, type OrderKey } from "@/lib/orders";
 import { systemPrompt, toChatMessages, type ProjectContext, type Turn } from "@/lib/prompt";
 import { endLLMRun, orderFeedback, startLLMRun } from "@/lib/tracing";
 import type { AgentStatus, OrgSnapshot } from "@/lib/types";
+import { getAgent, getTeam } from "@/server/directory";
+
+/** Prompts look agents and teams up in the directory: the constants, then the runtime db. */
+const DIRECTORY = { agent: getAgent, team: getTeam };
 
 const BASE_URL = process.env.CRUSOE_BASE_URL ?? "https://api.inference.crusoecloud.com/v1";
 
@@ -52,7 +56,7 @@ function cleanOrg(raw: OrgSnapshot | undefined): OrgSnapshot {
       launched: Boolean(t.launched),
       pending: (t.pending ?? []).slice(0, 10).map((p) => cap(p, 160)),
       agents: (t.agents ?? [])
-        .filter((a) => AGENTS[a.id])
+        .filter((a) => getAgent(a.id))
         .slice(0, 12)
         .map((a) => ({ id: a.id, status: STATUSES.has(a.status) ? a.status : "idle", doing: cap(a.doing, 200) })),
     })),
@@ -67,7 +71,7 @@ function cleanProject(raw: ProjectContext | undefined): ProjectContext | undefin
     name: cap(raw.name, 60),
     goal: cap(raw.goal),
     leadId: cap(raw.leadId, 40),
-    members: raw.members.filter((m) => AGENTS[m.id]).slice(0, 8).map((m) => ({ id: m.id, assignment: cap(m.assignment, 200) })),
+    members: raw.members.filter((m) => getAgent(m.id)).slice(0, 8).map((m) => ({ id: m.id, assignment: cap(m.assignment, 200) })),
     spec: cap(raw.spec, 4000),
   };
 }
@@ -96,7 +100,7 @@ export async function POST(req: Request) {
     project?: ProjectContext;
   };
   const { agentId, mode, history, images = [], order } = body;
-  const agent = AGENTS[agentId];
+  const agent = getAgent(agentId);
   if (!agent) return Response.json({ error: `Unknown agent "${agentId}".` }, { status: 400 });
   const chief = agentId === CHIEF_ID;
   const project = chief ? undefined : cleanProject(body.project);
@@ -115,10 +119,10 @@ export async function POST(req: Request) {
   const files = await readAgentFiles(agentId);
   const home = { soul: files.soul.content, memory: files.memory.content };
   const today = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "America/Los_Angeles" });
-  const system = chief ? chiefPrompt(cleanOrg(body.org), await readLedger(), home, today) : systemPrompt(agentId, mode, home, project);
+  const system = chief ? chiefPrompt(cleanOrg(body.org), await readLedger(), home, today) : systemPrompt(agentId, mode, home, project, DIRECTORY);
   const turns = history.slice(-16);
   if (chief && body.heartbeat) turns.push({ from: "you", text: HEARTBEAT });
-  const messages: { role: string; content: unknown }[] = [{ role: "system", content: system }, ...toChatMessages(agentId, turns)];
+  const messages: { role: string; content: unknown }[] = [{ role: "system", content: system }, ...toChatMessages(agentId, turns, DIRECTORY)];
   // Images ride on the newest user turn as OpenAI-style content parts.
   const lastUser = messages.findLast((m) => m.role === "user");
   if (images.length && lastUser) {

@@ -1,5 +1,4 @@
-import { agentType } from "@/lib/agent-files";
-import { AGENTS } from "@/lib/data";
+import { getAgent } from "@/server/directory";
 import { dataGuards, permissionsFor, toolsetOf } from "@/lib/policy/capabilities";
 import { listDetectors } from "@/lib/policy/detectors";
 import { globMatch } from "@/lib/policy/engine";
@@ -33,9 +32,9 @@ export async function GET(req: Request) {
 
   let archetype: Archetype | undefined;
   if (agentId) {
-    const known = AGENTS[agentId];
+    const known = getAgent(agentId);
     const given = params.get("archetype");
-    archetype = known ? agentType(known) : isArchetype(given) ? given : undefined;
+    archetype = known ? known.archetype : isArchetype(given) ? given : undefined;
     if (!archetype) return Response.json({ error: `Unknown agent "${agentId}". For an agent launched at runtime, add &archetype=.` }, { status: 404 });
   }
 

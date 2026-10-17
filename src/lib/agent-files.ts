@@ -21,12 +21,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { getServerCache, set as setCached } from "@/server/cache";
 import { announceCommit, getVault, OWNER, RUNTIME, VaultConflictError, type ScrubResult, type Vault } from "@/server/runtime/vault";
-import { AGENTS, CHIEF_ID, TEAMS_BY_ID } from "./data";
+import { agentType, getAgent, type DirectoryAgent } from "@/server/directory";
 import { scan } from "./policy/detectors";
 import { INHERENT, type AgentType } from "./inherent";
-import type { Agent } from "./types";
 
-export { INHERENT, type AgentType };
+export { agentType, INHERENT, type AgentType };
 
 const VERSIONED = !process.env.VERCEL;
 /** The repo's agents/: the vault's seed locally, the bundled read-only copy on Vercel. */
@@ -42,16 +41,6 @@ export interface FileInfo {
   updated: string;
 }
 
-export function agentType(agent: Agent): AgentType {
-  if (agent.id === CHIEF_ID) return "chief";
-  if (TEAMS_BY_ID[agent.teamId]?.leadId === agent.id || /lead/i.test(agent.role)) return "lead";
-  if (/writer|copy|draft/i.test(agent.role)) return "writer";
-  if (/research|fact|sourcer/i.test(agent.role)) return "researcher";
-  if (/analyst|sql|chart/i.test(agent.role)) return "analyst";
-  if (/design|\bux\b|\bui\b/i.test(agent.role)) return "designer";
-  if (/test|ci\b|review|eng/i.test(agent.role)) return "engineer";
-  return "coordinator";
-}
 
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -97,12 +86,17 @@ export function agentVault(): Promise<Vault> {
   return ready;
 }
 
-function soulTemplate(agent: Agent): string {
-  const team = TEAMS_BY_ID[agent.teamId];
-  const type = agentType(agent);
+/** Where the agent works, as its SOUL.md names it: `#channel`, or the project's name for a DM. */
+const placeOf = (agent: DirectoryAgent) => (agent.home.channel ? `#${agent.home.channel}` : `"${agent.home.name}"`);
+
+/** SOUL.md from the agent's archetype (its Inherent section) and its current project. */
+export function soulTemplate(agent: DirectoryAgent): string {
+  const type = agent.archetype;
+  const place = placeOf(agent);
+  const qualified = agent.qualifications.length ? `\nQualifications for this role: ${agent.qualifications.join(", ")}.\n` : "";
   return `# ${agent.name}'s soul
 
-${agent.role} on #${team.channel} · type: ${type}
+${agent.role} on ${place} · type: ${type}
 
 Personality: ${agent.brief}
 
@@ -112,19 +106,19 @@ How a ${type} does this job best. Applies on every team and changes slowly.
 
 ${bullets(INHERENT[type])}
 
-## In #${team.channel}
+## In ${place}
 
 What to master on this project. Grows as the work teaches it.
 
-Goal: ${team.goal}
-
+Goal: ${agent.home.goal}
+${qualified}
 ### Standing instructions
 
 _None yet. Pin a message with 📌 to add one._
 `;
 }
 
-function memoryTemplate(agent: Agent): string {
+export function memoryTemplate(agent: Pick<DirectoryAgent, "name">): string {
   return `# ${agent.name}'s memory
 
 What ${agent.name} has done, what went wrong, and what works. Newest first.
@@ -159,9 +153,9 @@ async function readIfThere(file: string): Promise<FileInfo | null> {
   }
 }
 
-async function ensure(id: string, which: AgentFile): Promise<FileInfo> {
+async function ensure(agent: DirectoryAgent, which: AgentFile): Promise<FileInfo> {
+  const { id } = agent;
   const file = fileOf(id, which);
-  const agent = AGENTS[id];
   const template = () => (which === "soul" ? soulTemplate(agent) : memoryTemplate(agent));
   if (VERSIONED) {
     const vault = await agentVault();
@@ -169,7 +163,7 @@ async function ensure(id: string, which: AgentFile): Promise<FileInfo> {
     if (found) return found;
     // expectedBlob null: only if the file still doesn't exist, so a racing request's file is never overwritten.
     await vault
-      .write({ path: vaultPath(id, which), content: template(), author: RUNTIME, source: "seed", expectedBlob: null, trailers: { Archetype: agentType(agent) } })
+      .write({ path: vaultPath(id, which), content: template(), author: RUNTIME, source: "seed", expectedBlob: null, trailers: { Archetype: agent.archetype } })
       .catch((e) => {
         if (!(e instanceof VaultConflictError)) throw e;
       });
@@ -187,14 +181,15 @@ async function ensure(id: string, which: AgentFile): Promise<FileInfo> {
 }
 
 export async function readAgentFiles(id: string): Promise<{ soul: FileInfo; memory: FileInfo }> {
-  if (!AGENTS[id]) throw new Error(`Unknown agent "${id}"`);
-  const [soul, memory] = await Promise.all([ensure(id, "soul"), ensure(id, "memory")]);
+  const agent = getAgent(id);
+  if (!agent) throw new Error(`Unknown agent "${id}"`);
+  const [soul, memory] = await Promise.all([ensure(agent, "soul"), ensure(agent, "memory")]);
   return { soul, memory };
 }
 
 /** Saves a file; `source` says why ("owner" edited it in the profile, "pin" came from a 📌). */
 export async function writeAgentFile(id: string, which: AgentFile, content: string, source: "owner" | "pin" = "owner"): Promise<FileInfo> {
-  if (!AGENTS[id]) throw new Error(`Unknown agent "${id}"`);
+  if (!getAgent(id)) throw new Error(`Unknown agent "${id}"`);
   const file = fileOf(id, which);
   const body = content.endsWith("\n") ? content : `${content}\n`;
   if (VERSIONED) await (await agentVault()).write({ path: vaultPath(id, which), content: body, author: OWNER, source });
