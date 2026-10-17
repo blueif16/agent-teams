@@ -11,7 +11,7 @@ import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { DiffHunk, DiffSegment, FileDiff, FileHistory, VaultAuthor, VaultCommit, VaultSource, VaultWriteRequest } from "@/lib/vault/types";
+import type { DiffHunk, DiffSegment, FileDiff, FileHistory, VaultAuthor, VaultCommit, VaultSource, VaultWriteManyRequest, VaultWriteRequest } from "@/lib/vault/types";
 import { getServerCache } from "@/server/cache";
 import { TOPICS } from "@/server/cache/bus";
 
@@ -271,6 +271,27 @@ export class Vault {
       subject: checkSubject(req.subject ?? defaultSubject(req.path, req.source)),
       trailers: trailerPairs(req.trailers),
       expect: req.expectedBlob === undefined ? [] : [{ path: req.path, blob: req.expectedBlob }],
+    };
+    authorLine(req.author);
+    return this.enqueue(() => this.commitNow(job));
+  }
+
+  /**
+   * Writes several files and commits them together. Every expected blob is checked before any file is touched, so
+   * one stale file rejects the whole write. Resolves to the commit, or null when nothing changed.
+   */
+  async writeMany(req: VaultWriteManyRequest): Promise<VaultCommit | null> {
+    if (!SOURCES.has(req.source)) throw new Error(`Bad source "${req.source}"`);
+    if (!req.files.length) throw new Error("writeMany needs at least one file");
+    const files = req.files.map((f) => ({ path: checkPath(f.path), content: f.content }));
+    if (new Set(files.map((f) => f.path)).size !== files.length) throw new Error("writeMany got the same path twice");
+    const job: Job = {
+      files,
+      author: req.author,
+      source: req.source,
+      subject: checkSubject(req.subject ?? defaultSubject(files[0].path, req.source)),
+      trailers: trailerPairs(req.trailers),
+      expect: req.files.flatMap((f) => (f.expectedBlob === undefined ? [] : [{ path: f.path, blob: f.expectedBlob }])),
     };
     authorLine(req.author);
     return this.enqueue(() => this.commitNow(job));
