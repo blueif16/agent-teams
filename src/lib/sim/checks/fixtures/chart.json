@@ -1,0 +1,9 @@
+{
+  "type": "bar",
+  "title": "What a 5-person team pays per month",
+  "subtitle": "List price × seats, from plans.csv",
+  "x": ["Starter", "Agents Pro", "Pro", "Team", "Basic", "Business"],
+  "series": [{ "name": "Cost", "values": [24, 33.33, 49.99, 95, 99, 299.99] }],
+  "unit": "USD/month",
+  "highlight": "Team"
+}

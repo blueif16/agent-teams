@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tern &mdash; meeting notes that write themselves</title>
+  <style>
+    :root { --ink: #1d2433; --accent: #0f766e; --paper: #f7f5f0; }
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: var(--ink); background: var(--paper); }
+    .hero { padding: 96px 24px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='1' cy='1' r='1' fill='%23ddd'/%3E%3C/svg%3E"); }
+    .btn { display: inline-block; padding: 12px 20px; border-radius: 8px; background: var(--accent); color: #fff; text-decoration: none; }
+    section { max-width: 960px; margin: 0 auto; padding: 64px 24px; }
+    @media (max-width: 480px) { .hero { padding: 48px 16px; } }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <a href="#top" class="logo">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12 L12 2 L22 12" stroke="currentColor" fill="none"/></svg>
+      Tern
+    </a>
+    <nav><a href="#how">How it works</a> <a href="#teams">Teams</a></nav>
+    <a href="#start" class="btn" data-cta="primary">Start your free trial</a>
+  </header>
+
+  <main>
+    <section class="hero" id="top">
+      <h1>Meeting notes that write themselves</h1>
+      <p>Tern records in-person meetings on your phone and hands you clean notes within 2 minutes of the meeting ending.</p>
+      <a href="#start" class="btn" data-cta="primary">Start your free trial</a>
+    </section>
+
+    <section id="problem">
+      <h2>You can&#39;t listen and type at the same time</h2>
+      <p>Clients talk faster than anyone can write, and the detail you miss is the one they remember.</p>
+    </section>
+
+    <section id="how">
+      <h2>Press record, put the phone down</h2>
+      <p>Tern works <em>offline</em> in basements and on client sites, and uploads when you are back online.</p>
+      <p>Notes come out in any of 12 languages.</p>
+    </section>
+
+    <section id="proof">
+      <h2>Hours back every week</h2>
+      <p>Pilot users saved <strong>3.5 hours</strong> a week on note-taking.</p>
+    </section>
+
+    <section id="teams">
+      <h2>One workspace for the whole practice</h2>
+      <p>Teams of up to 25 people share one workspace, and recordings are deleted after 30 days unless pinned.</p>
+    </section>
+
+    <section id="start">
+      <h2>Try Tern on your next meeting</h2>
+      <p>The free trial lasts 14 days and needs no card.</p>
+      <button type="button" class="btn" data-cta="primary">Start your
+        free trial</button>
+    </section>
+  </main>
+
+  <footer><p>&copy; Tern Labs</p></footer>
+
+  <script>
+    document.querySelectorAll('[data-cta="primary"]').forEach((el) => el.addEventListener('click', () => el.classList.add('pressed')));
+  </script>
+</body>
+</html>

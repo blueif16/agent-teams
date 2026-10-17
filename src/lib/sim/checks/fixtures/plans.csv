@@ -1,0 +1,7 @@
+vendor,plan,list_price,billing_unit,seats,usd_month,limits,url,accessed,quote
+Lindy,Pro,49.99,flat per month,1,49.99,"5,000 tasks/mo, 3 agents",https://www.lindy.ai/pricing,2026-10-15,"Pro $49.99/month, billed monthly"
+Relevance AI,Team,19,per user per month,5,95,"84,000 actions/yr, unlimited users",https://relevanceai.com/pricing,2026-10-15,Team $19 per user/month
+CrewAI,Basic,99,flat per month,1,99,"100 executions/mo, 2 live crews",https://www.crewai.com/pricing,2026-10-15,Basic: $99/month
+Zapier,Agents Pro,33.33,flat per month (annual),1,33.33,"1,500 activities/mo",https://zapier.com/pricing,2026-10-16,"""Pro"" plan: $33.33/mo, billed annually"
+n8n,Starter,24,flat per month (annual),1,24,"2,500 executions, 5 active workflows",https://n8n.io/pricing,2026-10-16,"Starter $24/month, billed annually"
+Lindy,Business,299.99,flat per month,1,299.99,"30,000 tasks/mo, 50 agents",https://www.lindy.ai/pricing,2026-10-15,Business $299.99/month
