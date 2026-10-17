@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { AGENTS, TEAMS, TEAMS_BY_ID } from "@/lib/data";
 import { readLedger } from "@/lib/ledger";
 import { agentReport, teamReport, totals } from "@/lib/stats";
@@ -8,8 +9,12 @@ import { agentReport, teamReport, totals } from "@/lib/stats";
  *                               (a team launched at runtime adds &agents=<id>,<id>)
  *   GET /api/stats?agent=<id>   one agent's stats and its recent calls
  *   GET /api/stats              totals for every team
+ * Served from the in-memory ledger. With Cache Components a GET handler that
+ * touches no request data or async IO is prerendered at build time, so
+ * connection() keeps this one at request time.
  */
 export async function GET(req: Request) {
+  await connection();
   const params = new URL(req.url).searchParams;
   const events = await readLedger();
 

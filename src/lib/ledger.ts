@@ -2,16 +2,11 @@
  * The performance ledger: one JSON line per model call, order or approval.
  * It is the source of truth for the Performance tabs and for the HR agent;
  * LangSmith keeps the full traces (`trace` links a call to its run).
- * Server only: append-only file at .data/ledger.jsonl. On Vercel the disk is
- * read-only except /tmp, so it lives there and lasts only as long as the instance.
+ * Server only: append-only file at .data/ledger.jsonl (/tmp on Vercel), read
+ * once and kept in memory by the server cache (src/server/cache).
  */
-import { appendFile, mkdir, readFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
+import { getServerCache } from "@/server/cache";
 import type { OrderKey } from "./orders";
-
-const DIR = process.env.VERCEL ? path.join(tmpdir(), "agent-teams") : path.join(process.cwd(), ".data");
-const FILE = path.join(DIR, "ledger.jsonl");
 
 interface Base {
   /** ISO timestamp. */
@@ -55,21 +50,12 @@ export interface ApprovalEvent extends Base {
 
 export type LedgerEvent = CallEvent | OrderEvent | ApprovalEvent;
 
+/** Appends to the file and to memory, and announces the change to stats listeners. */
 export async function record(event: LedgerEvent): Promise<void> {
-  await mkdir(DIR, { recursive: true });
-  await appendFile(FILE, `${JSON.stringify(event)}\n`);
+  await getServerCache().ledger.append(event);
 }
 
+/** Every event so far, from memory. */
 export async function readLedger(): Promise<LedgerEvent[]> {
-  let text: string;
-  try {
-    text = await readFile(FILE, "utf8");
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw e;
-  }
-  return text
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as LedgerEvent);
+  return [...(await getServerCache().ledger.events())];
 }
