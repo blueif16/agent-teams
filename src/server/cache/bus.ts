@@ -10,6 +10,7 @@
  *   files:agent:<id>   one of an agent's Markdown files changed
  *   rules              a privacy or tool rule was saved or removed
  *   skills             the skill library changed (skills/index.json or a vendored file)
+ *   state:<pid>        one of a project's state files changed (projects/<pid>/state/** in the vault)
  *   config             never sent: code and .env.local change only with a restart, and a client
  *                      revalidates what it shows when its stream reconnects
  */
@@ -30,6 +31,13 @@ export const TOPICS = {
   files: (id: string) => `files:agent:${id}`,
   rules: "rules",
   skills: "skills",
+  state: (pid: string) => `state:${pid}`,
+};
+
+/** The `state:<pid>` topic a vault path announces, if it is one of a project's state files. */
+export const stateTopicOf = (vaultPath: string): string | null => {
+  const pid = /^projects\/([^/]+)\/state\//.exec(vaultPath)?.[1];
+  return pid ? TOPICS.state(pid) : null;
 };
 
 export class Bus {

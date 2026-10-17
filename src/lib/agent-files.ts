@@ -20,6 +20,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { getServerCache, set as setCached } from "@/server/cache";
+import { stateTopicOf } from "@/server/cache/bus";
 import { announceCommit, getVault, OWNER, RUNTIME, VaultConflictError, type ScrubResult, type Vault } from "@/server/runtime/vault";
 import { AGENTS, CHIEF_ID, TEAMS_BY_ID } from "./data";
 import { scan } from "./policy/detectors";
@@ -140,6 +141,8 @@ export function agentVault(): Promise<Vault> {
       // Cache first, then announce, so a view that revalidates on the topic reads the committed content.
       onCommit: (p, content, commit) => {
         setCached(path.join(vault.dir, p), content);
+        const state = stateTopicOf(p);
+        if (state) getServerCache().bus.emit(state);
         return announceCommit(p, content, commit);
       },
     });
