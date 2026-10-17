@@ -9,6 +9,7 @@ import { excerpt, type OrderKey } from "@/lib/orders";
 import { systemPrompt, toChatMessages, type ProjectContext, type Turn } from "@/lib/prompt";
 import { endLLMRun, orderFeedback, startLLMRun } from "@/lib/tracing";
 import type { AgentStatus, OrgSnapshot } from "@/lib/types";
+import { modelFetch } from "@/server/sim/model-fetch";
 
 const BASE_URL = process.env.CRUSOE_BASE_URL ?? "https://api.inference.crusoecloud.com/v1";
 
@@ -19,7 +20,7 @@ export async function GET() {
 async function callCrusoe(body: unknown, signal: AbortSignal, retries = 2): Promise<Response> {
   // Backoff on 429/503 per Crusoe guidance: ~1s, doubling, with jitter.
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(`${BASE_URL}/chat/completions`, {
+    const res = await modelFetch()(`${BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.CRUSOE_API_KEY}`,
