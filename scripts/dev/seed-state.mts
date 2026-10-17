@@ -5,8 +5,9 @@
  *
  *   DATA_DIR=$(mktemp -d) node --experimental-transform-types --import ./scripts/dev/register-alias.mjs scripts/dev/seed-state.mts
  *
- * Writes the vault at $DATA_DIR/vault and the ledger at $DATA_DIR/ledger.jsonl (the owner approvals the tools check,
- * plus fixture model calls and compactions for the context bars), then prints the env to start a dev server on them.
+ * Writes the vault at $DATA_DIR/vault, the ledger at $DATA_DIR/ledger.jsonl (the owner approvals the tools check, plus
+ * fixture model calls and compactions for the context bars) and the team in the runtime db ($DATA_DIR/runtime.db: the
+ * PM and three members on an active project, as a launch makes them), so the app lists it like any launched team.
  * The project: a pricing page relaunch, 12 tasks across 2 milestones (one blocked on an owner question), 3
  * decisions (one superseded), 2 open items and a resolved one, a 3-member roster, a charter, prefs and a journal.
  * The worker `report` tool isn't merged yet, so no task has a lastReport.
@@ -18,9 +19,11 @@ import type { CompactionEvent } from "@/lib/compaction";
 import type { ApprovalEvent, CallEvent, LedgerEvent } from "@/lib/ledger";
 import { MODELS } from "@/lib/models";
 import { addMember, leadTools, statePath } from "@/server/project-state";
+import { getRuntimeDb } from "@/server/runtime/db";
 import { getVault, setVault, Vault } from "@/server/runtime/vault";
 
 const DATA_DIR = path.resolve(process.env.DATA_DIR || mkdtempSync(path.join(tmpdir(), "agent-teams-state-")));
+process.env.DATA_DIR = DATA_DIR;
 const PID = process.env.SEED_PID || "pricing";
 const LEAD = "juno";
 mkdirSync(DATA_DIR, { recursive: true });
@@ -141,6 +144,33 @@ await status(330, t8, { status: "review", evidence: [`file:projects/${PID}/files
 await snapshotFor(3, ["dag.json", "open.json"]);
 await call(352, "log_progress", { line: "Waiting on you for Q-2 and the t8 review." });
 
+// ------------------------------------------------------------------------------------------ the team (runtime db)
+
+const db = getRuntimeDb();
+const staff = [
+  { agentId: LEAD, name: "Juno", archetype: "lead", role: "PM" },
+  { agentId: "ana", name: "Ana", archetype: "writer", role: "Copywriter" },
+  { agentId: "bo", name: "Bo", archetype: "designer", role: "Product designer" },
+  { agentId: "cy", name: "Cy", archetype: "engineer", role: "Frontend engineer" },
+] as const;
+db.projects.create({
+  id: PID,
+  kind: "team",
+  channel: PID,
+  name: "Pricing page relaunch",
+  goal: "Ship a new pricing page with three clear tiers.",
+  successMetric: "Trial-to-paid conversion of at least 4% over 14 days.",
+  dueAt: day(11),
+  status: "active",
+  leadAgentId: LEAD,
+  budgetUsd: 15,
+});
+for (const s of staff) {
+  db.agents.create({ id: s.agentId, name: s.name, archetype: s.archetype });
+  db.members.add({ projectId: PID, agentId: s.agentId, role: s.role });
+  db.threads.ensure(s.agentId, PID);
+}
+
 // ------------------------------------------------------------------------------------------ ledger (fixture)
 
 const callRow = (min: number, who: string, input: number, cost: number): CallEvent => ({
@@ -162,6 +192,5 @@ rows.sort((a, b) => ((a as { at: string }).at < (b as { at: string }).at ? -1 : 
 writeFileSync(path.join(DATA_DIR, "ledger.jsonl"), rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
 
 console.log(`Seeded project "${PID}" through the state tools (rev ${rev}) in ${DATA_DIR}`);
-console.log(`Run the app on it:  DATA_DIR=${DATA_DIR} VAULT_DIR=${DATA_DIR}/vault npx next dev --port 3500`);
-console.log(`(Until DATA_DIR moves the ledger too, link it: ln -sfn ${DATA_DIR} .data)`);
+console.log(`Run the app on it:  DATA_DIR=${DATA_DIR} npx next dev --port 3500`);
 process.exit(0);
