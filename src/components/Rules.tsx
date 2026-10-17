@@ -98,7 +98,9 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 function Pill({ state, small = false }: { state: State; small?: boolean }) {
   const { label, Icon, cls } = STATE[state];
   return (
-    <span className="flex shrink-0 justify-end">
+    // A fixed box for row pills (as wide as "Asks you"), so the marks before it line up down the list. In a narrow
+    // pane the glyph goes and the words stay, so the labels keep their room.
+    <span className={`flex shrink-0 justify-end ${small ? "" : "min-w-[84px] @max-sm:min-w-[68px]"}`}>
       {/* Keyed on the state so a change pops instead of swapping silently; no pop on first paint. */}
       <AnimatePresence initial={false} mode="popLayout">
         <motion.span
@@ -111,7 +113,7 @@ function Pill({ state, small = false }: { state: State; small?: boolean }) {
             small ? "px-1.5 text-[11.5px] leading-[18px]" : "px-2 py-0.5 text-[12px] leading-[16px]"
           } ${cls}`}
         >
-          <Icon className="size-3" strokeWidth={2.5} />
+          <Icon className="size-3 @max-sm:hidden" strokeWidth={2.5} />
           {label}
         </motion.span>
       </AnimatePresence>
@@ -277,10 +279,11 @@ function Row({
         type="button"
         aria-expanded={open}
         onClick={onToggle}
-        className="tap-soft flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-black/[0.03] [li:first-child>&]:rounded-t-2xl [li:last-child>&]:rounded-b-2xl"
+        // A narrow pane trims gaps and type a little so the longest label ("Use passwords and accounts") still fits.
+        className="tap-soft flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-black/[0.03] @max-sm:gap-1.5 @max-sm:pl-3 @max-sm:pr-2.5 [li:first-child>&]:rounded-t-2xl [li:last-child>&]:rounded-b-2xl"
       >
-        <Icon className="size-4 shrink-0 text-ink-2" strokeWidth={1.9} />
-        <span className="min-w-0 flex-1 truncate text-[14px] leading-[20px]">{label}</span>
+        <Icon className="size-4 shrink-0 text-ink-2 @max-sm:mr-0.5" strokeWidth={1.9} />
+        <span className="min-w-0 flex-1 truncate text-[14px] leading-[20px] @max-sm:text-[13.5px]">{label}</span>
         {marks}
         <Pill state={state} />
       </button>
@@ -294,7 +297,7 @@ function Row({
             exit={{ height: 0, opacity: 0, overflow: "hidden" }}
             transition={SPRING}
           >
-            <div className="pb-2.5 pl-11 pr-4">{children}</div>
+            <div className="pb-2.5 pl-11 pr-4 @max-sm:pl-9 @max-sm:pr-2.5">{children}</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -304,8 +307,9 @@ function Row({
 
 function Line({ text, state }: { text: string; state?: State }) {
   return (
-    <div className="flex items-center gap-2 py-[3px]">
-      <span className="min-w-0 flex-1 truncate text-[13px] leading-[18px] text-ink-2" title={text}>
+    // One line in a wide pane; up to two in a narrow one, where one line would cut most of it.
+    <div className="flex items-start gap-2 py-[3px]">
+      <span className="min-w-0 flex-1 text-[13px] leading-[18px] text-ink-2 @sm:truncate @max-sm:line-clamp-2" title={text}>
         {text}
       </span>
       {state && <Pill small state={state} />}
@@ -882,7 +886,7 @@ export function RulesTab({ agentId, projectId, onNotify }: { agentId?: string; p
   const byId = new Map(data.rules.map((r) => [r.id, r]));
   const yours = data.rules.filter(ownedByYou);
   return (
-    <div>
+    <div className="@container">
       <RuleComposer
         agentId={agentId}
         projectId={projectId}
