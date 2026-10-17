@@ -1,34 +1,17 @@
 "use client";
 
-import { createContext, useContext, type ReactNode } from "react";
-import { defaultRehypePlugins, defaultUrlTransform, Streamdown, type Components } from "streamdown";
+import type { ReactNode } from "react";
+import { Streamdown, type Components } from "streamdown";
 import { code } from "@streamdown/code";
 
 /*
  * Agent replies as Markdown, rendered with Streamdown so half-streamed syntax (an open **, a table
  * mid-row, an unclosed fence) still reads cleanly. Styled to sit inside a chat bubble: chat-sized
- * headings, tight lists, tables as a white card. [label](artifact:id) links open in the workspace.
+ * headings, tight lists, tables as a white card.
  */
 
-const OpenArtifact = createContext<((id: string) => void) | undefined>(undefined);
-
 function Link({ href = "", children }: { href?: string; children?: ReactNode }) {
-  const onOpenArtifact = useContext(OpenArtifact);
   const look = "underline decoration-1 underline-offset-[3px] transition-[color,text-underline-offset] hover:text-accent hover:underline-offset-[5px] active:opacity-70";
-  if (href.startsWith("artifact:") && onOpenArtifact) {
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpenArtifact(href.slice("artifact:".length));
-        }}
-        className={look}
-      >
-        {children}
-      </button>
-    );
-  }
   if (/^(https?:|mailto:)/.test(href)) {
     return (
       <a href={href} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className={look}>
@@ -78,36 +61,19 @@ const PLUGINS = { code };
 const CONTROLS = { code: { copy: true, download: false }, table: false, mermaid: false } as const;
 const ANIMATE = { animation: "fadeIn", duration: 220, sep: "word" } as const;
 
-// Let the app's own artifact: links through the URL transform and the sanitizer; everything else
-// keeps Streamdown's safe defaults.
-const urlTransform = (url: string, key: string, node: Parameters<typeof defaultUrlTransform>[2]) =>
-  url.startsWith("artifact:") ? url : defaultUrlTransform(url, key, node);
-
-type Schema = { protocols?: Record<string, string[]> };
-const [sanitize, schema] = defaultRehypePlugins.sanitize as [unknown, Schema];
-const REHYPE = [
-  defaultRehypePlugins.raw,
-  [sanitize, { ...schema, protocols: { ...schema.protocols, href: [...(schema.protocols?.href ?? []), "artifact"] } }],
-  defaultRehypePlugins.harden,
-] as NonNullable<Parameters<typeof Streamdown>[0]["rehypePlugins"]>;
-
-export function Markdown({ text, streaming = false, onOpenArtifact }: { text: string; streaming?: boolean; onOpenArtifact?: (id: string) => void }) {
+export function Markdown({ text, streaming = false }: { text: string; streaming?: boolean }) {
   return (
-    <OpenArtifact.Provider value={onOpenArtifact}>
-      <Streamdown
-        className="md space-y-3"
-        components={COMPONENTS}
-        plugins={PLUGINS}
-        controls={CONTROLS}
-        urlTransform={urlTransform}
-        rehypePlugins={REHYPE}
-        lineNumbers={false}
-        codeBlockMaxHeight={360}
-        animated={ANIMATE}
-        isAnimating={streaming}
-      >
-        {text}
-      </Streamdown>
-    </OpenArtifact.Provider>
+    <Streamdown
+      className="md space-y-3"
+      components={COMPONENTS}
+      plugins={PLUGINS}
+      controls={CONTROLS}
+      lineNumbers={false}
+      codeBlockMaxHeight={360}
+      animated={ANIMATE}
+      isAnimating={streaming}
+    >
+      {text}
+    </Streamdown>
   );
 }

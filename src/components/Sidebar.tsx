@@ -2,12 +2,11 @@ import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { ChevronDown, Hash, Search } from "lucide-react";
 import { withChartSummaries } from "@/lib/charts";
-import { AGENTS, ARTIFACTS, CHIEF, CHIEF_ID, TEAMS } from "@/lib/data";
+import { AGENTS, CHIEF, CHIEF_ID } from "@/lib/data";
 import type { AgentStatus, Message } from "@/lib/types";
 import { Mascot } from "./Mascot";
 import { useOrg } from "./org";
 import { POP, SPRING, StatusDot, STATUS_LABEL, YouAvatar } from "./ui";
-import { KindIcon } from "./Workspace";
 import type { SideMode } from "./Rail";
 import type { View } from "./AgentTeams";
 
@@ -15,7 +14,6 @@ type Pending = { key: string; msg: Extract<Message, { kind: "approval" }> };
 
 const TITLES: Record<SideMode, string> = {
   home: "Agent Teams",
-  library: "Library",
   activity: "Activity",
   mentions: "Mentions",
   agents: "All agents",
@@ -77,7 +75,6 @@ export function Sidebar({
   chiefUnread,
   onMode,
   onNavigate,
-  onOpenArtifact,
 }: {
   className?: string;
   mode: SideMode;
@@ -92,7 +89,6 @@ export function Sidebar({
   chiefUnread: boolean;
   onMode: (m: SideMode) => void;
   onNavigate: (v: View) => void;
-  onOpenArtifact: (id: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -283,22 +279,6 @@ export function Sidebar({
             })}
           </Section>
         )}
-
-        {mode === "library" &&
-          TEAMS.map((t) => {
-            const items = ARTIFACTS.filter((a) => a.teamId === t.id);
-            if (!items.length) return null;
-            return (
-              <Section key={t.id} title={`#${t.channel}`}>
-                {items.map((art) => (
-                  <Row key={art.id} onClick={() => onOpenArtifact(art.id)}>
-                    <KindIcon kind={art.body.kind} />
-                    <span className="min-w-0 flex-1 truncate">{art.title}</span>
-                  </Row>
-                ))}
-              </Section>
-            );
-          })}
 
         {mode === "agents" && (
           <Section title="Company">

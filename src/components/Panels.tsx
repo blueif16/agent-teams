@@ -1,7 +1,7 @@
 import { Fragment, useState, type ReactNode } from "react";
-import { AlarmClock, CalendarClock, ChartColumn, Check, Fingerprint, Hash, List, Loader, MonitorPlay, Pause, Pin, Play } from "lucide-react";
+import { AlarmClock, CalendarClock, ChartColumn, Check, Fingerprint, Hash, List, Loader, Pause, Pin, Play } from "lucide-react";
 import { motion } from "motion/react";
-import { AGENTS, ARTIFACTS, ARTIFACTS_BY_ID, CHIEF_ID, TEAMS } from "@/lib/data";
+import { AGENTS, CHIEF_ID } from "@/lib/data";
 import type { AgentStatus } from "@/lib/types";
 import { Mascot } from "./Mascot";
 import { IdentityTab, Markdown } from "./Identity";
@@ -9,7 +9,6 @@ import { useOrg } from "./org";
 import { formatDue } from "@/lib/project";
 import { AgentPerformance, TeamPerformance } from "./Performance";
 import { Progress, SPRING, StatusChip } from "./ui";
-import { KindIcon } from "./Workspace";
 
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -85,7 +84,6 @@ export function AgentPanel({
   checkIns,
   onMessage,
   onToggleRun,
-  onOpenArtifact,
   onOpenChannel,
   onNotify,
 }: {
@@ -97,7 +95,6 @@ export function AgentPanel({
   checkIns: string[];
   onMessage: (id: string) => void;
   onToggleRun: (id: string) => void;
-  onOpenArtifact: (id: string) => void;
   onOpenChannel: (teamId: string) => void;
   onNotify: (text: string) => void;
 }) {
@@ -157,16 +154,6 @@ export function AgentPanel({
             >
               {status === "idle" ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
               {status === "idle" ? "Resume" : "Pause"}
-            </button>
-          )}
-          {a.artifactId && (
-            <button
-              type="button"
-              onClick={() => onOpenArtifact(a.artifactId!)}
-              className={`${pillBtn} bg-white shadow-[0_0_0_1px_#e2e2e2] hover:bg-[#f6f6f6]`}
-            >
-              <MonitorPlay className="size-3.5" />
-              See their work
             </button>
           )}
         </div>
@@ -264,20 +251,6 @@ export function AgentPanel({
                   {s}
                 </motion.div>
               ))}
-            </Group>
-          )}
-
-          {a.artifactId && (
-            <Group title="Latest work">
-              <button
-                type="button"
-                onClick={() => onOpenArtifact(a.artifactId!)}
-                className="tap-soft flex w-full items-center gap-3 px-4 py-3 text-left text-[14px] hover:bg-[#f6f6f6]"
-              >
-                <KindIcon kind={ARTIFACTS_BY_ID[a.artifactId].body.kind} />
-                <span className="min-w-0 flex-1 truncate">{ARTIFACTS_BY_ID[a.artifactId].title}</span>
-                <span className="text-[12.5px] text-muted">{ARTIFACTS_BY_ID[a.artifactId].updated}</span>
-              </button>
             </Group>
           )}
         </TabBody>
@@ -397,41 +370,6 @@ export function TeamPanel({
           </Group>
         </TabBody>
       )}
-    </div>
-  );
-}
-
-export function LibraryPanel({ onOpenArtifact }: { onOpenArtifact: (id: string) => void }) {
-  return (
-    <div className="mx-auto max-w-[620px] px-5 pb-10 pt-6">
-      <h2 className="px-1 text-[20px] font-semibold tracking-[-0.01em]">Library</h2>
-      <p className="mt-1 px-1 text-[14px] text-ink-2">Everything your agents have made, by team.</p>
-      {TEAMS.map((t) => {
-        const items = ARTIFACTS.filter((a) => a.teamId === t.id);
-        if (!items.length) return null;
-        return (
-          <Group key={t.id} title={`#${t.channel}`}>
-            {items.map((art) => {
-              const agent = AGENTS[art.agentId];
-              return (
-                <button
-                  key={art.id}
-                  type="button"
-                  onClick={() => onOpenArtifact(art.id)}
-                  className="tap-soft group flex w-full items-center gap-3 border-t border-line px-4 py-2.5 text-left first:border-t-0 hover:bg-[#f6f6f6]"
-                >
-                  <KindIcon kind={art.body.kind} />
-                  <span className="min-w-0 flex-1 truncate text-[14px]">{art.title}</span>
-                  <span className="squish-group">
-                    <Mascot look={agent.look} size={18} />
-                  </span>
-                  <span className="w-20 shrink-0 text-right text-[12.5px] text-muted">{art.updated}</span>
-                </button>
-              );
-            })}
-          </Group>
-        );
-      })}
     </div>
   );
 }

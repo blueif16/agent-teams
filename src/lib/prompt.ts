@@ -1,5 +1,5 @@
 import { CHARTS_NOTE, withChartSummaries } from "./charts";
-import { AGENTS, ARTIFACTS_BY_ID, TEAMS_BY_ID } from "./data";
+import { AGENTS, TEAMS_BY_ID } from "./data";
 import type { Message } from "./types";
 
 export interface Turn {
@@ -18,8 +18,6 @@ function describeMessage(m: Message): string | null {
         : `${name(m.from)} handed "${m.task}" to ${name(m.to)}`;
     case "approval":
       return `${name(m.from)} asked for approval: ${m.title} (${m.state})`;
-    case "artifact":
-      return `${name(m.from)} shared "${ARTIFACTS_BY_ID[m.artifactId]?.title}"`;
     case "proposal":
       return `${name(m.from)} proposed the "${m.project.name}" project (${m.state})`;
     case "status":
@@ -47,7 +45,6 @@ export function systemPrompt(
     .join("\n");
   const plan = agent.steps.map((s) => `- [${s.state}] ${s.label}`).join("\n");
   const log = team.messages.map(describeMessage).filter(Boolean).join("\n");
-  const artifact = agent.artifactId ? ARTIFACTS_BY_ID[agent.artifactId] : undefined;
 
   const home = homeFiles(files);
 
@@ -62,7 +59,7 @@ ${teammates}
 Your current task: ${agent.task} (${Math.round(agent.progress * 100)}% done, running ${agent.elapsed})
 Your plan:
 ${plan}
-${artifact ? `Your current artifact: "${artifact.title}" at ${artifact.host}\n` : ""}${agent.schedule?.length ? `Scheduled: ${agent.schedule.join("; ")}\n` : ""}
+${agent.schedule?.length ? `Scheduled: ${agent.schedule.join("; ")}\n` : ""}
 Recent #${team.channel} log:
 ${log}
 

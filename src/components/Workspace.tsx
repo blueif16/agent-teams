@@ -1,64 +1,20 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Columns2,
-  Copy,
-  Download,
-  Ellipsis,
-  FileText,
-  Globe,
-  Hash,
-  MessageSquareText,
-  Plus,
-  Presentation,
-  RotateCw,
-  SquareTerminal,
-  Table2,
-  X,
-} from "lucide-react";
-import { AGENTS, ARTIFACTS_BY_ID } from "@/lib/data";
+import { ArrowLeft, ArrowRight, Columns2, Ellipsis, Hash, RotateCw, X } from "lucide-react";
+import { AGENTS } from "@/lib/data";
 import { useOrg } from "./org";
-import type { AgentStatus, Artifact, ArtifactBody, Team } from "@/lib/types";
+import type { AgentStatus, Team } from "@/lib/types";
 import { Mascot } from "./Mascot";
 import { IconButton, SPRING } from "./ui";
-import { ArtifactView } from "./ArtifactView";
-import { AgentPanel, LibraryPanel, TeamPanel } from "./Panels";
+import { AgentPanel, TeamPanel } from "./Panels";
 
 export type Tab = { id: string } & (
-  | { type: "artifact"; artifactId: string }
   | { type: "agent"; agentId: string }
   | { type: "team"; teamId: string }
-  | { type: "library" }
 );
-
-export function KindIcon({ kind }: { kind: ArtifactBody["kind"] }) {
-  const cls = "size-[15px] shrink-0";
-  switch (kind) {
-    case "slides":
-      return (
-        <span className="grid size-[17px] shrink-0 place-items-center rounded-[4px] bg-[#f6c33d]">
-          <Presentation className="size-[11px] text-white" strokeWidth={2.4} />
-        </span>
-      );
-    case "doc":
-      return <FileText className={`${cls} text-[#3b78e7]`} />;
-    case "sheet":
-      return <Table2 className={`${cls} text-[#1e9a5a]`} />;
-    case "code":
-      return <SquareTerminal className={`${cls} text-ink-2`} />;
-    case "browser":
-      return <Globe className={`${cls} text-ink-2`} />;
-  }
-}
 
 function tabMeta(tab: Tab, teamsById: Record<string, Team>): { title: string; icon: React.ReactNode; url: string } {
   switch (tab.type) {
-    case "artifact": {
-      const a = ARTIFACTS_BY_ID[tab.artifactId];
-      return { title: a.title, icon: <KindIcon kind={a.body.kind} />, url: a.host };
-    }
     case "agent": {
       const a = AGENTS[tab.agentId];
       return {
@@ -75,8 +31,6 @@ function tabMeta(tab: Tab, teamsById: Record<string, Team>): { title: string; ic
         url: `agent-teams.app/teams/${t.id}`,
       };
     }
-    case "library":
-      return { title: "Library", icon: <Copy className="size-[15px] text-ink-2" />, url: "agent-teams.app/library" };
   }
 }
 
@@ -85,14 +39,12 @@ export function WorkspaceTabs({
   active,
   onSelect,
   onClose,
-  onNew,
   onHide,
 }: {
   tabs: Tab[];
   active: string;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
-  onNew: () => void;
   onHide: () => void;
 }) {
   const { teamsById } = useOrg();
@@ -146,47 +98,12 @@ export function WorkspaceTabs({
         })}
         </AnimatePresence>
       </div>
-      <IconButton label="Open library tab" onClick={onNew}>
-        <Plus className="size-[18px]" strokeWidth={1.6} />
-      </IconButton>
       <div className="flex-1" />
       <IconButton label="Hide workspace" onClick={onHide} active>
         <Columns2 className="size-[17px]" strokeWidth={1.7} />
       </IconButton>
     </div>
   );
-}
-
-function toMarkdown(a: Artifact): string {
-  const b = a.body;
-  const head = `# ${a.title}\n\n`;
-  switch (b.kind) {
-    case "slides":
-      return head + b.variants.map((v) => `## ${v.label}\n\n**${v.title}**\n\n${v.body}\n\nCTA: ${v.cta}\n`).join("\n");
-    case "doc":
-      return head + `## ${b.heading}\n\n` + b.sections.map((s) => (s.heading ? `### ${s.heading}\n\n` : "") + s.body).join("\n\n");
-    case "sheet":
-      return (
-        head +
-        `| ${b.columns.join(" | ")} |\n| ${b.columns.map(() => "---").join(" | ")} |\n` +
-        b.rows.map((r) => `| ${r.join(" | ")} |`).join("\n") +
-        (b.note ? `\n\n${b.note}` : "")
-      );
-    case "code":
-      return head + "```diff\n" + b.lines.map((l) => (l.type === "add" ? "+" : l.type === "del" ? "-" : " ") + l.text).join("\n") + "\n```";
-    case "browser":
-      return head + `## ${b.heading}\n\n` + b.items.map((i) => `- **${i.title}**: ${i.body}`).join("\n");
-  }
-}
-
-function download(a: Artifact) {
-  const blob = new Blob([toMarkdown(a)], { type: "text/markdown" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${a.id}.md`;
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
 const pill = "flex items-center rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.06)]";
@@ -198,13 +115,10 @@ export function WorkspaceBody({
   memories,
   checkIns,
   onNotify,
-  onOpenArtifact,
   onOpenAgent,
   onMessage,
   onOpenChannel,
   onToggleRun,
-  onAsk,
-  onSendTo,
   onCloseOthers,
   onCloseTab,
 }: {
@@ -214,13 +128,10 @@ export function WorkspaceBody({
   memories: Record<string, string[]>;
   checkIns: Record<string, string[]>;
   onNotify: (text: string) => void;
-  onOpenArtifact: (id: string) => void;
   onOpenAgent: (id: string) => void;
   onMessage: (agentId: string) => void;
   onOpenChannel: (teamId: string) => void;
   onToggleRun: (agentId: string) => void;
-  onAsk: (artifactId: string) => void;
-  onSendTo: (agentId: string, text: string) => void;
   onCloseOthers: (id: string) => void;
   onCloseTab: (id: string) => void;
 }) {
@@ -229,7 +140,6 @@ export function WorkspaceBody({
   const { teamsById } = useOrg();
   if (!tab) return null;
   const meta = tabMeta(tab, teamsById);
-  const artifact = tab.type === "artifact" ? ARTIFACTS_BY_ID[tab.artifactId] : null;
 
   return (
     <>
@@ -258,19 +168,6 @@ export function WorkspaceBody({
         <div className={`${pill} h-9 min-w-0 flex-1 justify-center px-4 text-[14.5px] text-ink`}>
           <span className="truncate">{meta.url}</span>
         </div>
-        {artifact && (
-          <div className={`${pill} p-0.5`}>
-            <IconButton label={`Ask ${AGENTS[artifact.agentId].name} about this`} onClick={() => onAsk(artifact.id)} className="rounded-full">
-              <MessageSquareText className="size-[16px]" strokeWidth={1.8} />
-            </IconButton>
-            <IconButton label="Download as Markdown" onClick={() => {
-                download(artifact);
-                onNotify(`Downloaded ${artifact.id}.md`);
-              }} className="rounded-full">
-              <Download className="size-[16px]" strokeWidth={1.8} />
-            </IconButton>
-          </div>
-        )}
         <div className="relative">
           <div className={`${pill} p-0.5`}>
             <IconButton label="More" onClick={() => setMenu((m) => !m)} className="rounded-full">
@@ -320,7 +217,6 @@ export function WorkspaceBody({
         transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
         className="scroll-quiet min-h-0 flex-1 overflow-y-auto border-t border-line"
       >
-        {tab.type === "artifact" && artifact && <ArtifactView artifact={artifact} onSendTo={onSendTo} />}
         {tab.type === "agent" && (
           <AgentPanel
             agentId={tab.agentId}
@@ -330,7 +226,6 @@ export function WorkspaceBody({
             checkIns={checkIns[tab.agentId] ?? []}
             onMessage={onMessage}
             onToggleRun={onToggleRun}
-            onOpenArtifact={onOpenArtifact}
             onOpenChannel={onOpenChannel}
             onNotify={onNotify}
           />
@@ -338,7 +233,6 @@ export function WorkspaceBody({
         {tab.type === "team" && (
           <TeamPanel teamId={tab.teamId} status={status} doing={doing} onOpenAgent={onOpenAgent} onOpenChannel={onOpenChannel} />
         )}
-        {tab.type === "library" && <LibraryPanel onOpenArtifact={onOpenArtifact} />}
       </motion.div>
     </>
   );

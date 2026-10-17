@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { ArrowLeft, ArrowRight, Columns2, Copy, Ellipsis, Hash, ListChecks, SquarePen } from "lucide-react";
-import { AGENTS, ARTIFACTS_BY_ID, CHIEF, CHIEF_ID, DMS, HQ, TEAMS, TEAMS_BY_ID } from "@/lib/data";
+import { ArrowLeft, ArrowRight, Columns2, Hash, ListChecks, SquarePen } from "lucide-react";
+import { AGENTS, CHIEF, CHIEF_ID, DMS, HQ, TEAMS, TEAMS_BY_ID } from "@/lib/data";
 import { excerpt, orderText, ORDERS_BY_KEY, type OrderKey } from "@/lib/orders";
 import { parseProject, PROJECT_FENCE, START_PROJECT, visibleText } from "@/lib/project";
 import { withChartSummaries } from "@/lib/charts";
@@ -78,7 +78,7 @@ export function AgentTeams() {
   // Desktop and mobile keep separate open states so resizing never fights the user.
   const [sidebarDesktop, setSidebarDesktop] = useState(true);
   const [sidebarMobile, setSidebarMobile] = useState(false);
-  const [workspaceDesktop, setWorkspaceDesktop] = useState(true);
+  const [workspaceDesktop, setWorkspaceDesktop] = useState(false);
   const [workspaceMobile, setWorkspaceMobile] = useState(false);
   const sidebarOpen = medium ? sidebarDesktop : sidebarMobile;
   const setSidebarOpen = (open: boolean) => (medium ? setSidebarDesktop(open) : setSidebarMobile(open));
@@ -87,8 +87,8 @@ export function AgentTeams() {
     setWorkspaceDesktop(open);
     setWorkspaceMobile(open);
   }, []);
-  const [tabs, setTabs] = useState<Tab[]>([{ id: "artifact:aster-slide5", type: "artifact", artifactId: "aster-slide5" }]);
-  const [activeTab, setActiveTab] = useState("artifact:aster-slide5");
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [activeTab, setActiveTab] = useState("");
   const [convos, setConvos] = useState<Record<string, Message[]>>(() => {
     const c: Record<string, Message[]> = {};
     for (const t of TEAMS) c[`team:${t.id}`] = t.messages;
@@ -211,15 +211,8 @@ export function AgentTeams() {
     [setWorkspaceOpen],
   );
 
-  const openArtifact = useCallback(
-    (artifactId: string) => {
-      if (ARTIFACTS_BY_ID[artifactId]) openTab({ id: `artifact:${artifactId}`, type: "artifact", artifactId });
-    },
-    [openTab],
-  );
   const openAgent = useCallback((agentId: string) => openTab({ id: `agent:${agentId}`, type: "agent", agentId }), [openTab]);
   const openTeam = useCallback((teamId: string) => openTab({ id: `team:${teamId}`, type: "team", teamId }), [openTab]);
-  const openLibrary = useCallback(() => openTab({ id: "library", type: "library" }), [openTab]);
 
   const closeTab = (id: string) => {
     setTabs((ts) => {
@@ -448,13 +441,6 @@ export function AgentTeams() {
     });
   };
 
-  const askAbout = (artifactId: string) => {
-    const art = ARTIFACTS_BY_ID[artifactId];
-    const v: View = { kind: "dm", agentId: art.agentId };
-    navigate(v);
-    setPrefill({ key: convKey(v), text: `About “${art.title}”: `, nonce: Date.now() });
-  };
-
   const key = convKey(view);
   const messages = convos[key] ?? [];
 
@@ -530,7 +516,6 @@ export function AgentTeams() {
       active={activeTab}
       onSelect={setActiveTab}
       onClose={closeTab}
-      onNew={openLibrary}
       onHide={() => setWorkspaceOpen(false)}
     />
   );
@@ -542,7 +527,6 @@ export function AgentTeams() {
       memories={memories}
       checkIns={checkIns}
       onNotify={notify}
-      onOpenArtifact={openArtifact}
       onOpenAgent={openAgent}
       onMessage={(agentId) => navigate({ kind: "dm", agentId })}
       onOpenChannel={(teamId) => navigate({ kind: "channel", teamId })}
@@ -550,12 +534,6 @@ export function AgentTeams() {
         const resuming = status[agentId] === "idle";
         setStatus((s) => ({ ...s, [agentId]: resuming ? "working" : "idle" }));
         notify(`${AGENTS[agentId].name} ${resuming ? "is back to work" : "is paused"}`);
-      }}
-      onAsk={askAbout}
-      onSendTo={(agentId, text) => {
-        const v: View = { kind: "dm", agentId };
-        navigate(v);
-        send(v, text);
       }}
       onCloseOthers={(id) => {
         setTabs((ts) => ts.filter((t) => t.id === id));
@@ -634,7 +612,6 @@ export function AgentTeams() {
                 chiefUnread={chiefUnread}
                 onMode={setSide}
                 onNavigate={navigate}
-                onOpenArtifact={openArtifact}
               />
             </motion.div>
           )}
@@ -648,10 +625,6 @@ export function AgentTeams() {
               </IconButton>
               <IconButton label="Forward" onClick={forward} disabled={future.length === 0}>
                 <ArrowRight className="size-[18px]" strokeWidth={1.7} />
-              </IconButton>
-              <IconButton label="Library" onClick={openLibrary} className="relative">
-                <Copy className="size-[17px]" strokeWidth={1.7} />
-                {pending.length > 0 && <span className="absolute right-1 top-1 size-[7px] rounded-full bg-accent ring-2 ring-frame" />}
               </IconButton>
               <IconButton label="New message" onClick={() => document.querySelector<HTMLTextAreaElement>("#composer")?.focus()}>
                 <SquarePen className="size-[17px]" strokeWidth={1.7} />
@@ -668,14 +641,11 @@ export function AgentTeams() {
                   <Hash className="size-[17px]" strokeWidth={1.7} />
                 </IconButton>
               )}
-              <IconButton label="Library" onClick={openLibrary}>
-                <Ellipsis className="size-[18px]" strokeWidth={1.7} />
-              </IconButton>
               <IconButton label="Plan" onClick={() => (view.kind === "dm" ? openAgent(view.agentId) : openTeam(view.teamId))}>
                 <ListChecks className="size-[18px]" strokeWidth={1.7} />
               </IconButton>
-              {!workspace && (
-                <IconButton label="Show workspace" onClick={() => (tabs.length ? setWorkspaceOpen(true) : openLibrary())}>
+              {!workspace && tabs.length > 0 && (
+                <IconButton label="Show workspace" onClick={() => setWorkspaceOpen(true)}>
                   <Columns2 className="size-[17px]" strokeWidth={1.7} />
                 </IconButton>
               )}
@@ -709,10 +679,8 @@ export function AgentTeams() {
               handlers={handlers}
               onSend={(text) => send(view, text)}
               onDecide={(id, d) => decide(key, id, d)}
-              onOpenArtifact={openArtifact}
               onOpenAgent={openAgent}
               onOpenTeam={openTeam}
-              onOpenLibrary={openLibrary}
               onMessageAgent={(agentId) => navigate({ kind: "dm", agentId })}
               onOpenChannel={(teamId) => navigate({ kind: "channel", teamId })}
               onLaunchProject={(msgId) => launchProject(key, msgId)}

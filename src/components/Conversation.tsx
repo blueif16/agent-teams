@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { CornerDownRight, Hand } from "lucide-react";
-import { AGENTS, ARTIFACTS_BY_ID, CHIEF_ID } from "@/lib/data";
+import { AGENTS, CHIEF_ID } from "@/lib/data";
 import type { OrderKey } from "@/lib/orders";
 import { CHIEF_SHORTCUTS } from "@/lib/project";
 import type { Agent, AgentStatus, Message } from "@/lib/types";
 import { Mascot } from "./Mascot";
 import { POP, RichText, StatusDot } from "./ui";
 import { Composer } from "./Composer";
-import { SlideCard } from "./SlideArt";
-import { KindIcon } from "./Workspace";
 import { ActionMenu, HoverBar, ReactionChips, type MenuTarget, type Reaction } from "./MessageActions";
 import { Markdown } from "./Markdown";
 import { ChartBlock } from "./Charts";
@@ -21,10 +19,9 @@ import type { View } from "./AgentTeams";
 type Text = Extract<Message, { kind: "text" }>;
 
 const authorOf = (m: Message) =>
-  m.kind === "text" || m.kind === "approval" || m.kind === "artifact" || m.kind === "proposal" ? m.from : null;
+  m.kind === "text" || m.kind === "approval" || m.kind === "proposal" ? m.from : null;
 
-const textOf = (m: Message) =>
-  m.kind === "text" ? withChartSummaries(m.text) : m.kind === "artifact" ? `Shared “${ARTIFACTS_BY_ID[m.artifactId]?.title}”` : "";
+const textOf = (m: Message) => (m.kind === "text" ? withChartSummaries(m.text) : "");
 
 const SUGGESTIONS = ["What are you working on?", "What's blocking you?", "Give me a progress update"].map((s) => ({ label: s, ask: s }));
 
@@ -49,10 +46,8 @@ export function Conversation({
   handlers,
   onSend,
   onDecide,
-  onOpenArtifact,
   onOpenAgent,
   onOpenTeam,
-  onOpenLibrary,
   onMessageAgent,
   onOpenChannel,
   onLaunchProject,
@@ -69,10 +64,8 @@ export function Conversation({
   handlers: MessageHandlers;
   onSend: (text: string) => void;
   onDecide: (id: string, d: "approved" | "declined") => void;
-  onOpenArtifact: (id: string) => void;
   onOpenAgent: (id: string) => void;
   onOpenTeam: (id: string) => void;
-  onOpenLibrary: () => void;
   onMessageAgent: (id: string) => void;
   onOpenChannel: (teamId: string) => void;
   onLaunchProject: (msgId: string) => void;
@@ -239,11 +232,10 @@ export function Conversation({
       } else if (m.kind === "proposal") {
         body = <ProposalCard m={m} onLaunch={() => onLaunchProject(m.id)} onRevise={onReviseProject} onOpenChannel={onOpenChannel} />;
       } else {
-        // Text and artifacts take reactions and quick actions.
-        const inner = m.kind === "text" ? <AgentBubble m={m} onOpenArtifact={onOpenArtifact} /> : <ArtifactCard id={m.artifactId} onOpen={onOpenArtifact} />;
+        // Text takes reactions and quick actions.
         body = (
           <>
-            {m.kind === "text" && m.quote && (
+            {m.quote && (
               <p className="mb-1.5 flex items-center gap-1.5 text-[13px] text-[#818181]">
                 <CornerDownRight className="size-4 shrink-0" strokeWidth={1.6} />
                 <span className="truncate">{m.quote}</span>
@@ -272,7 +264,7 @@ export function Conversation({
                 transition={POP}
                 style={{ transformOrigin: "0% 100%" }}
               >
-                {inner}
+                <AgentBubble m={m} />
               </motion.div>
               {!channel && (
                 <span className="pointer-events-none absolute bottom-1.5 left-full ml-2 whitespace-nowrap text-[11.5px] text-muted opacity-0 transition-opacity group-hover/msg:opacity-100">
@@ -406,7 +398,6 @@ export function Conversation({
             prefill={prefill}
             onSend={onSend}
             onOpenPlan={() => (channel ? onOpenTeam(team.id) : onOpenAgent(dmAgent!.id))}
-            onOpenLibrary={onOpenLibrary}
           />
         </div>
       </div>
@@ -455,7 +446,7 @@ export function Conversation({
 }
 
 /** An agent's reply: Markdown bubbles, with each chart block drawn as its own card between them. */
-function AgentBubble({ m, onOpenArtifact }: { m: Text; onOpenArtifact: (id: string) => void }) {
+function AgentBubble({ m }: { m: Text }) {
   const segments = splitCharts(m.streaming ? trimPartialFence(m.text) : m.text);
   const lastText = segments.findLastIndex((s) => s.kind === "text");
   return (
@@ -468,7 +459,7 @@ function AgentBubble({ m, onOpenArtifact }: { m: Text; onOpenArtifact: (id: stri
             key={i}
             className="w-fit max-w-[min(620px,100%)] rounded-[20px] bg-bubble px-4 py-[11px] text-[15px] leading-[22px] text-ink transition-colors group-hover/msg:bg-[#ececec]"
           >
-            <Markdown text={s.text.trim()} streaming={!!m.streaming && i === lastText} onOpenArtifact={onOpenArtifact} />
+            <Markdown text={s.text.trim()} streaming={!!m.streaming && i === lastText} />
           </div>
         ),
       )}
@@ -537,36 +528,5 @@ function ApprovalCard({
         </AnimatePresence>
       </div>
     </motion.div>
-  );
-}
-
-function ArtifactCard({ id, onOpen }: { id: string; onOpen: (id: string) => void }) {
-  const art = ARTIFACTS_BY_ID[id];
-  if (!art) return null;
-  const b = art.body;
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onOpen(id);
-      }}
-      className="lift block w-[520px] max-w-full overflow-hidden rounded-[20px] text-left shadow-[0_0_0_1px_rgba(0,0,0,0.05)] hover:shadow-[0_10px_28px_rgba(0,0,0,0.1),0_0_0_1px_rgba(0,0,0,0.06)]"
-      aria-label={`Open ${art.title}`}
-    >
-      {b.kind === "slides" ? (
-        <div className="h-[150px]">
-          <SlideCard section={b.section} title={b.variants[0].title} />
-        </div>
-      ) : (
-        <div className="bg-paper px-4 py-3.5">
-          <div className="flex items-center gap-2 text-[13px] text-muted">
-            <KindIcon kind={b.kind} />
-            {art.host}
-          </div>
-          <div className="mt-1.5 text-[16px] text-ink">{art.title}</div>
-        </div>
-      )}
-    </button>
   );
 }

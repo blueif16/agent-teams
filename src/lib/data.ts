@@ -1,5 +1,5 @@
 import { MODELS } from "./models";
-import type { Agent, AgentType, Artifact, MascotLook, Message, Team } from "./types";
+import type { Agent, AgentType, MascotLook, Message, Team } from "./types";
 
 /*
  * Seed state for the eight agent teams. Each team is a channel; each agent
@@ -51,7 +51,6 @@ export const TEAMS: Team[] = [
         progress: 0.67,
         elapsed: "2d 4h",
         subAgents: 3,
-        artifactId: "aster-slide5",
         steps: [
           { label: "Read the launch brief and build notes", state: "done" },
           { label: "Draft the launch deck (v1 to v3)", state: "done" },
@@ -92,7 +91,6 @@ export const TEAMS: Team[] = [
         task: "Review digest delivered",
         progress: 1,
         elapsed: "1h 40m",
-        artifactId: "aster-digest",
         steps: [
           { label: "Pull App Store reviews since Sept 1", state: "done" },
           { label: "Cluster requests by theme", state: "done" },
@@ -149,7 +147,6 @@ export const TEAMS: Team[] = [
         at: "9:10 AM",
         text: "Two headline options for slide 5, based on Dottie's digest. I'd keep the tone calm and skip exclamation marks.",
       },
-      { id: "al-5", kind: "artifact", from: "felipe", at: "9:26 AM", artifactId: "aster-slide5" },
       {
         id: "al-6",
         kind: "text",
@@ -190,7 +187,6 @@ export const TEAMS: Team[] = [
         progress: 0.35,
         elapsed: "11d 2h",
         subAgents: 6,
-        artifactId: "radar-lumen",
         steps: [
           { label: "Snapshot pricing and changelog pages", state: "done" },
           { label: "Diff against last sweep", state: "active" },
@@ -209,7 +205,6 @@ export const TEAMS: Team[] = [
         task: "Pricing matrix is current",
         progress: 1,
         elapsed: "22m",
-        artifactId: "radar-matrix",
         steps: [
           { label: "Update Lumen's Pro price", state: "done" },
           { label: "Recompute price gaps", state: "done" },
@@ -317,7 +312,6 @@ export const TEAMS: Team[] = [
         task: "Drafting a reply to the Sequoia scout",
         progress: 0.6,
         elapsed: "18m",
-        artifactId: "inbox-draft",
         steps: [
           { label: "Read the thread", state: "done" },
           { label: "Draft a 3-sentence reply", state: "active" },
@@ -398,7 +392,6 @@ export const TEAMS: Team[] = [
         task: "Fixing the reconnect race in sync.spec.ts",
         progress: 0.9,
         elapsed: "2h 14m",
-        artifactId: "bug-pr",
         steps: [
           { label: "Reproduce the flake locally", state: "done" },
           { label: "Find the root cause", state: "done" },
@@ -504,7 +497,6 @@ export const TEAMS: Team[] = [
         task: "First draft is ready for review",
         progress: 1,
         elapsed: "1h 02m",
-        artifactId: "inv-draft",
         steps: [
           { label: "Draft highlights and lowlights", state: "done" },
           { label: "Write three asks", state: "done" },
@@ -591,7 +583,6 @@ export const TEAMS: Team[] = [
         task: "Scoring portfolios for motion and brand work",
         progress: 0.7,
         elapsed: "2h 33m",
-        artifactId: "hire-sheet",
         steps: [
           { label: "Search portfolios", state: "done" },
           { label: "Score against the brief", state: "active" },
@@ -687,7 +678,6 @@ export const TEAMS: Team[] = [
         task: "Drafting the 3-day agenda",
         progress: 0.6,
         elapsed: "54m",
-        artifactId: "trip-doc",
         steps: [
           { label: "List activities near Incline Village", state: "done" },
           { label: "Draft the agenda", state: "active" },
@@ -776,7 +766,6 @@ export const TEAMS: Team[] = [
         task: "Charts published",
         progress: 1,
         elapsed: "30m",
-        artifactId: "data-sheet",
         steps: [{ label: "Chart the five headline metrics", state: "done" }],
         brief: "Visual thinker. Prefers one clear chart over three busy ones.",
       },
@@ -910,7 +899,6 @@ export const DMS: Record<string, Message[]> = {
       text: "Here are the [two options](artifact:aster-slide5). I'd pick A for the closest match to the original; B emphasizes the daily score.\n\nI'm saving the two previews to your Library now.",
     },
     { id: "fd-7", kind: "text", from: "felipe", at: "9:26 AM", text: "Option A: “See your day more clearly.”" },
-    { id: "fd-8", kind: "artifact", from: "felipe", at: "9:26 AM", artifactId: "aster-slide5" },
   ],
   mabel: [
     {
@@ -932,231 +920,9 @@ export const DMS: Record<string, Message[]> = {
   ],
 };
 
-export const ARTIFACTS: Artifact[] = [
-  {
-    id: "aster-slide5",
-    title: "Aster — Slide 5 daily-view options",
-    host: "docs.google.com",
-    agentId: "felipe",
-    teamId: "aster-launch",
-    updated: "9:26 AM",
-    body: {
-      kind: "slides",
-      section: "Email + social",
-      variants: [
-        {
-          label: "Variant A",
-          title: "See your day more clearly.",
-          body: "Sleep, activity and your daily score. Together in one view.",
-          cta: "Request an invite",
-        },
-        {
-          label: "Variant B",
-          title: "Your day, in one view.",
-          body: "Your daily score, sleep and activity. Start with Today.",
-          cta: "Request an invite",
-        },
-      ],
-    },
-  },
-  {
-    id: "aster-digest",
-    title: "Review digest: daily view",
-    host: "docs.google.com",
-    agentId: "dottie",
-    teamId: "aster-launch",
-    updated: "8:41 AM",
-    body: {
-      kind: "doc",
-      heading: "App Store reviews: what people want from a daily view",
-      sections: [
-        { body: "212 reviews since Sept 1. 38 (18%) ask for a daily view. Sources: App Store and Play Store, US and UK." },
-        { heading: "Top requests", body: "“Show me today, not the week” (17). A single daily score (11). Sleep and activity side by side (10)." },
-        { heading: "What this means for the deck", body: "Lead slide 5 with today. Keep the weekly view as a secondary point." },
-      ],
-    },
-  },
-  {
-    id: "aster-build",
-    title: "Aster 2.4 build notes",
-    host: "builds.aster.app",
-    agentId: "felipe",
-    teamId: "aster-launch",
-    updated: "Yesterday",
-    body: {
-      kind: "browser",
-      heading: "Build 2.4 (412)",
-      items: [
-        { title: "Launch screen is now “Today”", body: "Replaces “Your week.” Shows a daily score from 0 to 100." },
-        { title: "Weekly view moved", body: "Now a tab inside Today." },
-        { title: "New widget", body: "Lock-screen widget for the daily score." },
-      ],
-    },
-  },
-  {
-    id: "radar-lumen",
-    title: "Lumen pricing, before and after",
-    host: "lumen.app/pricing",
-    agentId: "scout",
-    teamId: "competitor-radar",
-    updated: "6:02 AM",
-    body: {
-      kind: "browser",
-      heading: "Lumen pricing",
-      items: [
-        { title: "Pro: $12 → $15 / month", body: "Seen at 5:48 AM PT. Annual plan unchanged at $120." },
-        { title: "New: Today widget", body: "Listed under Pro features. Announced in their changelog the same morning." },
-      ],
-    },
-  },
-  {
-    id: "radar-matrix",
-    title: "Pricing matrix",
-    host: "sheets.google.com",
-    agentId: "ledger",
-    teamId: "competitor-radar",
-    updated: "6:25 AM",
-    body: {
-      kind: "sheet",
-      columns: ["Product", "Pro / mo", "Annual", "Daily view", "Gap vs Aster"],
-      rows: [
-        ["Aster", "$12", "$108", "Yes", "—"],
-        ["Lumen", "$15", "$120", "Yes (new)", "+$3"],
-        ["Hearth", "$10", "$96", "No", "−$2"],
-        ["Northstar", "$14", "$130", "Yes", "+$2"],
-        ["Pace", "$9", "$84", "No", "−$3"],
-        ["Kiln", "$18", "$160", "Yes", "+$6"],
-      ],
-    },
-  },
-  {
-    id: "inbox-draft",
-    title: "Reply to Sequoia scout",
-    host: "mail.google.com",
-    agentId: "bea",
-    teamId: "inbox-triage",
-    updated: "8:46 AM",
-    body: {
-      kind: "doc",
-      heading: "Re: Coffee next week?",
-      sections: [
-        { body: "Hi Maya, thanks for reaching out. We're heads-down on a launch until Oct 21, so the week after works best." },
-        { body: "Would Tuesday the 28th at 10 AM suit you? Happy to come to you." },
-        { body: "Best," },
-      ],
-    },
-  },
-  {
-    id: "bug-pr",
-    title: "PR #482: wait for socket open in sync.spec",
-    host: "github.com",
-    agentId: "rook",
-    teamId: "bug-bash",
-    updated: "9:46 AM",
-    body: {
-      kind: "code",
-      file: "tests/sync.spec.ts",
-      lines: [
-        { text: "@@ -41,9 +41,10 @@ describe(\"sync reconnect\")", type: "meta" },
-        { text: "  it(\"resumes after a dropped socket\", async () => {" },
-        { text: "    const client = await connect(server.url);" },
-        { text: "    server.drop(client.id);", type: "del" },
-        { text: "    server.drop(client.id);", type: "add" },
-        { text: "    await once(client.socket, \"open\");", type: "add" },
-        { text: "    await client.push(fixture.edits);" },
-        { text: "    expect(await server.state()).toEqual(fixture.expected);" },
-        { text: "  });" },
-      ],
-      checks: [
-        { label: "50 of 50 reruns passed", ok: true },
-        { label: "Lint", ok: true },
-        { label: "Human approval", ok: false },
-      ],
-    },
-  },
-  {
-    id: "inv-draft",
-    title: "October investor update",
-    host: "docs.google.com",
-    agentId: "quill",
-    teamId: "investor-update",
-    updated: "Mon 5:22 PM",
-    body: {
-      kind: "doc",
-      heading: "Aster: October update",
-      sections: [
-        { heading: "Highlights", body: "MRR $84.2k, up 9.1%. Launch of the Today screen on Oct 21." },
-        { heading: "Lowlights", body: "Monthly churn rose to 2.4%. Android 2.3.1 crash rate doubled; a fix ships this week." },
-        { heading: "Asks", body: "Intros to health-app partners. A designer referral. Feedback on the launch deck." },
-      ],
-    },
-  },
-  {
-    id: "hire-sheet",
-    title: "Founding designer shortlist",
-    host: "sheets.google.com",
-    agentId: "kit",
-    teamId: "hiring-loop",
-    updated: "9:18 AM",
-    body: {
-      kind: "sheet",
-      columns: ["Candidate", "Location", "Motion", "Brand", "Status"],
-      rows: [
-        ["R. Okafor", "Brooklyn", "5", "4", "Screen Wed"],
-        ["L. Duarte", "Lisbon", "4", "5", "Screen Thu"],
-        ["M. Chen", "Oakland", "4", "4", "Screen Thu"],
-        ["S. Varga", "Remote", "5", "3", "Replied"],
-        ["J. Park", "Seattle", "3", "5", "Contacted"],
-        ["A. Haddad", "Austin", "4", "3", "Contacted"],
-      ],
-    },
-  },
-  {
-    id: "trip-doc",
-    title: "Tahoe offsite plan",
-    host: "docs.google.com",
-    agentId: "lumi",
-    teamId: "offsite-tahoe",
-    updated: "Tue 4:00 PM",
-    body: {
-      kind: "doc",
-      heading: "Tahoe offsite: Thu Nov 13 to Sat Nov 15",
-      sections: [
-        { heading: "Thursday", body: "Arrive by 3 PM. Lake walk, then dinner at the house." },
-        { heading: "Friday", body: "Roadmap session 9 to 12. Afternoon kayaking or a hike to Monkey Rock." },
-        { heading: "Saturday", body: "Demo hour, lunch, and departures from 2 PM." },
-      ],
-    },
-  },
-  {
-    id: "data-sheet",
-    title: "Weekly pulse",
-    host: "sheets.google.com",
-    agentId: "gus",
-    teamId: "data-pulse",
-    updated: "Mon 8:20 AM",
-    body: {
-      kind: "sheet",
-      columns: ["Metric", "This week", "Last week", "Change"],
-      rows: [
-        ["DAU", "18.4k", "17.4k", "+6%"],
-        ["D7 retention", "41%", "44%", "−3 pts"],
-        ["Trials started", "1,920", "1,610", "+19%"],
-        ["Trial → paid", "22%", "23%", "−1 pt"],
-        ["Crash-free sessions", "98.1%", "99.3%", "−1.2 pts"],
-      ],
-      note: "Trials moved more than 10%: driven by the Lumen price change. Crash-free drop is Android 2.3.1.",
-    },
-  },
-];
-
 export const AGENTS: Record<string, Agent> = Object.fromEntries(
   [...TEAMS, HQ].flatMap((t) => t.agents.map((a) => [a.id, a])),
 );
 
 /** Every team by id, the chief's included; TEAMS is the list shown as channels. */
 export const TEAMS_BY_ID: Record<string, Team> = Object.fromEntries([...TEAMS, HQ].map((t) => [t.id, t]));
-
-export const ARTIFACTS_BY_ID: Record<string, Artifact> = Object.fromEntries(
-  ARTIFACTS.map((a) => [a.id, a]),
-);

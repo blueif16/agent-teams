@@ -57,35 +57,8 @@ export interface Agent {
   steps: PlanStep[];
   schedule?: string[];
   subAgents?: number;
-  artifactId?: string;
   /** Persona notes fed into the system prompt. */
   brief: string;
-}
-
-export type ArtifactBody =
-  | {
-      kind: "slides";
-      section: string;
-      variants: { label: string; title: string; body: string; cta: string }[];
-    }
-  | { kind: "doc"; heading: string; sections: { heading?: string; body: string }[] }
-  | { kind: "sheet"; columns: string[]; rows: string[][]; note?: string }
-  | {
-      kind: "code";
-      file: string;
-      lines: { text: string; type?: "add" | "del" | "meta" }[];
-      checks: { label: string; ok: boolean }[];
-    }
-  | { kind: "browser"; heading: string; items: { title: string; body: string }[] };
-
-export interface Artifact {
-  id: string;
-  title: string;
-  host: string;
-  agentId: string;
-  teamId: string;
-  updated: string;
-  body: ArtifactBody;
 }
 
 interface MessageBase {
@@ -122,7 +95,6 @@ export type Message =
       detail: string;
       state: "pending" | "approved" | "declined";
     })
-  | (MessageBase & { kind: "artifact"; from: string; artifactId: string })
   | (MessageBase & { kind: "status"; text: string })
   | (MessageBase & {
       kind: "proposal";

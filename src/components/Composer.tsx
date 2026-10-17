@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowUp, AtSign, Copy, ListChecks, Mic, Plus } from "lucide-react";
+import { ArrowUp, AtSign, ListChecks, Mic, Plus } from "lucide-react";
 import type { Agent } from "@/lib/types";
 import { Mascot } from "./Mascot";
 import { SPRING } from "./ui";
@@ -36,7 +36,6 @@ export function Composer({
   prefill,
   onSend,
   onOpenPlan,
-  onOpenLibrary,
 }: {
   placeholder: string;
   busy: boolean;
@@ -44,7 +43,6 @@ export function Composer({
   prefill: { text: string; nonce: number } | null;
   onSend: (text: string) => void;
   onOpenPlan: () => void;
-  onOpenLibrary: () => void;
 }) {
   const [text, setText] = useState("");
   const [menu, setMenu] = useState(false);
@@ -175,16 +173,6 @@ export function Composer({
               }}
             >
               <ListChecks className="size-4 text-muted" /> Show the plan
-            </button>
-            <button
-              type="button"
-              className="tap-soft flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left hover:bg-bubble"
-              onClick={() => {
-                setMenu(false);
-                onOpenLibrary();
-              }}
-            >
-              <Copy className="size-4 text-muted" /> Open the library
             </button>
           </motion.div>
       )}

@@ -97,11 +97,8 @@ export function IconButton({
   );
 }
 
-/**
- * Chat text: paragraphs, line breaks, **bold**, `code`, and
- * [label](artifact:id) links that open in the workspace.
- */
-export function RichText({ text, onOpenArtifact }: { text: string; onOpenArtifact?: (id: string) => void }) {
+/** Chat text: paragraphs, line breaks, **bold**, `code` and links. */
+export function RichText({ text }: { text: string }) {
   return (
     <>
       {text.split(/\n{2,}/).map((para, i) => (
@@ -109,7 +106,7 @@ export function RichText({ text, onOpenArtifact }: { text: string; onOpenArtifac
           {para.split("\n").map((line, j) => (
             <span key={j}>
               {j > 0 && <br />}
-              {inline(line, onOpenArtifact)}
+              {inline(line)}
             </span>
           ))}
         </p>
@@ -118,7 +115,7 @@ export function RichText({ text, onOpenArtifact }: { text: string; onOpenArtifac
   );
 }
 
-export function inline(line: string, onOpenArtifact?: (id: string) => void): ReactNode[] {
+export function inline(line: string): ReactNode[] {
   const out: ReactNode[] = [];
   const re = /\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|`([^`]+)`/g;
   let last = 0;
@@ -127,22 +124,7 @@ export function inline(line: string, onOpenArtifact?: (id: string) => void): Rea
     if (m.index > last) out.push(line.slice(last, m.index));
     if (m[1]) {
       const target = m[2];
-      if (target.startsWith("artifact:") && onOpenArtifact) {
-        const id = target.slice("artifact:".length);
-        out.push(
-          <button
-            key={m.index}
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenArtifact(id);
-            }}
-            className="underline decoration-1 underline-offset-[3px] transition-[color,text-underline-offset] hover:text-accent hover:underline-offset-[5px] active:opacity-70"
-          >
-            {m[1]}
-          </button>,
-        );
-      } else if (/^https?:\/\//.test(target)) {
+      if (/^https?:\/\//.test(target)) {
         out.push(
           <a key={m.index} href={target} target="_blank" rel="noreferrer" className="underline decoration-1 underline-offset-[3px]">
             {m[1]}
