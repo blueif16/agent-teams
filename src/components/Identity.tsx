@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, Heart, Pencil } from "lucide-react";
 import { cache, useCached, type Resource } from "@/lib/client-cache";
-import { AGENTS } from "@/lib/data";
+import { useOrg } from "./org";
 import { HistoryButton } from "./FileHistory";
 import { IconButton, inline, POP, SPRING } from "./ui";
 
@@ -239,7 +239,7 @@ export function IdentityTab({ agentId, onNotify }: { agentId: string; onNotify: 
   const resource = identityOf(agentId);
   const { data, error } = useCached<Identity>(resource);
   const [open, setOpen] = useState<{ which: Which; edit: boolean } | null>(null);
-  const agent = AGENTS[agentId];
+  const agent = useOrg().agents[agentId] ?? { name: agentId };
 
   if (!data) {
     if (!error) return <IdentitySkeleton name={agent.name} />;

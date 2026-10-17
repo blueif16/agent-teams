@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Columns2, Ellipsis, Hash, Puzzle, X } from "lucide-react";
-import { AGENTS } from "@/lib/data";
 import { useOrg } from "./org";
-import type { AgentStatus, PlanStep, Team } from "@/lib/types";
+import type { Agent, AgentStatus, PlanStep, Team } from "@/lib/types";
 import { Mascot } from "./Mascot";
 import { IconButton, SPRING } from "./ui";
 import { AgentPanel, TeamPanel } from "./Panels";
@@ -15,19 +14,19 @@ export type Tab = { id: string } & (
   | { type: "skills" }
 );
 
-function tabMeta(tab: Tab, teamsById: Record<string, Team>): { title: string; icon: React.ReactNode } {
+function tabMeta(tab: Tab, teamsById: Record<string, Team>, agents: Record<string, Agent>): { title: string; icon: React.ReactNode } {
   switch (tab.type) {
     case "agent": {
-      const a = AGENTS[tab.agentId];
+      const a = agents[tab.agentId];
       return {
-        title: `${a.name}: activity`,
-        icon: <Mascot look={a.look} size={17} />,
+        title: `${a?.name ?? "Agent"}: activity`,
+        icon: a ? <Mascot look={a.look} size={17} /> : null,
       };
     }
     case "team": {
       const t = teamsById[tab.teamId];
       return {
-        title: `#${t.channel} plan`,
+        title: `#${t?.channel ?? "team"} plan`,
         icon: <Hash className="size-[15px] text-ink-2" />,
       };
     }
@@ -49,13 +48,13 @@ export function WorkspaceTabs({
   onClose: (id: string) => void;
   onHide: () => void;
 }) {
-  const { teamsById } = useOrg();
+  const { teamsById, agents } = useOrg();
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1 pl-1" role="tablist">
       <div className="flex min-w-0 items-center gap-1 overflow-hidden">
         <AnimatePresence initial={false}>
         {tabs.map((tab) => {
-          const meta = tabMeta(tab, teamsById);
+          const meta = tabMeta(tab, teamsById, agents);
           const on = tab.id === active;
           return (
             <motion.div

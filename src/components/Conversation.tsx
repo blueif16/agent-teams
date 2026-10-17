@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { CornerDownRight, Hand, X } from "lucide-react";
-import { AGENTS, CHIEF_ID } from "@/lib/data";
+import { CHIEF_ID } from "@/lib/data";
 import type { OrderKey } from "@/lib/orders";
 import { CHIEF_SHORTCUTS } from "@/lib/project";
 import type { Agent, AgentStatus, Message } from "@/lib/types";
@@ -13,7 +13,7 @@ import { ActionMenu, HoverBar, ReactionChips, type MenuTarget, type Reaction } f
 import { Markdown } from "./Markdown";
 import { ChartBlock } from "./Charts";
 import { splitCharts, trimPartialFence, withChartSummaries } from "@/lib/charts";
-import { ProposalCard } from "./Chief";
+import { LaunchCard } from "./Chief";
 import { useOrg } from "./org";
 import type { View } from "./AgentTeams";
 
@@ -51,7 +51,8 @@ export function Conversation({
   onMessageAgent,
   onOpenChannel,
   onLaunchProject,
-  onReviseProject,
+  onEditProposal,
+  onRequestChanges,
 }: {
   view: View;
   messages: Message[];
@@ -69,9 +70,11 @@ export function Conversation({
   onMessageAgent: (id: string) => void;
   onOpenChannel: (teamId: string) => void;
   onLaunchProject: (msgId: string) => void;
-  onReviseProject: () => void;
+  onEditProposal: (msgId: string, update: (m: Extract<Message, { kind: "proposal" }>) => Extract<Message, { kind: "proposal" }>) => void;
+  /** "Request changes" on the option cards: sent to Mira as a normal message. */
+  onRequestChanges: (text: string) => void;
 }) {
-  const { teamsById } = useOrg();
+  const { teamsById, agents } = useOrg();
   const scroller = useRef<HTMLDivElement>(null);
   const mounted = useRef(false);
   // Messages present on mount render still; anything newer animates in.
@@ -84,20 +87,22 @@ export function Conversation({
   const [menu, setMenu] = useState<MenuTarget | null>(null);
 
   const channel = view.kind === "channel";
-  const team = channel ? teamsById[view.teamId] : teamsById[AGENTS[view.agentId].teamId];
-  const dmAgent = view.kind === "dm" ? AGENTS[view.agentId] : null;
+  const dmAgent = view.kind === "dm" ? agents[view.agentId] : null;
+  const team = (channel ? teamsById[view.teamId] : teamsById[dmAgent?.teamId ?? ""]) ?? teamsById.company;
   const last = messages[messages.length - 1];
   const lastLen = last?.kind === "text" ? last.text.length : 0;
+  // Mira's option cards arrive taller than the shimmer line they replace: bring them, and Launch, into view.
+  const cardsArrived = last?.kind === "proposal" && last.state === "ready";
 
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 240;
-    if (!mounted.current || nearBottom) {
+    if (!mounted.current || nearBottom || cardsArrived) {
       el.scrollTo({ top: el.scrollHeight, behavior: mounted.current ? "smooth" : "auto" });
     }
     mounted.current = true;
-  }, [messages.length, lastLen, typingAgentId]);
+  }, [messages.length, lastLen, typingAgentId, cardsArrived]);
 
   const active = team.agents.filter((a) => status[a.id] === "working").length;
   const needs = team.agents.filter((a) => status[a.id] === "needs-you").length;
@@ -179,9 +184,9 @@ export function Conversation({
     if (m.kind === "status") {
       node = <p className="my-4 text-center text-[12.5px] text-muted">{m.text}</p>;
     } else if (m.kind === "handoff") {
-      const from = AGENTS[m.from];
-      const to = AGENTS[m.to];
-      node = (
+      const from = agents[m.from];
+      const to = agents[m.to];
+      node = !from || !to ? null : (
         <div className="my-4 flex flex-col items-center gap-1 text-center">
           <span className="flex items-center gap-1.5 text-[12.5px] text-muted">
             {m.byYou ? (
@@ -214,8 +219,11 @@ export function Conversation({
           </div>
         </div>
       );
+    } else if (!agents[author!]) {
+      // An author the org doesn't know (yet): nothing to draw.
+      node = null;
     } else {
-      const agent = AGENTS[author!];
+      const agent = agents[author!];
       const msgReactions = reactions[m.id] ?? [];
       const lastReaction = msgReactions[msgReactions.length - 1];
       const acked = lastReaction && !initialReactions.has(`${m.id}:${lastReaction.order}`);
@@ -233,7 +241,15 @@ export function Conversation({
           />
         );
       } else if (m.kind === "proposal") {
-        body = <ProposalCard m={m} onLaunch={() => onLaunchProject(m.id)} onRevise={onReviseProject} onOpenChannel={onOpenChannel} />;
+        body = (
+          <LaunchCard
+            m={m}
+            onEdit={(update) => onEditProposal(m.id, update)}
+            onLaunch={() => onLaunchProject(m.id)}
+            onRequestChanges={onRequestChanges}
+            onOpen={() => m.launched && (m.launched.channel ? onOpenChannel(m.launched.projectId) : onMessageAgent(m.launched.leadId))}
+          />
+        );
       } else {
         // Text takes reactions and quick actions.
         body = (
@@ -324,9 +340,9 @@ export function Conversation({
     );
   });
 
-  const typingAgent = typingAgentId ? AGENTS[typingAgentId] : null;
+  const typingAgent = typingAgentId ? (agents[typingAgentId] ?? null) : null;
   const mentionable: Agent[] = channel ? team.agents : [];
-  const menuAgent = menu ? AGENTS[menu.agentId] : null;
+  const menuAgent = menu ? (agents[menu.agentId] ?? null) : null;
 
   return (
     <section className="relative flex min-w-0 flex-1 flex-col" aria-label={channel ? `#${team.channel}` : dmAgent!.name}>

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronDown } from "lucide-react";
 import { useCached, type Resource } from "@/lib/client-cache";
-import { AGENTS } from "@/lib/data";
+import { CAST } from "@/lib/data";
 import { useOrg } from "./org";
 import { tierOf } from "@/lib/models";
 import { ORDERS } from "@/lib/orders";
@@ -210,10 +210,11 @@ function TokensByAgent({ report, onOpenAgent }: { report: TeamReport; onOpenAgen
   const [hover, setHover] = useState<string | null>(null);
   const rows = [...report.agents].sort((a, b) => b.input + b.output - (a.input + a.output));
   const max = Math.max(1, ...rows.map((a) => a.input + a.output));
+  const agents = useOrg().agents;
   return (
     <div className="space-y-1">
       {rows.map((a) => {
-        const agent = AGENTS[a.agent];
+        const agent = agents[a.agent] ?? { id: a.agent, name: a.agent, look: CAST.lead };
         const s = split(a);
         const total = a.input + a.output;
         const segs = [s.cached, s.fresh, s.output];
@@ -384,7 +385,8 @@ function StatsSkeleton() {
 }
 
 export function TeamPerformance({ teamId, onOpenAgent }: { teamId: string; onOpenAgent: (id: string) => void }) {
-  const team = useOrg().teamsById[teamId];
+  const org = useOrg();
+  const team = org.teamsById[teamId];
   // Launched teams exist only in the browser, so they name their members.
   const { data, error } = useStats<TeamReport>({
     key: `/api/stats?team=${teamId}${team.launched ? `&agents=${team.agents.map((a) => a.id).join(",")}` : ""}`,
@@ -417,7 +419,7 @@ export function TeamPerformance({ teamId, onOpenAgent }: { teamId: string; onOpe
                 <tbody>
                   {data.agents.map((a) => (
                     <tr key={a.agent} className="border-b border-line last:border-0">
-                      <td className="px-2 py-1.5">{AGENTS[a.agent].name}</td>
+                      <td className="px-2 py-1.5">{org.agents[a.agent]?.name ?? a.agent}</td>
                       <td className={td}>{a.calls}</td>
                       <td className={td}>{tokens(a.input + a.output)}</td>
                       <td className={td}>{pct(a.cacheHit)}</td>
@@ -443,8 +445,8 @@ export function TeamPerformance({ teamId, onOpenAgent }: { teamId: string; onOpe
 
 export function AgentPerformance({ agentId }: { agentId: string }) {
   const { data, error } = useStats<AgentReport>(agentStats(agentId));
+  const agent = useOrg().agents[agentId] ?? { name: agentId };
   if (!data) return error ? <Status error={error} /> : <StatsSkeleton />;
-  const agent = AGENTS[agentId];
   const signals = data.calls > 0 || ORDERS.some((o) => data.orders[o.key] > 0);
   return (
     <div>

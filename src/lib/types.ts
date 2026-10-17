@@ -1,3 +1,5 @@
+import type { LaunchOptions, Proposal } from "./project";
+
 export type MascotShape =
   | "cloud"
   | "pear"
@@ -91,26 +93,26 @@ export type Message =
   | (MessageBase & { kind: "status"; text: string })
   | (MessageBase & {
       kind: "proposal";
-      /** The chief, who staffs projects. */
+      /** The chief, who proposes the options. */
       from: string;
-      project: Project;
-      state: "pending" | "launched";
-      /** Set once launched: the new team's id. */
-      teamId?: string;
+      /**
+       * drafting: her fence is still streaming; planning: parsed, POST /api/projects/plan in flight. Both show only a
+       * shimmer line: no card renders until every option has come back staffed (ready).
+       */
+      state: "drafting" | "planning" | "ready" | "launching" | "launched";
+      proposal?: Proposal;
+      plan?: LaunchOptions;
+      /** The launch's idempotency key, made once per card, so a retried launch can't create a second team. */
+      nonce: string;
+      /** The option card that's picked. */
+      picked: number;
+      /** The owner's edits to the shared charter and the budget, folded away under the cards. */
+      edits?: { goal?: string; due?: string | null; budgetUsd?: number };
+      /** Why the last launch attempt failed. */
+      error?: string;
+      /** Once launched: the project, its channel (null for a solo DM) and its lead. */
+      launched?: { projectId: string; channel: string | null; leadId: string };
     });
-
-/** A project the chief proposes: an A-team picked from the roster, a goal and a short spec. */
-export interface Project {
-  name: string;
-  channel: string;
-  goal: string;
-  /** YYYY-MM-DD, when the goal has a date. */
-  due?: string;
-  leadId: string;
-  members: { id: string; assignment: string }[];
-  /** Markdown: problem, scope, milestones, success metric, risks. */
-  spec: string;
-}
 
 export interface Team {
   id: string;
@@ -122,6 +124,15 @@ export interface Team {
   messages: Message[];
   /** Teams the chief launched at runtime: their spec and each member's assignment. */
   launched?: { spec: string; due?: string; assignments: Record<string, string> };
+}
+
+/** GET /api/org: what the runtime db adds to the code constants (src/server/directory.ts). */
+export interface OrgPayload {
+  /** Channels. */
+  teams: Team[];
+  /** Solo experts' projects, shown as DMs. */
+  dms: Team[];
+  agents: Agent[];
 }
 
 /** Live state of every team, sent to the chief so her answers match what the app shows. */
