@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore }
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronDown, GitBranch, HistoryIcon, MessageSquareQuote, MoonStar, RotateCcw, Sprout, X } from "lucide-react";
+import { cache, useCached, type Resource } from "@/lib/client-cache";
 import { AGENTS, CAST } from "@/lib/data";
 import type { AgentType, MascotLook } from "@/lib/types";
 import { derivationsOf, originOf, relativeTime, sourceChip, summaryOf, type Derivation, type FileOrigin } from "@/lib/vault/present";
@@ -36,14 +37,30 @@ export interface FileHistoryProps {
   onRestored?: (file: { content: string; updated: string }) => void;
 }
 
-type Load<T> = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; data: T };
+const filesRoute = (agentId: string, file: AgentFileName) => `/api/agents/${encodeURIComponent(agentId)}/files/${file}`;
+// Every commit to an agent's files announces files:agent:<id> (the vault's announceCommit), as Identity's reads use.
+const filesTopic = (agentId: string) => `files:agent:${agentId}`;
 
-async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? `The server answered ${res.status}`);
-  return body as T;
-}
+/** The client-cache resource for a file's history: prefetch it to make the first open instant. */
+export const historyOf = (agentId: string, file: AgentFileName): Resource => ({
+  key: `${filesRoute(agentId, file)}/history`,
+  topic: filesTopic(agentId),
+});
+
+/** One version's word diff against the version before it. A version never changes, so neither does its diff. */
+const diffOf = (agentId: string, file: AgentFileName, change: string): Resource => ({
+  key: `${filesRoute(agentId, file)}/diff?to=${encodeURIComponent(change)}`,
+  topic: filesTopic(agentId),
+});
+
+// Relative times re-read the clock once a minute; render code never calls Date.now() itself.
+const MINUTE = 60_000;
+const subscribeClock = (tick: () => void) => {
+  const t = setInterval(tick, MINUTE);
+  return () => clearInterval(t);
+};
+const clockNow = () => Math.floor(Date.now() / MINUTE) * MINUTE;
+const useNow = () => useSyncExternalStore(subscribeClock, clockNow, () => 0);
 
 const TYPES: AgentType[] = ["lead", "writer", "researcher", "coordinator", "analyst", "engineer"];
 const castIndex = (id: string) => {
@@ -174,10 +191,11 @@ const SEG: Record<DiffSegment["op"], string> = {
   del: "rounded-[3px] bg-[#fde3e1] text-[#a1261d] line-through decoration-[#a1261d]/50",
 };
 
-function WordDiff({ state }: { state: Load<FileDiff> | undefined }) {
-  if (!state || state.status === "loading") return <p className="py-2 text-[12.5px] text-muted">Loading the change…</p>;
-  if (state.status === "error") return <p className="py-2 text-[12.5px] text-[#c4321b]">Couldn&apos;t load this change: {state.message}</p>;
-  const { hunks } = state.data;
+function WordDiff({ agentId, file, change }: { agentId: string; file: AgentFileName; change: string }) {
+  const { data, error } = useCached<FileDiff>(diffOf(agentId, file, change));
+  if (!data && error) return <p className="py-2 text-[12.5px] text-[#c4321b]">Couldn&apos;t load this change ({error}).</p>;
+  if (!data) return <p className="py-2 text-[12.5px] text-muted">Loading the change…</p>;
+  const { hunks } = data;
   if (!hunks.length) return <p className="py-2 text-[12.5px] text-muted">No text changed in this version.</p>;
   return (
     <div className="rounded-2xl bg-white py-2 text-[13px] leading-[20px] shadow-[0_0_0_1px_rgba(0,0,0,0.06)]">
@@ -280,52 +298,39 @@ function ConfirmRestore({
 /** The timeline of one agent file, newest first. */
 export function FileHistory({ agentId, file, onNotify, onRestored }: FileHistoryProps) {
   const name = AGENT_FILES[file];
-  const base = `/api/agents/${encodeURIComponent(agentId)}/files/${file}`;
   const agentName = nameOf(agentId);
-  const [state, setState] = useState<Load<{ history: FileHistoryData; now: number }>>({ status: "loading" });
-  const [reload, setReload] = useState(0);
+  const resource = historyOf(agentId, file);
+  const { data: history, error } = useCached<FileHistoryData>(resource);
+  const now = useNow();
   const [open, setOpen] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
-  const [diffs, setDiffs] = useState<Record<string, Load<FileDiff>>>({});
   const [busy, setBusy] = useState(false);
   const [restoreError, setRestoreError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    getJson<FileHistoryData>(`${base}/history`)
-      .then((history) => alive && setState({ status: "ready", data: { history, now: Date.now() } }))
-      .catch((e: Error) => alive && setState({ status: "error", message: e.message }));
-    return () => {
-      alive = false;
-    };
-  }, [base, reload]);
-
   const toggle = (c: VaultCommit) => {
-    const next = open === c.change ? null : c.change;
-    setOpen(next);
+    setOpen(open === c.change ? null : c.change);
     setConfirm(null);
     setRestoreError(null);
-    if (!next || diffs[next]?.status === "ready") return;
-    setDiffs((d) => ({ ...d, [next]: { status: "loading" } }));
-    getJson<FileDiff>(`${base}/diff?to=${encodeURIComponent(next)}`)
-      .then((data) => setDiffs((d) => ({ ...d, [next]: { status: "ready", data } })))
-      .catch((e: Error) => setDiffs((d) => ({ ...d, [next]: { status: "error", message: e.message } })));
   };
 
+  // A write: a plain POST. The commit announces files:agent:<id>; revalidating here as well makes the new row
+  // appear even when the event stream is down.
   const restore = async (c: VaultCommit) => {
     setBusy(true);
     setRestoreError(null);
     try {
-      const body = await getJson<{ commit: VaultCommit | null; content: string; updated: string }>(`${base}/restore`, {
+      const res = await fetch(`${filesRoute(agentId, file)}/restore`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ change: c.change }),
       });
+      const body = (await res.json().catch(() => ({}))) as { commit?: VaultCommit | null; content?: string; updated?: string; error?: string };
+      if (!res.ok) throw new Error(body.error ?? `Restore failed (${res.status})`);
       onNotify(body.commit ? `Restored ${agentName}'s ${name} to ${when(c.at)}` : `${name} already matches that version`);
-      onRestored?.({ content: body.content, updated: body.updated });
+      onRestored?.({ content: body.content ?? "", updated: body.updated ?? new Date().toISOString() });
       setConfirm(null);
       setOpen(null);
-      setReload((n) => n + 1);
+      void cache.revalidate(resource.key);
     } catch (e) {
       setRestoreError((e as Error).message);
     } finally {
@@ -333,7 +338,22 @@ export function FileHistory({ agentId, file, onNotify, onRestored }: FileHistory
     }
   };
 
-  if (state.status === "loading")
+  if (!history && error)
+    return (
+      <div className="rounded-[20px] bg-white px-4 py-5 text-center shadow-[0_0_0_1px_rgba(0,0,0,0.05)]">
+        <p className="text-[14px] font-medium">Couldn&apos;t load the history of {name}</p>
+        <p className="mt-1 text-[12.5px] text-muted">The server answered {error}.</p>
+        <button
+          type="button"
+          onClick={() => void cache.revalidate(resource.key)}
+          className="tap mt-3 rounded-full bg-white px-3 py-1 text-[13px] font-medium shadow-[0_0_0_1px_#e2e2e2] hover:bg-[#f6f6f6]"
+        >
+          Try again
+        </button>
+      </div>
+    );
+
+  if (!history)
     return (
       <div aria-busy className="space-y-2.5">
         {[0, 1, 2].map((i) => (
@@ -342,25 +362,6 @@ export function FileHistory({ agentId, file, onNotify, onRestored }: FileHistory
       </div>
     );
 
-  if (state.status === "error")
-    return (
-      <div className="rounded-[20px] bg-white px-4 py-5 text-center shadow-[0_0_0_1px_rgba(0,0,0,0.05)]">
-        <p className="text-[14px] font-medium">Couldn&apos;t load the history of {name}</p>
-        <p className="mt-1 text-[12.5px] text-muted">{state.message}</p>
-        <button
-          type="button"
-          onClick={() => {
-            setState({ status: "loading" });
-            setReload((n) => n + 1);
-          }}
-          className="tap mt-3 rounded-full bg-white px-3 py-1 text-[13px] font-medium shadow-[0_0_0_1px_#e2e2e2] hover:bg-[#f6f6f6]"
-        >
-          Try again
-        </button>
-      </div>
-    );
-
-  const { history, now } = state.data;
   const origin = originOf(history.commits);
   if (!origin)
     return (
@@ -435,7 +436,7 @@ export function FileHistory({ agentId, file, onNotify, onRestored }: FileHistory
                       className="overflow-hidden"
                     >
                       <div className="px-1 pb-3 pt-1.5">
-                        <WordDiff state={diffs[c.change]} />
+                        <WordDiff agentId={agentId} file={file} change={c.change} />
                         <div className="mt-2 flex items-center gap-2 px-1">
                           {i === 0 ? (
                             <span className="text-[12px] text-muted">This is the current version.</span>
