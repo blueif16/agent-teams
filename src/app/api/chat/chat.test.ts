@@ -79,6 +79,19 @@ describe("POST /api/chat with uploads", () => {
     });
   });
 
+  it("inlines an attached text document in the newest user turn as an <attachment> block, not an image part", async () => {
+    const spec = "# Client spec\n\nOnline booking above the fold.\n";
+    const { id } = await storeUpload(new TextEncoder().encode(spec), "spec.md");
+
+    const { status } = await chat({ agentId: CHIEF_ID, mode: "dm", history: [{ from: "you", text: "Here's the spec" }], uploads: [id] });
+
+    expect(status).toBe(200);
+    const last = sentMessages().at(-1)!;
+    expect(typeof last.content).toBe("string");
+    expect(last.content).toContain("Here's the spec");
+    expect(last.content).toContain(`<attachment name="spec.md">\n${spec}\n</attachment>`);
+  });
+
   it("refuses more than 4 uploads with 400 and never calls the model", async () => {
     const ids = [];
     for (let shade = 0; shade < 5; shade++) ids.push((await storeUpload(png(2, 2, shade * 50))).id);
