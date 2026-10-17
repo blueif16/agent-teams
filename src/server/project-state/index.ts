@@ -1,8 +1,11 @@
 /*
- * The lead's durable project state (F §3, §9; M1/M2). Read side for the UI and the window opener; the lead's and
- * workers' state tools come from leadTools/workerTools (not wired into agents here).
+ * The lead's durable project state (F §3, §9; M1/M2), in the vault at projects/<pid>/state/.
+ * Read side for the UI and the window opener; leadTools/workerTools for the runtime to register (not wired here).
  */
 export * from "./digest";
 export * from "./format";
 export * from "./schema";
 export { journalPath, readState, reportPath, statePath } from "./store";
+export { StateError, type StateErrorCode } from "./rules";
+export { addMember, type Dispatch, type DispatchRequest, type MemberInput, type StateDeps } from "./ops";
+export { leadTools, type LeadDeps } from "./tools";
