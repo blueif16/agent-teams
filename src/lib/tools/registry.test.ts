@@ -7,6 +7,7 @@ import { createFilesystemMiddleware } from "deepagents";
 import { describe, expect, it } from "vitest";
 import { CHART_FENCE } from "../charts";
 import { PROJECT_FENCE } from "../project";
+import { researchTool } from "../../server/runtime/tools/research";
 import type { Archetype } from "../policy/types";
 import { getTool, REGISTRY } from "./registry";
 import type { ArtifactType } from "./types";
@@ -28,8 +29,10 @@ const H_SETS: Record<Archetype | "*", string[]> = {
   coordinator: ["assign_task", "plan", "board"],
 };
 
-/** H §3 "EXISTS" rows: the only entries that are ready today. */
+/** H §3 "EXISTS" rows: the only entries that are ready today, besides what the runtime registered since (SHIPPED). */
 const H_READY = ["file_tools", "chart", "markdown", "project"];
+/** R6: You.com Research, on every agent whose toolset has it, behind the approval gate (src/server/runtime/approvals.ts). */
+const SHIPPED = ["research"];
 
 /** H §3 tiers that are not T0/T1 (everything else is T0 for present entries, T1 for writes, T0 for reads). */
 const H_TIERS: Record<string, string> = {
@@ -41,8 +44,8 @@ const H_TIERS: Record<string, string> = {
   dispatch: "T1",
 };
 
-/** What exists in the repo right now: the deepagents file tools, and the two fences with parsers. */
-const RUNTIME_CALLS = new Set<string>((createFilesystemMiddleware().tools ?? []).map((t) => t.name));
+/** What exists in the repo right now: the deepagents file tools, the runtime's research tool, and the two fences with parsers. */
+const RUNTIME_CALLS = new Set<string>([...(createFilesystemMiddleware().tools ?? []).map((t) => t.name), researchTool({ agentId: "x", team: "x" }).name]);
 const REPO_FENCES = new Set([CHART_FENCE, PROJECT_FENCE].map((f) => f.replace(/^```/, "")));
 const MARKDOWN_TSX = readFileSync(new URL("../../components/Markdown.tsx", import.meta.url), "utf8");
 const PACKAGE_DEPS = Object.keys(
@@ -98,8 +101,8 @@ describe("registry: H §4 load-time checks", () => {
   });
 
   it("marks ready exactly the entries that exist in the repo now", () => {
-    expect(REGISTRY.filter((d) => d.status === "ready").map((d) => d.id).sort()).toEqual([...H_READY].sort());
-    for (const d of REGISTRY.filter((x) => x.status === "ready")) expect(d.origin, d.id).toBe("exists");
+    expect(REGISTRY.filter((d) => d.status === "ready").map((d) => d.id).sort()).toEqual([...H_READY, ...SHIPPED].sort());
+    for (const d of REGISTRY.filter((x) => H_READY.includes(x.id))) expect(d.origin, d.id).toBe("exists");
   });
 
   it("backs every ready entry with real calls, fences or components", () => {
