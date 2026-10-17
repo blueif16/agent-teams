@@ -182,15 +182,30 @@ const zoneOf = (id: string) => ZONES.find((z) => z.id === id)!;
 export function deliverableProblem(path: string): string | null {
   const norm = normPath(path);
   if (norm === null) return "It climbs out of its folder or isn't an absolute path.";
+  const zone = zoneHit(norm, "write_file");
+  if (zone) return zone;
   if (!/^\/project\/[^/]/i.test(norm)) return "Deliverables live in the project's shared files, under /project/.";
   if (/^\/project\/[^/]*[*?]/i.test(norm)) return "That's the whole shared folder; name a file, or a folder of its own.";
-  const probe: PolicyEvent = { agentId: "", archetype: "chief", projectId: "", tool: "write_file", args: { path: sampleOf(norm) }, argSpans: [], contextLabels: [], sinks: [] };
-  const hit = ZONE_RULES.find((r) => decide(probe, [r], [], new Date(0)).firedRuleIds.includes(r.id));
-  if (hit) {
-    const z = zoneOf(hit.id.slice("r_zone".length));
-    return `That's in ${z.label.toLowerCase()}: ${z.reason}`;
-  }
   return null;
+}
+
+/** The protected or forbidden zone a path or glob lands in for this tool, as one sentence with its reason. */
+function zoneHit(glob: string, tool: string): string | null {
+  const probe: PolicyEvent = { agentId: "", archetype: "chief", projectId: "", tool, args: { path: sampleOf(glob) }, argSpans: [], contextLabels: [], sinks: [] };
+  const hit = ZONE_RULES.find((r) => decide(probe, [r], [], new Date(0)).firedRuleIds.includes(r.id));
+  if (!hit) return null;
+  const z = zoneOf(hit.id.slice("r_zone".length));
+  return `"${z.label}" is ${z.severity}: ${z.reason}`;
+}
+
+/**
+ * Why an allow (or grant) on file tools can't open this path or glob, or null when it can. A write may only widen an
+ * agent's scope to a deliverable (deliverableProblem); a read may go anywhere but a forbidden zone.
+ */
+export function fileAccessProblem(glob: string, writes: boolean): string | null {
+  if (writes) return deliverableProblem(glob);
+  const norm = normPath(glob);
+  return norm === null ? "It climbs out of its folder or isn't an absolute path." : zoneHit(norm, "read_file");
 }
 
 /** The deliverables that pass deliverableProblem, normalised, without duplicates. */
