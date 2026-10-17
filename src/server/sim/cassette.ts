@@ -306,7 +306,8 @@ export function createCassette(opts: CassetteOptions): Cassette {
     all.push(entry);
     byId.set(id(entry.key, entry.n), entry);
   };
-  if (mode === "record") {
+  // record starts the file over (a recording is one run, never patched); update adds to it; replay only reads.
+  if (mode === "record" || (mode === "update" && !existsSync(file))) {
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, `${JSON.stringify({ v: 1, kind: "cassette", createdAt: new Date().toISOString() })}\n`);
   } else {
