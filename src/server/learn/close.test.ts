@@ -1,162 +1,29 @@
-import { execFileSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { agentVault, memoryTemplate } from "@/lib/agent-files";
-import { readLedger, record, type CallEvent } from "@/lib/ledger";
-import { MODELS } from "@/lib/models";
-import type { Archetype } from "@/lib/policy/types";
-import type { Composition } from "@/lib/skills/types";
+import { readLedger, type CallEvent } from "@/lib/ledger";
 import { getRuntimeDb } from "@/server/runtime/db";
 import { fakeCrusoe, textOf, type ChatRequest, type Turn } from "@/server/runtime/testing/fake-crusoe";
 import { tempEnv, type TempEnv } from "@/server/runtime/testing/env";
-import { RUNTIME } from "@/server/runtime/vault";
 import { closeProject } from "./close";
-import type { RunFeedback } from "./types";
+import { FEEDBACK, PID, seedProject, SKILL, vaultReader } from "./test-kit";
 
 /*
  * The learning step at project close (test-mode design §7b), against a real vault (git), a real runtime db and the
  * real ledger in a temp DATA_DIR, with the fake model. Commits are read back with the git CLI, so a test can't pass by
- * trusting the close's own summary.
+ * trusting the close's own summary. The seeded project is in ./test-kit.ts.
  */
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 
-const PID = "p_launch01";
 const PRICE_REF = "rubric:landing-copy/prices_supported@v2";
 const REDO_REF = "order:redo@40";
 
-const CHARTER = `# Launch kit
-
-Goal: Launch the Pro plan to field sales teams
-Due: 2026-11-01
-Success metric: 40 demo requests in the first week
-Budget: $2
-
-## Scope
-
-Must:
-- a pricing section that quotes $49/month per seat
-- a landing page and a launch email
-
-Won't:
-- paid ads
-
-## Roles
-
-- PM: Pam (lead) Skills: acme/project-planning.
-- Copywriter: Wren (writer) Skills: acme/copywriting.
-`;
-
-const SKILL = (name: string, body: string) => `---\nname: ${name}\ndescription: ${body}\n---\n\n# ${name}\n\n- ${body}.\n`;
-
-const FEEDBACK: RunFeedback = {
-  runId: "run-1",
-  scenarioId: "launch-kit",
-  trial: 1,
-  failed: [
-    {
-      itemId: "prices_supported",
-      label: "every price in the copy is in the pricing table",
-      deliverable: "landing-copy",
-      agentId: "wren",
-      version: 2,
-      evidence: [{ seq: 41, note: "the hero quotes a discount the table doesn't have" }],
-    },
-  ],
-  orders: [{ order: "redo", agentId: "wren", deliverable: "landing-copy", note: "the hero has a number that isn't in the facts", seq: 40 }],
-  slow: [{ phase: "work", ms: 600_000, prevMs: 400_000 }],
-};
-
-const comp = (archetype: Archetype, role: string, skills: string[]): Composition => ({
-  id: `c-${role}`,
-  archetype,
-  skills,
-  role,
-  qualifications: [],
-  source: "orchestrator",
-  createdAt: "2026-10-17T10:00:00.000Z",
-});
-
-const call = (agent: string, cost: number, team = PID): CallEvent => ({
-  t: "call",
-  kind: "run",
-  at: "2026-10-17T11:00:00.000Z",
-  team,
-  agent,
-  model: MODELS.main,
-  asked: MODELS.main,
-  input: 1000,
-  cached: 500,
-  output: 200,
-  ms: 1500,
-  cost,
-  ok: true,
-  thread: `a:${agent}:p:${team}`,
-  run: "r-1",
-});
-
-const GIT = process.platform === "darwin" ? execFileSync("xcrun", ["--find", "git"], { encoding: "utf8" }).trim() : "git";
-const GIT_ENV: NodeJS.ProcessEnv = {
-  ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_"))),
-  NODE_ENV: process.env.NODE_ENV,
-  GIT_CONFIG_GLOBAL: "/dev/null",
-  GIT_CONFIG_NOSYSTEM: "1",
-};
-
-interface GitCommit {
-  sha: string;
-  subject: string;
-  trailers: Record<string, string[]>;
-  files: string[];
-}
-
 let env: TempEnv;
-let vaultDir: string;
-const git = (...args: string[]) => execFileSync(GIT, args, { cwd: vaultDir, env: GIT_ENV, encoding: "utf8" });
-
-/** Commits after `since` (a sha), oldest first, read with git itself. */
-function commitsSince(since: string): GitCommit[] {
-  const out = git("log", "--reverse", "--name-only", "--format=%x1e%H%x1f%s%x1f%(trailers:only,unfold,separator=%x1d,key_value_separator=%x1c)%x1f", `${since}..HEAD`);
-  return out
-    .split("\x1e")
-    .filter((c) => c.trim())
-    .map((c) => {
-      const [sha, subject, raw, names = ""] = c.split("\x1f");
-      const trailers: Record<string, string[]> = {};
-      for (const t of raw.split("\x1d")) {
-        const cut = t.indexOf("\x1c");
-        if (cut > 0) (trailers[t.slice(0, cut)] ??= []).push(t.slice(cut + 1));
-      }
-      return { sha, subject, trailers, files: names.split("\n").filter(Boolean) };
-    });
-}
-const head = () => git("rev-parse", "HEAD").trim();
-const vaultFile = (p: string) => readFile(path.join(vaultDir, p), "utf8");
+let vault: ReturnType<typeof vaultReader>;
+const head = () => vault.head();
+const commitsSince = (since: string) => vault.commitsSince(since);
+const vaultFile = (p: string) => vault.file(p);
 
 async function seed() {
-  const db = getRuntimeDb();
-  const vault = await agentVault();
-  vaultDir = vault.dir;
-  db.agents.create({ id: "pam", name: "Pam", archetype: "lead", config: { composition: comp("lead", "PM", ["acme/project-planning"]) } });
-  db.agents.create({ id: "wren", name: "Wren", archetype: "writer", config: { composition: comp("writer", "Copywriter", ["acme/copywriting"]) } });
-  db.projects.create({ id: PID, kind: "team", channel: "launch-kit", name: "Launch kit", goal: "Launch the Pro plan", status: "active", leadAgentId: "pam", specMd: CHARTER, budgetUsd: 2 });
-  db.members.add({ projectId: PID, agentId: "pam", role: "PM" });
-  db.members.add({ projectId: PID, agentId: "wren", role: "Copywriter" });
-  const memory = memoryTemplate({ name: "Wren" }).replace("_None recorded yet._", "- Asked the PM for the facts sheet before drafting (observed)");
-  await vault.writeMany({
-    files: [
-      { path: "agents/pam/MEMORY.md", content: memoryTemplate({ name: "Pam" }) },
-      { path: "agents/wren/MEMORY.md", content: memory },
-      { path: "agents/pam/skills/project-planning/SKILL.md", content: SKILL("project-planning", "Break the goal into tasks with owners") },
-      { path: "agents/wren/skills/copywriting/SKILL.md", content: SKILL("copywriting", "Write benefit-led copy") },
-      { path: "skills/writer/copywriting/SKILL.md", content: SKILL("copywriting", "The shared library copy") },
-      { path: `projects/${PID}/state/charter.md`, content: CHARTER },
-    ],
-    author: RUNTIME,
-    source: "seed",
-    subject: "agent(*): seed the test project",
-  });
-  for (const row of [call("pam", 0.004), call("wren", 0.0083), call("pam", 1, "p_other")]) await record(row);
+  vault = vaultReader(await seedProject());
 }
 
 /** The model, scripted per step and agent from the `step:` and `agent:` lines the close puts in each request. */
