@@ -32,10 +32,13 @@ const Who = z.enum(["mira", "lead", "any-expert", "any", ...ARCHETYPES]);
  * - offline: no external URL in any src/href (renders with zero network requests).
  * - frames: canvas frames exist at each width in `widths`; with `orderFrom`, their section order equals that
  *   deliverable's section order.
- * - recompute: each normalized cost recomputes from price × units within `tolerance` (fraction).
- * - chart_matches: a ```chart fence whose unit label contains `unit` and whose values equal deliverable `table`.
- * - prices_supported: every price in the text is in deliverable `table`, or is a recommendation inside the cited band.
- * - monotonic_tiers: each higher tier costs more and includes every feature of the tier below.
+ * - recompute: in every row, column `total` equals `price` × `quantity` within `tolerance` (a fraction of total).
+ * - chart_matches: a ```chart fence whose unit label contains `unit`, and whose label → value pairs equal the
+ *   `label` and `value` columns of deliverable `table`.
+ * - prices_supported: every $ amount in the text appears in column `column` of deliverable `table`, or lies inside
+ *   a band (min–max of that column) that the same sentence cites.
+ * - monotonic_tiers: rows in table order: each tier's `price` is higher than the row above, and its `features`
+ *   (";"-separated) include every feature of the row above.
  * - mentions: the text contains every phrase in `all` (case-insensitive); used to check a new requirement landed.
  * - sections: the doc has each heading in `headings`, in order.
  * - max_words: the text has at most `max` words.
@@ -51,10 +54,10 @@ export const CHECKS = {
   single_cta: z.strictObject({}),
   offline: z.strictObject({}),
   frames: z.strictObject({ widths: z.array(z.int().positive()).min(1), orderFrom: z.string().optional() }),
-  recompute: z.strictObject({ tolerance: z.number().positive().default(0.01) }),
-  chart_matches: z.strictObject({ table: z.string(), unit: z.string() }),
-  prices_supported: z.strictObject({ table: z.string() }),
-  monotonic_tiers: z.strictObject({}),
+  recompute: z.strictObject({ price: z.string(), quantity: z.string(), total: z.string(), tolerance: z.number().positive().default(0.01) }),
+  chart_matches: z.strictObject({ table: z.string(), unit: z.string(), label: z.string(), value: z.string() }),
+  prices_supported: z.strictObject({ table: z.string(), column: z.string() }),
+  monotonic_tiers: z.strictObject({ tier: z.string(), price: z.string(), features: z.string() }),
   mentions: z.strictObject({ all: z.array(z.string().min(1)).min(1) }),
   sections: z.strictObject({ headings: z.array(z.string().min(1)).min(1) }),
   max_words: z.strictObject({ max: z.int().positive() }),
