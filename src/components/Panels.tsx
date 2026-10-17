@@ -1,5 +1,5 @@
 import { Fragment, useState, type ReactNode } from "react";
-import { ChartColumn, Check, Fingerprint, Hash, List, Loader, Pause, Pin, Play } from "lucide-react";
+import { ChartColumn, Check, Fingerprint, Hash, List, Loader, Pause, Pin, Play, Shield } from "lucide-react";
 import { motion } from "motion/react";
 import { AGENTS, CHIEF_ID } from "@/lib/data";
 import type { AgentStatus, PlanStep } from "@/lib/types";
@@ -8,6 +8,7 @@ import { IdentityTab, Markdown } from "./Identity";
 import { useOrg } from "./org";
 import { formatDue } from "@/lib/project";
 import { AgentPerformance, TeamPerformance } from "./Performance";
+import { RulesTab } from "./Rules";
 import { SPRING, StatusChip } from "./ui";
 
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
@@ -106,7 +107,7 @@ export function AgentPanel({
   const isLead = team.leadId === a.id && !chief;
   // Projects the chief staffed this agent on, besides its home team.
   const projects = org.teams.filter((t) => t.launched && t.agents.some((x) => x.id === a.id));
-  const [tab, setTab] = useState<"overview" | "performance" | "identity">("overview");
+  const [tab, setTab] = useState<"overview" | "performance" | "rules" | "identity">("overview");
 
   return (
     <div className="mx-auto max-w-[560px] px-5 pb-10 pt-8">
@@ -167,6 +168,7 @@ export function AgentPanel({
         items={[
           { key: "overview", label: "Overview", icon: <List className={icon} /> },
           { key: "performance", label: "Performance", icon: <ChartColumn className={icon} /> },
+          { key: "rules", label: "Rules", icon: <Shield className={icon} /> },
           { key: "identity", label: "Soul and memory", icon: <Fingerprint className={icon} /> },
         ]}
       />
@@ -174,6 +176,11 @@ export function AgentPanel({
       {tab === "performance" && (
         <TabBody tab={tab}>
           <AgentPerformance agentId={a.id} />
+        </TabBody>
+      )}
+      {tab === "rules" && (
+        <TabBody tab={tab}>
+          <RulesTab agentId={a.id} onNotify={onNotify} />
         </TabBody>
       )}
       {tab === "identity" && (
@@ -240,15 +247,17 @@ export function TeamPanel({
   doing,
   onOpenAgent,
   onOpenChannel,
+  onNotify,
 }: {
   teamId: string;
   status: Record<string, AgentStatus>;
   doing: Record<string, string>;
   onOpenAgent: (id: string) => void;
   onOpenChannel: (teamId: string) => void;
+  onNotify: (text: string) => void;
 }) {
   const t = useOrg().teamsById[teamId];
-  const [tab, setTab] = useState<"overview" | "performance">("overview");
+  const [tab, setTab] = useState<"overview" | "performance" | "rules">("overview");
 
   return (
     <div className="mx-auto max-w-[560px] px-5 pb-10 pt-8">
@@ -290,12 +299,18 @@ export function TeamPanel({
         items={[
           { key: "overview", label: "Overview", icon: <List className={icon} /> },
           { key: "performance", label: "Performance", icon: <ChartColumn className={icon} /> },
+          { key: "rules", label: "Rules", icon: <Shield className={icon} /> },
         ]}
       />
 
       {tab === "performance" && (
         <TabBody tab={tab}>
           <TeamPerformance teamId={t.id} onOpenAgent={onOpenAgent} />
+        </TabBody>
+      )}
+      {tab === "rules" && (
+        <TabBody tab={tab}>
+          <RulesTab projectId={t.id} onNotify={onNotify} />
         </TabBody>
       )}
       {tab === "overview" && (

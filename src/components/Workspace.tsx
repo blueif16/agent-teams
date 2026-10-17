@@ -202,7 +202,14 @@ export function WorkspaceBody({
           />
         )}
         {tab.type === "team" && (
-          <TeamPanel teamId={tab.teamId} status={status} doing={doing} onOpenAgent={onOpenAgent} onOpenChannel={onOpenChannel} />
+          <TeamPanel
+            teamId={tab.teamId}
+            status={status}
+            doing={doing}
+            onOpenAgent={onOpenAgent}
+            onOpenChannel={onOpenChannel}
+            onNotify={onNotify}
+          />
         )}
       </motion.div>
     </>
