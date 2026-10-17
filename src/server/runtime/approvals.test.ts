@@ -250,6 +250,26 @@ describe("the tool gate", () => {
     expect(db.runs.get(runId!)?.status).toBe("done");
   }, 30_000);
 
+  it.each(["start_team", "set_charter"])("runs %s without asking: the owner's go on the launch is the approval", async (name) => {
+    let ran = false;
+    const stub = tool(
+      async () => {
+        ran = true;
+        return "ok";
+      },
+      { name, description: "Stand-in.", schema: z.object({}).passthrough() },
+    );
+    const fake = fakeCrusoe([{ toolCalls: [{ name, args: {} }] }, { text: "Done." }]);
+    rt = runtime(fake, fakeYou(), { tools: () => [stub] });
+
+    const { runId } = rt.send(T, { text: "Go." });
+    await rt.idle(T);
+
+    expect(ran).toBe(true);
+    expect(db.approvals.pending({ thread: T })).toEqual([]);
+    expect(db.runs.get(runId!)?.status).toBe("done");
+  }, 30_000);
+
   it("parks an owner message sent while the thread waits, and delivers it in the resumed run", async () => {
     const fake = fakeCrusoe([research(), { text: "Done." }]);
     rt = runtime(fake, fakeYou());
