@@ -6,19 +6,32 @@
  */
 import { HumanMessage } from "@langchain/core/messages";
 import { createMiddleware } from "langchain";
+import { imageParts } from "@/server/uploads";
 import type { RuntimeDb } from "./db";
 
 /** What an owner DM carries in the inbox. */
 export interface DmPayload {
+  /** The owner's text, with an <attachment> block per text document they attached (src/server/uploads.ts). */
   text: string;
   /** Who sent it: "owner" for now. */
   from: string;
+  /** Image upload ids, inlined as image parts when the DM is delivered. */
+  images?: string[];
+  /** Every upload id the owner attached, so a reloaded thread can show them. */
+  uploads?: string[];
 }
 
 /** The inbox items as the user messages the model sees, tagged so the UI can tell a DM from other turns. */
-export function dmMessages(items: { id: number; payload: DmPayload }[]): HumanMessage[] {
-  return items.map(
-    (i) => new HumanMessage({ content: i.payload.text, additional_kwargs: { surface: "dm", from: i.payload.from, inbox_id: i.id } }),
+export async function dmMessages(items: { id: number; payload: DmPayload }[]): Promise<HumanMessage[]> {
+  return Promise.all(
+    items.map(async (i) => {
+      const { text, from, images = [], uploads } = i.payload;
+      // An image deleted since it was attached is dropped rather than failing the run.
+      const parts = images.length ? await imageParts(images).catch(() => []) : [];
+      const content = parts.length ? [...(text ? [{ type: "text" as const, text }] : []), ...parts] : text;
+      // OpenAI-style image_url parts, which ChatOpenAI sends as they are; the v1 content types only list standard blocks.
+      return new HumanMessage({ content: content as HumanMessage["content"], additional_kwargs: { surface: "dm", from, inbox_id: i.id, ...(uploads?.length && { uploads }) } });
+    }),
   );
 }
 
@@ -26,12 +39,12 @@ export function dmMessages(items: { id: number; payload: DmPayload }[]): HumanMe
 export function inboxDrain(db: RuntimeDb, threadId: string, currentRun: () => string | undefined) {
   return createMiddleware({
     name: "InboxDrain",
-    beforeModel: () => {
+    beforeModel: async () => {
       const runId = currentRun();
       if (!runId) return;
       const items = db.inbox.take<DmPayload>(threadId, runId, ["dm"]);
       if (!items.length) return;
-      return { messages: dmMessages(items) };
+      return { messages: await dmMessages(items) };
     },
   });
 }

@@ -154,3 +154,63 @@ export async function imageParts(ids: string[]): Promise<ImagePart[]> {
     }),
   );
 }
+
+// ------------------------------------------------------------------------------------- uploads → agents
+
+/** Upload ids one message can carry, images and text documents together. */
+export const MAX_UPLOADS_PER_MESSAGE = 8;
+/** A text document longer than this goes to the model as its path and size only. */
+export const MAX_INLINE_CHARS = 20_000;
+
+/** A text document copied into a project's folder: `path` is where its agents see it. */
+export interface ProjectInput {
+  name: string;
+  /** `/project/inputs/<name>` */
+  path: string;
+  bytes: number;
+  text: string;
+}
+
+/**
+ * Copies the text documents among `ids` to `<data>/projects/<projectId>/files/inputs/<name>`, which the project's
+ * agents see as `/project/inputs/<name>` (src/server/runtime/backends.ts). Images are skipped. A later file of the
+ * same name replaces the earlier one. Throws UploadError (400) for an id that isn't a stored upload.
+ */
+export async function copyInputs(ids: string[], projectId: string): Promise<ProjectInput[]> {
+  // Every file is read before any is written, so an unknown id copies nothing.
+  const files = [];
+  for (const id of ids) {
+    if (IMAGE_ID.test(id)) continue;
+    const file = await readUpload(id);
+    if (!file?.name) throw new UploadError(`Couldn't find the attached file "${String(id).slice(0, 80)}". Attach it again.`, 400);
+    files.push({ name: file.name, bytes: file.bytes });
+  }
+  const dir = path.join(dataDir(), "projects", projectId, "files", "inputs");
+  if (files.length) await mkdir(dir, { recursive: true });
+  for (const f of files) await writeFile(path.join(dir, f.name), f.bytes);
+  return files.map((f) => ({ name: f.name, path: `/project/inputs/${f.name}`, bytes: f.bytes.byteLength, text: f.bytes.toString("utf8") }));
+}
+
+/** How a text document reaches the model: inline up to 20,000 characters, past that its path and size only. */
+export function attachmentBlock(f: ProjectInput): string {
+  if (f.text.length <= MAX_INLINE_CHARS) return `<attachment name="${f.name}" path="${f.path}">\n${f.text}\n</attachment>`;
+  return `<attachment name="${f.name}" path="${f.path}" size="${f.bytes} bytes">Too long to inline; read it at ${f.path}.</attachment>`;
+}
+
+/**
+ * One message's uploads, for the run's human message: the text documents copied to the thread's project folder and
+ * written out as <attachment> blocks, and the image ids (imageParts() inlines them when the message is delivered).
+ * Throws UploadError (400) for too many uploads or an id that isn't a stored upload.
+ */
+export async function attachUploads(ids: unknown, projectId: string): Promise<{ blocks: string; images: string[]; uploads: string[] }> {
+  const list = Array.isArray(ids) ? ids : [];
+  if (!list.every((id): id is string => typeof id === "string")) throw new UploadError("Send uploads as a list of upload ids.", 400);
+  if (list.length > MAX_UPLOADS_PER_MESSAGE) throw new UploadError(`A message can carry at most ${MAX_UPLOADS_PER_MESSAGE} attachments.`, 400);
+  const images = list.filter((id) => IMAGE_ID.test(id));
+  if (images.length > MAX_IMAGES_PER_MESSAGE) throw new UploadError(`A message can carry at most ${MAX_IMAGES_PER_MESSAGE} images.`, 400);
+  for (const id of images) {
+    if (!(await readUpload(id))) throw new UploadError(`Couldn't find the attached image "${id.slice(0, 80)}". Attach it again.`, 400);
+  }
+  const inputs = await copyInputs(list, projectId);
+  return { blocks: inputs.map(attachmentBlock).join("\n\n"), images, uploads: list };
+}

@@ -67,10 +67,15 @@ export class Runtime {
     );
   }
 
-  /** An owner message to a thread. Throws UnknownThreadError for a thread the runtime db doesn't have. */
-  send(threadId: string, message: { text: string; from?: string }): SendResult {
+  /**
+   * An owner message to a thread; `images` are upload ids, sent as image parts (attachUploads() in
+   * src/server/uploads.ts turns a message's uploads into these). Throws UnknownThreadError for a thread the
+   * runtime db doesn't have.
+   */
+  send(threadId: string, message: { text: string; from?: string; images?: string[]; uploads?: string[] }): SendResult {
     if (!this.db.threads.get(threadId)) throw new UnknownThreadError(threadId);
-    const item = this.db.inbox.add<DmPayload>(threadId, "dm", { text: message.text, from: message.from ?? "owner" });
+    const { text, from = "owner", images, uploads } = message;
+    const item = this.db.inbox.add<DmPayload>(threadId, "dm", { text, from, ...(images?.length && { images }), ...(uploads?.length && { uploads }) });
     if (this.queue.isBusy(threadId)) return { delivered: "inbox", runId: this.active.get(threadId), inboxId: item.id };
     const run = this.db.runs.create({ threadId, trigger: "dm", lane: "interactive" });
     // A failure is on the run row (and, with streaming, on the thread's events); nobody awaits it here.
