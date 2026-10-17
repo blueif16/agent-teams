@@ -212,7 +212,8 @@ function sleep(ms: number, signal?: AbortSignal | null): Promise<void> {
 
 /**
  * The recorded response at the recorded pace divided by `speed`: headers after ttfbMs, each chunk at its
- * recorded time since the request. An abort errors the body at once, as fetch's own body does.
+ * recorded time since the request. Each chunk is made only when read (highWaterMark 0), and its wait
+ * rejects on abort, so an aborted signal errors the body with an AbortError at the next or pending read.
  */
 async function replay(entry: CassetteEntry, t0: number, speed: number, signal?: AbortSignal | null): Promise<Response> {
   const { status, headers, ttfbMs, chunks } = entry.response;
@@ -222,24 +223,13 @@ async function replay(entry: CassetteEntry, t0: number, speed: number, signal?: 
   if (!chunks.length) return new Response(null, { status, headers });
   let i = 0;
   let due = 0;
-  let onAbort = () => {};
   const body = new ReadableStream<Uint8Array>(
     {
-      start(c) {
-        onAbort = () => c.error(abortReason(signal!));
-        signal?.addEventListener("abort", onAbort, { once: true });
-      },
       async pull(c) {
-        if (i >= chunks.length) {
-          signal?.removeEventListener("abort", onAbort);
-          return c.close();
-        }
+        if (i >= chunks.length) return c.close();
         due += chunks[i].dt;
         await until(due);
         c.enqueue(new Uint8Array(Buffer.from(chunks[i++].b64, "base64")));
-      },
-      cancel() {
-        signal?.removeEventListener("abort", onAbort);
       },
     },
     { highWaterMark: 0 },
