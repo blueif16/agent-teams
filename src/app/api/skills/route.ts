@@ -1,14 +1,15 @@
 import { ARCHETYPES } from "@/lib/policy/schema";
 import type { Archetype } from "@/lib/policy/types";
-import { loadLibrary } from "@/lib/skills/library";
 import { createSearchSkills } from "@/lib/skills/search";
 import type { SkillHit } from "@/lib/skills/types";
+import { skillLibrary } from "@/server/cache";
 
 /*
  * The skill library, searched locally (no network; the web only through find_skill).
  *   GET /api/skills?q=&archetype=&limit=   SkillHit[] best first; archetype boosts its own skills
  *   GET /api/skills                        every scan-clean skill, most starred first (score 0, no why)
- * Skills whose scan found anything are never listed.
+ * Skills whose scan found anything are never listed. The library comes from the server cache; an import
+ * announces `skills` on GET /api/events.
  */
 export async function GET(req: Request) {
   const params = new URL(req.url).searchParams;
@@ -19,7 +20,7 @@ export async function GET(req: Request) {
   }
   const limit = Math.min(Math.max(Number(params.get("limit")) || 20, 1), 200);
 
-  const { index } = await loadLibrary();
+  const { index } = await skillLibrary();
   if (!q) {
     const all: SkillHit[] = index.skills
       .filter((s) => s.scan.findings === 0)
