@@ -134,6 +134,56 @@ function replay(entry: CassetteEntry): Response {
   return new Response(chunks.length ? body : null, { status, headers });
 }
 
+/**
+ * Hands the caller each chunk the moment it is read (never buffers), timing it as it goes, and calls
+ * `save` once: when the body ends, or with `partial` when the caller cancels or the read fails. The body
+ * is read even if the caller never reads it (a 429 before a retry), so every exchange is saved.
+ */
+function record(res: Response, started: number, save: (response: CassetteEntry["response"]) => void): Response {
+  const type = res.headers.get("content-type");
+  const head = { status: res.status, headers: type ? { "content-type": type } : {}, ttfbMs: Math.round(performance.now() - started) };
+  const chunks: CassetteChunk[] = [];
+  let saved = false;
+  const finish = (partial: boolean) => {
+    if (saved) return false;
+    saved = true;
+    save({ ...head, chunks, ...(partial && { partial: true as const }) });
+    return true;
+  };
+  if (!res.body) {
+    finish(false);
+    return res;
+  }
+  const reader = res.body.getReader();
+  // Rounded times since the request, so the gaps add up to the recorded total.
+  let last = 0;
+  const body = new ReadableStream<Uint8Array>({
+    start(c) {
+      void (async () => {
+        try {
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const at = Math.round(performance.now() - started);
+            chunks.push({ dt: at - last, b64: Buffer.from(value).toString("base64") });
+            last = at;
+            c.enqueue(value);
+          }
+          // Saved before the caller sees the end, so a finished stream is always on disk.
+          if (finish(false)) c.close();
+        } catch (e) {
+          if (finish(true)) c.error(e);
+        }
+      })();
+    },
+    cancel(reason) {
+      finish(true);
+      return reader.cancel(reason);
+    },
+  });
+  return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
+}
+
 export function createCassette(opts: CassetteOptions): Cassette {
   const { file, mode } = opts;
   const upstream = opts.upstream ?? ((input: Input, init?: RequestInit) => globalThis.fetch(input, init));
@@ -159,39 +209,9 @@ export function createCassette(opts: CassetteOptions): Cassette {
       if (hit) return replay(hit);
     }
     const res = await upstream(input, init);
-    const ttfbMs = Math.round(performance.now() - started);
-    const chunks: CassetteChunk[] = [];
-    const raw: Uint8Array[] = [];
-    let last = 0;
-    if (res.body) {
-      const reader = res.body.getReader();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const at = Math.round(performance.now() - started);
-        chunks.push({ dt: at - last, b64: Buffer.from(value).toString("base64") });
-        last = at;
-        raw.push(value);
-      }
-    }
-    const type = res.headers.get("content-type");
-    append({
-      v: 1,
-      key,
-      n: 1,
-      canonical,
-      request,
-      response: { status: res.status, headers: type ? { "content-type": type } : {}, ttfbMs, chunks },
-      recordedAt: new Date().toISOString(),
-    });
-    let i = 0;
-    const body = new ReadableStream<Uint8Array>({
-      pull(c) {
-        if (i >= raw.length) return c.close();
-        c.enqueue(raw[i++]);
-      },
-    });
-    return new Response(res.body ? body : null, { status: res.status, statusText: res.statusText, headers: res.headers });
+    return record(res, started, (response) =>
+      append({ v: 1, key, n: 1, canonical, request, response, recordedAt: new Date().toISOString() }),
+    );
   };
 
   return {
