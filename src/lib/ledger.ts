@@ -1,11 +1,12 @@
 /*
- * The performance ledger: one JSON line per model call, order or approval.
+ * The performance ledger: one JSON line per model call, paid tool call, order or approval.
  * It is the source of truth for the Performance tabs and for the HR agent;
  * LangSmith keeps the full traces (`trace` links a call to its run).
  * Server only: append-only file at .data/ledger.jsonl (/tmp on Vercel), read
  * once and kept in memory by the server cache (src/server/cache).
  */
 import { getServerCache } from "@/server/cache";
+import { tapLedger } from "@/server/sim/taps";
 import type { OrderKey } from "./orders";
 
 interface Base {
@@ -48,11 +49,27 @@ export interface ApprovalEvent extends Base {
   decision: "approved" | "declined";
 }
 
-export type LedgerEvent = CallEvent | OrderEvent | ApprovalEvent;
+/** One paid tool call by an agent (web search, page fetch), refused ones included. Not a model call. */
+export interface ToolEvent extends Base {
+  t: "tool";
+  /** The tool the agent called, e.g. "web_search". */
+  tool: string;
+  /** The provider endpoint, e.g. "ydc-index.io/v1/search"; absent when the call was refused before going out. */
+  endpoint?: string;
+  ms: number;
+  /** USD at the provider's list price. */
+  cost: number;
+  ok: boolean;
+  /** Why it failed, in a few words. */
+  error?: string;
+}
+
+export type LedgerEvent = CallEvent | OrderEvent | ApprovalEvent | ToolEvent;
 
 /** Appends to the file and to memory, and announces the change to stats listeners. */
 export async function record(event: LedgerEvent): Promise<void> {
   await getServerCache().ledger.append(event);
+  tapLedger(event);
 }
 
 /** Every event so far, from memory. */

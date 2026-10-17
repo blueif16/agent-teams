@@ -112,9 +112,10 @@ export function totals(events: LedgerEvent[]): Totals {
       if (e.ok) latencies.push(e.ms);
     } else if (e.t === "order") {
       t.orders[e.order]++;
-    } else {
+    } else if (e.t === "approval") {
       t[e.decision]++;
     }
+    // Tool rows (web search, page fetch) only move lastAt for now; their spend isn't in these totals yet.
   }
   t.accepted = t.orders.go + t.approved;
   t.rejected = t.orders.redo + t.declined;
