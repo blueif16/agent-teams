@@ -47,9 +47,11 @@ const REVIEWER_MODEL = process.env.WORKER_MODEL ?? MODELS.main;
  */
 const resilient = (model: string) => {
   const fallbacks = modelChain(model).slice(1).map((m) => crusoe(m));
+  // The first middleware is the outermost: fallback must wrap retry, or the first
+  // failure goes straight to the fallback with no backoff (D finding 3).
   return [
-    modelRetryMiddleware({ maxRetries: 3, initialDelayMs: 1000, backoffFactor: 2, onFailure: "error" }),
     ...(fallbacks.length ? [modelFallbackMiddleware(...fallbacks)] : []),
+    modelRetryMiddleware({ maxRetries: 3, initialDelayMs: 1000, backoffFactor: 2, onFailure: "error" }),
   ];
 };
 

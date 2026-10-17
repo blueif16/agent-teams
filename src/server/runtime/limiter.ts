@@ -1,0 +1,259 @@
+/*
+ * Client-side rate limiter for Crusoe: one process-wide limiter, one bucket per
+ * model (D §7). Crusoe limits each model per minute on requests (RPM) and on
+ * tokens (TPM, input plus output); exceeding either returns 429.
+ *
+ * Each bucket keeps a sliding 60 s log of what was sent. A sliding log never
+ * puts more than the limit into any 60 s span, so it stays under the cap
+ * whether Crusoe resets on a fixed minute or a rolling one.
+ */
+import { AsyncLocalStorage } from "node:async_hooks";
+
+/**
+ * Who waits first (D §7): `interactive` (an owner message or DM) ahead of `work`
+ * (assignments, callbacks) ahead of `background` (heartbeats, dreams).
+ */
+export type Lane = "interactive" | "work" | "background";
+const RANK: Record<Lane, number> = { interactive: 0, work: 1, background: 2 };
+
+export type LimiterOptions = {
+  /** Requests per minute per model. Crusoe without a payment method: 30. */
+  rpm?: number;
+  /** Tokens per minute per model. Crusoe without a payment method: 500K. */
+  tpm?: number;
+  windowMs?: number;
+  /**
+   * Count cached prompt tokens toward TPM. Whether Crusoe does is UNVERIFIED
+   * (F §4), so they count unless its remaining-tokens headers show otherwise.
+   */
+  countCachedTokens?: boolean;
+};
+
+/** What a bucket's window holds: one request each, or usage only Crusoe saw (`requests` > 1 or 0). */
+type Entry = { at: number; requests: number; tokens: number };
+
+type Waiter = { lane: Lane; tokens: number; resolve: (r: Reservation) => void };
+
+type Bucket = {
+  log: Entry[];
+  waiters: Waiter[];
+  timer?: ReturnType<typeof setTimeout>;
+};
+
+/** The `usage` of an OpenAI-compatible chat completion. */
+export type Usage = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  prompt_tokens_details?: { cached_tokens?: number };
+};
+
+/** A granted request; hand it back to `observe` with the response. */
+export type Reservation = { readonly bucket: Bucket; readonly entry: Entry };
+
+export class Limiter {
+  private readonly rpm: number;
+  private readonly tpm: number;
+  private readonly windowMs: number;
+  private readonly countCachedTokens: boolean;
+  private readonly buckets = new Map<string, Bucket>();
+
+  constructor(opts: LimiterOptions = {}) {
+    this.rpm = opts.rpm ?? 30;
+    this.tpm = opts.tpm ?? 500_000;
+    this.windowMs = opts.windowMs ?? 60_000;
+    this.countCachedTokens = opts.countCachedTokens ?? true;
+  }
+
+  /**
+   * Wait until `model` has room for one more request of `estTokens`, then count it.
+   * A request estimated above the whole TPM limit is counted as the limit, so it
+   * goes once the bucket is empty instead of waiting forever. If `signal` aborts
+   * first, the request leaves the queue and the promise rejects with its reason.
+   */
+  acquire(model: string, estTokens: number, lane: Lane = "work", signal?: AbortSignal | null): Promise<Reservation> {
+    const b = this.bucket(model);
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) return reject(signal.reason);
+      const onAbort = () => {
+        b.waiters.splice(b.waiters.indexOf(w), 1);
+        reject(signal!.reason);
+        this.pump(b); // whoever was behind it may fit now
+      };
+      const w: Waiter = {
+        lane,
+        tokens: Math.min(estTokens, this.tpm),
+        resolve: (r) => {
+          signal?.removeEventListener("abort", onAbort);
+          resolve(r);
+        },
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+      // Behind every waiter of the same or a higher lane, ahead of any lower one.
+      const at = b.waiters.findIndex((x) => RANK[x.lane] > RANK[lane]);
+      b.waiters.splice(at === -1 ? b.waiters.length : at, 0, w);
+      this.pump(b);
+    });
+  }
+
+  /**
+   * Correct the bucket from Crusoe's answer. Its `x-ratelimit-remaining-*` headers
+   * count everything on this key, including other processes, so when they report
+   * less room than we think, the difference is recorded as used, from the start of
+   * our window (D §7 assumes Crusoe's minute starts with the first request in it;
+   * Crusoe documents no reset header). A 429 records the whole rest as used.
+   */
+  observe({ bucket: b, entry }: Reservation, res: { status: number; headers: Headers }, usage?: Usage) {
+    // The estimate only saw the prompt; the usage has the real total, output included.
+    if (usage?.total_tokens !== undefined) {
+      const cached = this.countCachedTokens ? 0 : (usage.prompt_tokens_details?.cached_tokens ?? 0);
+      entry.tokens = usage.total_tokens - cached;
+    }
+    const now = Date.now();
+    this.prune(b, now);
+    const start = b.log[0]?.at ?? now;
+    const used = this.used(b);
+    // A 429 means "none left", whatever the headers say: empty the bucket until the window passes.
+    const left = (h: string) => (res.status === 429 ? 0 : header(res.headers, h));
+    const requests = gap(this.rpm - used.requests, left("x-ratelimit-remaining-requests"));
+    const tokens = gap(this.tpm - used.tokens, left("x-ratelimit-remaining-tokens"));
+    if (requests || tokens) b.log.unshift({ at: start, requests, tokens });
+    this.pump(b);
+  }
+
+  /**
+   * At least half of `model`'s requests and tokens are free this minute. Background
+   * work only runs then (D §7); the scheduler asks before starting a heartbeat or dream.
+   */
+  hasHeadroom(model: string): boolean {
+    const b = this.bucket(model);
+    this.prune(b, Date.now());
+    return this.headroom(b);
+  }
+
+  private headroom(b: Bucket): boolean {
+    const used = this.used(b);
+    return this.rpm - used.requests >= this.rpm / 2 && this.tpm - used.tokens >= this.tpm / 2;
+  }
+
+  private bucket(model: string): Bucket {
+    let b = this.buckets.get(model);
+    if (!b) this.buckets.set(model, (b = { log: [], waiters: [] }));
+    return b;
+  }
+
+  /** Drop entries that have left the window. */
+  private prune(b: Bucket, now: number) {
+    while (b.log.length && b.log[0].at + this.windowMs <= now) b.log.shift();
+  }
+
+  private used(b: Bucket) {
+    let requests = 0;
+    let tokens = 0;
+    for (const e of b.log) {
+      requests += e.requests;
+      tokens += e.tokens;
+    }
+    return { requests, tokens };
+  }
+
+  private fits(b: Bucket, w: Waiter): boolean {
+    const used = this.used(b);
+    if (w.lane === "background" && !this.headroom(b)) return false;
+    return used.requests + 1 <= this.rpm && used.tokens + w.tokens <= this.tpm;
+  }
+
+  /**
+   * Admit waiters in queue order while the first one fits; otherwise wake up when the
+   * oldest entry leaves the window. Nobody gets past a waiter that doesn't fit, so a
+   * small background call can't take room a bigger foreground call is waiting for.
+   */
+  private pump(b: Bucket) {
+    const now = Date.now();
+    this.prune(b, now);
+    while (b.waiters.length && this.fits(b, b.waiters[0])) {
+      const w = b.waiters.shift()!;
+      const entry = { at: now, requests: 1, tokens: w.tokens };
+      b.log.push(entry);
+      w.resolve({ bucket: b, entry });
+    }
+    if (b.timer) clearTimeout(b.timer);
+    b.timer = undefined;
+    if (b.waiters.length && b.log.length) {
+      b.timer = setTimeout(() => this.pump(b), b.log[0].at + this.windowMs - now);
+    }
+  }
+}
+
+/**
+ * A numeric header, or undefined when it is missing or blank: `Number(null)` and
+ * `Number("")` are 0, which would read as "no room left". A garbled value is NaN,
+ * which never compares below anything, so it is ignored too.
+ */
+function header(headers: Headers, name: string): number | undefined {
+  const v = headers.get(name)?.trim();
+  return v ? Number(v) : undefined;
+}
+
+/**
+ * How much less room Crusoe reports than we count, or 0. Headers only ever lower
+ * the budget: requests still in flight may not be in Crusoe's count yet, so
+ * raising our count to match would forget them.
+ */
+function gap(left: number, remaining: number | undefined): number {
+  return remaining !== undefined && remaining < left ? left - remaining : 0;
+}
+
+const laneStore = new AsyncLocalStorage<Lane>();
+
+/** Run `fn` with every model call inside it (through limitFetch) in `lane`. The run executor sets this. */
+export function withLane<T>(lane: Lane, fn: () => T): T {
+  return laneStore.run(lane, fn);
+}
+
+/** The one limiter per process (D §7), kept on globalThis so dev-server module reloads don't make a second one. */
+export function getLimiter(): Limiter {
+  const g = globalThis as { __agentTeamsLimiter?: Limiter };
+  return (g.__agentTeamsLimiter ??= new Limiter());
+}
+
+/** The `model` field of a chat-completions body, or "unknown" when the body isn't one. */
+function modelOf(body: string): string {
+  try {
+    const model = (JSON.parse(body) as { model?: unknown }).model;
+    return typeof model === "string" ? model : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * The usage of a JSON response, read from a clone so the caller still gets the body.
+ * A streamed (SSE) response is left alone: reading it would hold the stream until it
+ * ends. Its headers still calibrate the bucket; its own count stays the estimate.
+ */
+async function usageOf(res: Response): Promise<Usage | undefined> {
+  if (!res.headers.get("content-type")?.includes("application/json")) return undefined;
+  try {
+    return ((await res.clone().json()) as { usage?: Usage }).usage;
+  } catch {
+    return undefined; // an empty or garbled body: the caller deals with it, the status still counts
+  }
+}
+
+/**
+ * A `fetch` for `ChatOpenAI({ configuration: { fetch } })` that waits on the limiter
+ * before each request and corrects it from the response. It wraps `baseFetch`
+ * rather than calling the global fetch, so it can sit anywhere in a chain of fetch
+ * wrappers (a privacy scrubber, say), and it returns the inner response as is.
+ */
+export function limitFetch(baseFetch: typeof fetch = fetch, limiter: Limiter = getLimiter()): typeof fetch {
+  return async (input, init) => {
+    const body = typeof init?.body === "string" ? init.body : "";
+    const lane = laneStore.getStore() ?? "work";
+    const reservation = await limiter.acquire(modelOf(body), Math.ceil(body.length / 4), lane, init?.signal);
+    const res = await baseFetch(input, init);
+    limiter.observe(reservation, res, await usageOf(res));
+    return res;
+  };
+}
