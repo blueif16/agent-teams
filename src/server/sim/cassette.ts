@@ -185,16 +185,60 @@ function load(file: string): CassetteEntry[] {
     .filter((l) => l.kind !== "cassette") as CassetteEntry[];
 }
 
-function replay(entry: CassetteEntry): Response {
-  const { status, headers, chunks } = entry.response;
-  let i = 0;
-  const body = new ReadableStream<Uint8Array>({
-    pull(c) {
-      if (i >= chunks.length) return c.close();
-      c.enqueue(new Uint8Array(Buffer.from(chunks[i++].b64, "base64")));
-    },
+const abortReason = (signal: AbortSignal): unknown => signal.reason ?? new DOMException("This operation was aborted", "AbortError");
+
+/** Waits ms (none if ≤ 0), rejecting with the signal's reason if it aborts first or already has. */
+function sleep(ms: number, signal?: AbortSignal | null): Promise<void> {
+  if (signal?.aborted) return Promise.reject(abortReason(signal));
+  if (!(ms > 0)) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortReason(signal!));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
-  return new Response(chunks.length ? body : null, { status, headers });
+}
+
+/**
+ * The recorded response at the recorded pace divided by `speed`: headers after ttfbMs, each chunk at its
+ * recorded time since the request. An abort errors the body at once, as fetch's own body does.
+ */
+async function replay(entry: CassetteEntry, t0: number, speed: number, signal?: AbortSignal | null): Promise<Response> {
+  const { status, headers, ttfbMs, chunks } = entry.response;
+  // Deadlines from the request start, so time spent by the reader doesn't add up.
+  const until = (ms: number) => sleep(t0 + ms / speed - performance.now(), signal);
+  await until(ttfbMs);
+  if (!chunks.length) return new Response(null, { status, headers });
+  let i = 0;
+  let due = 0;
+  let onAbort = () => {};
+  const body = new ReadableStream<Uint8Array>(
+    {
+      start(c) {
+        onAbort = () => c.error(abortReason(signal!));
+        signal?.addEventListener("abort", onAbort, { once: true });
+      },
+      async pull(c) {
+        if (i >= chunks.length) {
+          signal?.removeEventListener("abort", onAbort);
+          return c.close();
+        }
+        due += chunks[i].dt;
+        await until(due);
+        c.enqueue(new Uint8Array(Buffer.from(chunks[i++].b64, "base64")));
+      },
+      cancel() {
+        signal?.removeEventListener("abort", onAbort);
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  return new Response(body, { status, headers });
 }
 
 /**
@@ -249,7 +293,8 @@ function record(res: Response, started: number, save: (response: CassetteEntry["
 }
 
 export function createCassette(opts: CassetteOptions): Cassette {
-  const { file, mode } = opts;
+  const { file, mode, speed = Infinity } = opts;
+  if (!(speed > 0)) throw new RangeError(`cassette: speed must be above 0, got ${speed}`);
   const upstream = opts.upstream ?? ((input: Input, init?: RequestInit) => globalThis.fetch(input, init));
   const all: CassetteEntry[] = [];
   const byId = new Map<string, CassetteEntry>();
@@ -297,7 +342,7 @@ export function createCassette(opts: CassetteOptions): Cassette {
     started.set(key, n);
     if (mode !== "record") {
       const hit = byId.get(id(key, n));
-      if (hit) return replay(hit);
+      if (hit) return replay(hit, t0, speed, init?.signal);
       if (mode === "replay") return miss(key, n, canonical, request);
     }
     const res = await upstream(input, init);
