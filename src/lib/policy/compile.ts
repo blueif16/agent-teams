@@ -29,6 +29,8 @@ export interface CompileContext {
   projects: string[];
   /** Every rule in force (defaults included). */
   rules: Rule[];
+  /** Each agent's task deliverables from the PM (agent id → paths), when known. */
+  deliverables?: Record<string, string[]>;
   now: Date;
 }
 
