@@ -5,7 +5,9 @@ Vendored:   scripts/policy/vendor/gitleaks.toml (verbatim)
 Generated:  src/lib/policy/detectors/gitleaks.gen.ts, by scripts/policy/import-gitleaks.mts (Go RE2 patterns ported to
             JS; path and commit allowlists and path-only rules removed)
 Test data:  true- and false-positive samples from cmd/generate/config/rules/*.go at the same commit
-            (src/lib/policy/detectors/fixtures.ts)
+            (src/lib/policy/detectors/fixtures/secrets.ts, fixtures/benign.ts)
+Semantics:  src/lib/policy/detectors/engine.ts follows detect/detect.go and detect/utils.go (secret group, entropy,
+            allowlists, generic-rule precedence)
 
 MIT License
 

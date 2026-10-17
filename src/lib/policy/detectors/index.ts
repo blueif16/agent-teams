@@ -1,8 +1,9 @@
 /*
- * The detector pack's interface (design §6). PLACEHOLDER: finds nothing until the detector pack lands; the rules
- * engine and routes are built against these signatures.
+ * The detector pack's interface (design §6): labelled spans of secrets and PII in text.
+ * Local pack: vendored gitleaks rules and three secretlint rules. The rules engine and routes import these signatures.
  */
 import type { DetectorSummary, Label } from "../types";
+import { scanDetailed } from "./pipeline";
 
 export interface Span {
   start: number;
@@ -19,11 +20,14 @@ export interface ScanOptions {
   hosted?: boolean;
 }
 
-/** Labelled spans of sensitive data in `text`. */
+/** Labelled spans of sensitive data in `text`. Never throws. */
 export async function scan(text: string, opts: ScanOptions = {}): Promise<Span[]> {
-  void text;
   void opts;
-  return [];
+  try {
+    return (await scanDetailed(text)).spans;
+  } catch {
+    return [];
+  }
 }
 
 /** The detector sets in the pack, plus hosted providers. */
