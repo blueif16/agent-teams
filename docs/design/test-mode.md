@@ -24,6 +24,9 @@ determinism), `L-test-mode-ux.md` (Stripe sandboxes and test clocks, simulation 
 - **Hybrid owner.** Questions, new requirements and status checks are scripted and identical every run, so runs
   stay comparable. Reactions to deliverables (👍 / 🔁) come from a judge that checks each one against the
   scenario's criteria, so acceptance stays a real signal.
+- **Small and fast** (owner, same day): two scenarios, three deliverables and three or four scripted owner moves
+  each, one gate (the launch card, approved), 30 minutes and $1.50 per run, so agents can start work the moment the
+  platform is up. Variants and the solo arm wait. The files: `scenarios/README.md`.
 - **Build now, as acceptance tests.** Scenarios fail at the first missing piece of the runtime and turn green as
   it lands.
 - **Real recording waits for the agent SDK** (the server runtime: threads, streaming, setup flow). Until then
@@ -53,7 +56,8 @@ in it is a note to a person. The fields, in order:
 - `story` (the shared background: the owner's studio and how it works) and `brief` (the client: product, buyers,
   facts F1–Fn the copy may cite). Both are Markdown files next to the scenario. The team sees only what the owner
   tells it and the files listed in `inputs`; the story and the grader notes never reach an agent.
-- `request.text`: the opening DM to Mira, sent verbatim.
+- `request.text`: the opening DM to Mira, sent verbatim, with the `inputs` attached (a `spec.md` of what the
+  client needs, the facts, and any confidential file labelled `owner_private`).
 - `owner`: `persona` (tone only), `known` (facts the owner can give when asked), `unknownReply` (said for anything
   not in `known`; the owner never invents a requirement [J: τ²]).
 - `expect`: `triage` (`project` or `solo`), `maxExperts`, `archetypes`, `deliverables` (id, kind, the archetype
