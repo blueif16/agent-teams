@@ -8,6 +8,7 @@
  */
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { dataDir as appDataDir } from "../paths";
 import { Bus } from "./bus";
 import { FileCache, type CachedFile } from "./files";
 import { LedgerCache } from "./ledger";
@@ -21,9 +22,9 @@ export interface ServerCache {
 }
 
 // On Vercel the disk is read-only except /tmp, so writes live there and last only as long as the instance.
-const dataDir = () => (process.env.VERCEL ? path.join(tmpdir(), "agent-teams") : path.join(process.cwd(), ".data"));
+const dataDir = () => (process.env.VERCEL ? path.join(tmpdir(), "agent-teams") : appDataDir());
 // The same roots agent-files.ts reads and writes: locally the vault's agents/ (getVault's dir: $VAULT_DIR, else
-// .data/vault); on Vercel the bundled agents/ and its /tmp copy.
+// <DATA_DIR>/vault); on Vercel the bundled agents/ and its /tmp copy.
 const agentRoots = () =>
   process.env.VERCEL
     ? [path.join(process.cwd(), "agents"), path.join(tmpdir(), "agent-teams", "agents")]
