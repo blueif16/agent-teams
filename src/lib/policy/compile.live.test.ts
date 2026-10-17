@@ -1,16 +1,23 @@
 /*
  * Live eval of the NL compiler on E §5.3's five worked examples, against real Crusoe (GLM-5.3, falling back per
- * modelChain). Skipped unless CRUSOE_LIVE=1 and CRUSOE_API_KEY are set:
- *   CRUSOE_LIVE=1 npx vitest run src/lib/policy/compile.live.test.ts
+ * modelChain). Skipped unless CRUSOE_LIVE=1 and a key is set (CRUSOE_API_KEY, or CRUSOE_ENV_FILE pointing at a
+ * .env.local that has it):
+ *   CRUSOE_LIVE=1 CRUSOE_ENV_FILE=../../.env.local npx vitest run src/lib/policy/compile.live.test.ts
  * Checks are deterministic: the rule kinds, effects/actions, labels, sinks and scope, and what decide() does with the
  * compiled rules on top of the defaults. None of these sentences appear in the compiler's prompt.
  */
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { compileRules, type CompileContext } from "@/lib/policy/compile";
 import { DEFAULT_RULES } from "@/lib/policy/defaults";
 import { decide, globMatch } from "@/lib/policy/engine";
 import type { CompileResult, PolicyEvent, Rule } from "@/lib/policy/types";
 
+const envFile = process.env.CRUSOE_ENV_FILE;
+if (process.env.CRUSOE_LIVE === "1" && !process.env.CRUSOE_API_KEY && envFile && existsSync(envFile)) {
+  const line = readFileSync(envFile, "utf8").split("\n").find((l) => l.startsWith("CRUSOE_API_KEY="));
+  if (line) process.env.CRUSOE_API_KEY = line.slice("CRUSOE_API_KEY=".length).trim().replace(/^["']|["']$/g, "");
+}
 const LIVE = process.env.CRUSOE_LIVE === "1" && Boolean(process.env.CRUSOE_API_KEY);
 const NOW = new Date();
 const CTX: CompileContext = {
@@ -49,9 +56,10 @@ const flows = (r: CompileResult) => r.rules.filter((x): x is Extract<Rule, { kin
 describe.skipIf(!LIVE)("NL compiler, live (E §5.3)", { timeout: 300_000 }, () => {
   it("1. Never send anything from the Acme project to anyone outside acme.com.", async () => {
     const r = await compile("Never send anything from the Acme project to anyone outside acme.com.");
-    const block = flows(r).find((f) => f.action === "block" && f.sinks.includes("email") && covers(f.labels, "project:acme-launch"));
+    const outsideAcme = (f: Extract<Rule, { kind: "flow" }>) =>
+      Boolean(f.where?.some((c) => /^to/.test(c.path) && c.op === "domain_not_in" && [c.value].flat().includes("acme.com")));
+    const block = flows(r).find((f) => f.action === "block" && f.sinks.includes("email") && covers(f.labels, "project:acme-launch") && outsideAcme(f));
     expect(block, JSON.stringify(r.rules)).toBeDefined();
-    expect(block!.where?.some((c) => /^to/.test(c.path) && c.op === "domain_not_in" && [c.value].flat().includes("acme.com"))).toBe(true);
     const mail = (to: string) =>
       ev({ tool: "send_email", args: { to: [to] }, argSpans: [{ path: "body", start: 0, end: 4, label: "project:acme-launch" }], contextLabels: ["project:acme-launch"], sinks: ["email"] });
     expect(effect(r, mail("eve@evil.example"))).toBe("block");
@@ -94,9 +102,9 @@ describe.skipIf(!LIVE)("NL compiler, live (E §5.3)", { timeout: 300_000 }, () =
 
   it("5. Keep what agents learn on Bluebird out of other projects.", async () => {
     const r = await compile("Keep what agents learn on Bluebird out of other projects.");
-    const block = flows(r).find((f) => f.action === "block" && covers(f.labels, "project:bluebird"));
+    // A new block on memory:global is required (it tightens r_proj02's ask); project:other may be left to r_proj01.
+    const block = flows(r).find((f) => f.action === "block" && covers(f.labels, "project:bluebird") && covers(f.sinks, "memory:global"));
     expect(block, JSON.stringify(r.rules)).toBeDefined();
-    expect(covers(block!.sinks, "memory:global") && covers(block!.sinks, "project:other")).toBe(true);
     const learn = (sink: string) => ev({ projectId: "bluebird", tool: "dream_write", contextLabels: ["project:bluebird"], sinks: [sink] });
     expect(effect(r, learn("memory:global"))).toBe("block");
     expect(effect(r, learn("project:other"))).toBe("block");

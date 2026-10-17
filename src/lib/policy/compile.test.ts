@@ -175,6 +175,36 @@ describe("compileRules", () => {
     if (!out.ok) expect(out.issues.join("\n")).toMatch(/recipient/);
   });
 
+  it("rejects one rule that ANDs the same test across paths (an any-of written as all-of never fires)", async () => {
+    const allOf = json({
+      rules: [
+        {
+          kind: "flow",
+          scope: {},
+          labels: ["pii.*"],
+          sinks: ["email"],
+          where: [
+            { path: "to[*]", op: "domain_not_in", value: ["acme.com"] },
+            { path: "cc[*]", op: "domain_not_in", value: ["acme.com"] },
+          ],
+          action: "block",
+        },
+      ],
+      assumptions: [],
+      questions: [],
+    });
+    const split = json({
+      rules: ["to[*]", "cc[*]"].map((path) => ({ kind: "flow", scope: {}, labels: ["pii.*"], sinks: ["email"], where: [{ path, op: "domain_not_in", value: ["acme.com"] }], action: "block" })),
+      assumptions: [],
+      questions: [],
+    });
+    const { fetchFn, calls } = fakeCrusoe([allOf, split]);
+    const out = await compileRules({ text: TEXT }, CTX, deps(fetchFn));
+    expect(calls).toHaveLength(2);
+    expect(calls[1].body.messages.at(-1)?.content).toMatch(/rules\.0\.where.*one rule per path/);
+    expect(out.ok && out.result.rules).toHaveLength(2);
+  });
+
   it("rejects a grant on a locked rule and an allow for secrets", async () => {
     const relax = json({
       rules: [

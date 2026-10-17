@@ -82,11 +82,28 @@ ArgConstraint = {"path": one of the tool's "args" in <facts> ("url", "to[*]", "c
   in, not_in: value is a list of exact values · path_glob, path_not_glob: a glob · matches, not_matches: a JS regex · max_len: a number
 On a rule that restricts (ask, deny, block or a rewrite), a constraint on "to[*]" holds when ANY recipient satisfies it.
 On a grant or an allow it must hold for EVERY recipient.
+All constraints in one rule must hold together (AND). For "any of to, cc or bcc", write one rule per path.
 
 How rules combine: the most restrictive outcome wins (block/deny > ask > tokenize > redact/hash/mask > allow). Rule
 order doesn't matter. A tool no tool rule matches gets its tier default (in <facts>). Adding a deny never relaxes
 anything; only a grant relaxes, and only ask → allow.
+
+Scope has no "except". For "everyone except X", scope the rule to every archetype other than X's; if other agents
+share X's archetype, also list them by id and add an assumption that agents hired later with that archetype aren't
+covered. Listing only today's agent ids leaves out every agent hired later.
 </policy_v1>
+
+<owner_words>
+What owners' words usually mean here (each sink is listed in <facts>):
+- "send", "share", "upload", "post outside" → email, web, api:*, calendar (ask which ones if the sentence doesn't say)
+- "learn", "remember", "memory", "notes" → memory:self (this project) and memory:global (carries into other projects)
+- "other projects", "other teams" → project:other AND memory:global: project details reach other projects both by
+  being sent there and through what an agent remembers
+- "the model", "Crusoe" → model:crusoe · "LangSmith", "traces", "logs" → trace:langsmith
+- "API keys", "passwords", "tokens", "credentials" → secret.* · "personal info" → pii.* · "<project> data" → project:<id>
+- "X can do Y" when Y already asks (its tier default or a rule in force) is ambiguous: allowed but still asked first,
+  or allowed without asking? Ask, recommending the existing ask, unless the sentence says "without asking".
+</owner_words>
 
 <the_bar>
 Required, every one:
@@ -266,12 +283,25 @@ function checkRule(r: Rule, at: string, ctx: CompileContext, classifierLabels: S
     const ok = LABEL.test(l) || (l.startsWith("project:") && projects.has(l.slice(8))) || classifierLabels.has(l);
     if (!ok) issues.push(`${path}: unknown label "${l}"`);
   };
-  const constraints = (cs: ArgConstraint[] | undefined, path: string, allowed: Set<string> | null) =>
+  const constraints = (cs: ArgConstraint[] | undefined, path: string, allowed: Set<string> | null) => {
+    // Constraints in one rule must ALL hold. The same test on two paths is an any-of written as all-of: it would
+    // fire only when every path fails at once, so it almost never fires.
+    const seen = new Map<string, string>();
+    for (const c of cs ?? []) {
+      const test = `${c.op}:${JSON.stringify(c.value)}`;
+      const other = seen.get(test);
+      if (other && other !== c.path) {
+        issues.push(`${path}: "${other}" and "${c.path}" get the same test, and all constraints in a rule must hold together; for "any of them", write one rule per path`);
+        break;
+      }
+      seen.set(test, c.path);
+    }
     (cs ?? []).forEach((c, j) => {
       if (allowed && !allowed.has(argBase(c.path))) issues.push(`${path}.${j}.path: "${c.path}" is not an arg of these tools (${[...allowed].join(", ")})`);
       if (HOST_OPS.has(c.op))
         for (const v of [c.value].flat()) if (typeof v !== "string" || !HOST.test(v)) issues.push(`${path}.${j}.value: "${String(v)}" is not a host name like acme.com`);
     });
+  };
 
   if (r.kind === "tool") {
     r.match.tools.forEach((t, j) => toolKnown(t) || issues.push(`${at}.match.tools.${j}: unknown tool "${t}"`));
