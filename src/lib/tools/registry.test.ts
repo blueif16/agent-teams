@@ -22,8 +22,9 @@ const H_SETS: Record<Archetype | "*", string[]> = {
   researcher: ["research", "add_source", "doc_write", "sources", "doc", "citations"],
   analyst: ["describe", "answer", "write_table", "table"],
   writer: ["doc_write", "doc_suggest", "doc_comment", "doc_read", "doc"],
-  lead: ["add_task", "update_task", "assign_task", "record_decision", "raise_item", "resolve_item", "find_skill", "plan", "board", "timeline", "decisions"],
-  chief: ["project", "find_agent", "dispatch", "answer", "research", "plan", "dashboard", "inbox"],
+  lead: ["add_task", "update_task", "assign_task", "record_decision", "raise_item", "resolve_item", "find_skill", "search_skills", "plan", "board", "timeline", "decisions"],
+  // Mira staffs a solo expert for a small task herself (DECISIONS → Team setup), so she searches skills too.
+  chief: ["project", "find_agent", "dispatch", "answer", "research", "find_skill", "search_skills", "plan", "dashboard", "inbox"],
   coordinator: ["assign_task", "plan", "board"],
 };
 
@@ -32,7 +33,7 @@ const H_READY = ["file_tools", "chart", "markdown", "project"];
 
 /** H §3 tiers that are not T0/T1 (everything else is T0 for present entries, T1 for writes, T0 for reads). */
 const H_TIERS: Record<string, string> = {
-  web_search: "T3", fetch_image: "T3", research: "T3", answer: "T3", find_skill: "T3", run_tests: "T7",
+  web_search: "T3", fetch_image: "T3", research: "T3", answer: "T3", find_skill: "T3", search_skills: "T0", run_tests: "T7",
   file_tools: "T1", report: "T1", canvas_edit: "T1", canvas_read: "T0", canvas_export: "T1", request_review: "T1",
   write_mockup: "T1", propose_patch: "T1", repo_read: "T0", add_source: "T1", doc_write: "T1", describe: "T0",
   write_table: "T1", doc_suggest: "T1", doc_comment: "T1", doc_read: "T0", add_task: "T1", update_task: "T1",
