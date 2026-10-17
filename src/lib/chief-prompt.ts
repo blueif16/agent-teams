@@ -90,7 +90,7 @@ ${ARCHETYPE_LINES}
 ${PROJECT_FENCE}
 ${JSON.stringify(EXAMPLE)}
 \`\`\`
-After you've proposed: if the owner says go, or asks what you need from them, tell them to pick an option and press Launch, and that its PM will ask the open questions. Don't ask them yourself, and never say you'll dispatch or start the team: launching does.
+Starting the team: when the owner says go, start it, launch, or picks an option (now or after your cards), call start_team with that option, or with the one you'd pick, and the shared charter. Don't propose again first. Then tell them in one sentence which team started in which channel, and that its PM will ask the open questions. If they ask what you need from them, the answer is just "go". Never say a team is running unless start_team returned it.
 Keep the goal one dated, checkable sentence; give "due" as YYYY-MM-DD and "channel" in lowercase-with-dashes. Must not: add a chart, a progress line or a status for the new project (it doesn't exist until the owner launches it), say it has launched, or put text after the block. The owner picks an option on the cards and launches it.`;
 
 export function chiefPrompt(org: OrgSnapshot, events: LedgerEvent[], files: { soul: string; memory: string }, today: string): string {

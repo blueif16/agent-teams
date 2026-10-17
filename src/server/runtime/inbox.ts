@@ -1,50 +1,96 @@
 /*
- * InboxDrain (research D §1): an owner DM sent while the thread is busy waits in the `inbox` table, and this
- * beforeModel hook hands every waiting one to the model as a user message before its next call. The agent
- * answers within one tool round-trip, in the same run, without aborting its work. Appending a user message
- * after a tool result is valid OpenAI ordering; the hook-returns-messages pattern is HITL's.
+ * InboxDrain (research D §1): whatever reaches a thread waits in the `inbox` table, and this beforeModel hook hands
+ * every waiting item to the model as a user message before its next call: an owner DM sent while the thread is busy,
+ * the kickoff of a launched project, a brief from the PM, a report's `<state_delta>` for the PM. The agent answers
+ * within one tool round-trip, in the same run, without aborting its work. Appending a user message after a tool
+ * result is valid OpenAI ordering; the hook-returns-messages pattern is HITL's.
+ *
+ * A thread with a `context` (the PM's: its project digest) gets it once more after every batch it is handed, so
+ * each wake sees the state as it is now.
  */
 import { HumanMessage } from "@langchain/core/messages";
 import { createMiddleware } from "langchain";
 import { imageParts } from "@/server/uploads";
-import type { RuntimeDb } from "./db";
+import type { InboxKind, RuntimeDb } from "./db";
 
-/** What an owner DM carries in the inbox. */
+/** What a DM carries in the inbox: from the owner, or from another agent (the PM's brief to an expert). */
 export interface DmPayload {
-  /** The owner's text, with an <attachment> block per text document they attached (src/server/uploads.ts). */
+  /** With an <attachment> block per text document the owner attached (src/server/uploads.ts). */
   text: string;
-  /** Who sent it: "owner" for now. */
+  /** Who sent it: "owner", or the sending agent's id. */
   from: string;
   /** Image upload ids, inlined as image parts when the DM is delivered. */
   images?: string[];
-  /** Every upload id the owner attached, so a reloaded thread can show them. */
+  /** Every upload id attached. */
   uploads?: string[];
 }
 
+/** The image parts of a batch's DMs; an image deleted since it was attached is dropped rather than failing the run. */
+async function batchImages(items: { payload: unknown }[]) {
+  const ids = items.map((i) => (i.payload as Partial<DmPayload> | null)?.images ?? []);
+  return (await Promise.all(ids.map((group) => (group.length ? imageParts(group).catch(() => []) : [])))).flat();
+}
+
+/** A launched project's kickoff on its lead's thread (setup/provision.ts). */
+export interface KickoffPayload {
+  from: string;
+  projectId: string;
+  charter: string;
+  budgetUsd: number | null;
+  instruction: string;
+}
+
+/** A report's state delta on the PM's thread (`text` is the `<state_delta>` line). */
+export interface CallbackPayload extends DmPayload {
+  taskId: string;
+  rev: number;
+}
+
+/** The text the model sees for one inbox item. */
+export function inboxText(kind: InboxKind, payload: unknown): string {
+  const p = (payload && typeof payload === "object" ? payload : {}) as Partial<DmPayload & KickoffPayload>;
+  if (kind === "assignment" && typeof p.instruction === "string") return [p.instruction, p.charter?.trim()].filter(Boolean).join("\n\n");
+  return typeof p.text === "string" ? p.text : JSON.stringify(payload);
+}
+
 /** The inbox items as the user messages the model sees, tagged so the UI can tell a DM from other turns. */
-export async function dmMessages(items: { id: number; payload: DmPayload }[]): Promise<HumanMessage[]> {
-  return Promise.all(
-    items.map(async (i) => {
-      const { text, from, images = [], uploads } = i.payload;
-      // An image deleted since it was attached is dropped rather than failing the run.
-      const parts = images.length ? await imageParts(images).catch(() => []) : [];
-      const content = parts.length ? [...(text ? [{ type: "text" as const, text }] : []), ...parts] : text;
-      // OpenAI-style image_url parts, which ChatOpenAI sends as they are; the v1 content types only list standard blocks.
-      return new HumanMessage({ content: content as HumanMessage["content"], additional_kwargs: { surface: "dm", from, inbox_id: i.id, ...(uploads?.length && { uploads }) } });
-    }),
-  );
+export function inboxMessages(items: { id: number; kind: InboxKind; payload: unknown; append?: string }[]): HumanMessage[] {
+  return items.map((i) => {
+    const from = (i.payload as { from?: unknown } | null)?.from;
+    return new HumanMessage({
+      content: [inboxText(i.kind, i.payload), i.append].filter(Boolean).join("\n\n"),
+      additional_kwargs: { surface: i.kind, from: typeof from === "string" ? from : "owner", inbox_id: i.id },
+    });
+  });
+}
+
+export interface DrainOptions {
+  /** Added after each batch, as one more user message; null or a throw adds nothing. */
+  context?: () => Promise<string | null>;
 }
 
 /** `currentRun` names the run in progress on `threadId`; items are marked delivered to it. */
-export function inboxDrain(db: RuntimeDb, threadId: string, currentRun: () => string | undefined) {
+export function inboxDrain(db: RuntimeDb, threadId: string, currentRun: () => string | undefined, opts: DrainOptions = {}) {
   return createMiddleware({
     name: "InboxDrain",
     beforeModel: async () => {
       const runId = currentRun();
       if (!runId) return;
-      const items = db.inbox.take<DmPayload>(threadId, runId, ["dm"]);
+      const items = db.inbox.take(threadId, runId);
       if (!items.length) return;
-      return { messages: await dmMessages(items) };
+      const context = await opts.context?.().catch((e: unknown) => {
+        console.warn(`[runtime] no context for ${threadId}:`, (e as Error).message);
+        return null;
+      });
+      // One message for the batch: of several returned at once only the last reaches the model.
+      const [first, ...rest] = inboxMessages(items.map((i, n) => (n === items.length - 1 && context ? { ...i, append: context } : i)));
+      const images = await batchImages(items);
+      if (!rest.length && !images.length) return { messages: [first] };
+      const text = [first, ...rest].map((m) => m.content as string).join("\n\n");
+      // OpenAI-style image_url parts, which ChatOpenAI sends as they are; the v1 content types only list standard blocks.
+      const content = (images.length ? [...(text ? [{ type: "text" as const, text }] : []), ...images] : text) as HumanMessage["content"];
+      const additional_kwargs = rest.length ? { ...first.additional_kwargs, inbox_ids: items.map((i) => i.id) } : first.additional_kwargs;
+      return { messages: [new HumanMessage({ content, additional_kwargs })] };
     },
   });
 }

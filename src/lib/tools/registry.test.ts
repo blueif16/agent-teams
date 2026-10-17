@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { CHART_FENCE } from "../charts";
 import { PROJECT_FENCE } from "../project";
 import type { Archetype } from "../policy/types";
+import { BASH_NOTE } from "./notes";
 import { getTool, REGISTRY } from "./registry";
 import type { ArtifactType } from "./types";
 
@@ -17,10 +18,11 @@ const ARTIFACT_TYPES: ArtifactType[] = ["canvas", "mockup", "doc", "sources", "t
 /** H §3: the base set and each archetype's curated set (A and P rows). */
 const H_SETS: Record<Archetype | "*", string[]> = {
   "*": ["file_tools", "web_search", "report", "chart", "markdown", "mermaid"],
-  designer: ["canvas_edit", "canvas_read", "canvas_export", "request_review", "write_mockup", "fetch_image", "canvas", "mockup"],
-  engineer: ["propose_patch", "repo_read", "run_tests", "diff", "files", "tests"],
-  researcher: ["research", "add_source", "doc_write", "sources", "doc", "citations"],
-  analyst: ["describe", "answer", "write_table", "table"],
+  // bash is the workbench's sandboxed shell (src/server/workbench): the experts who compute get it; the writer, PM and Mira don't.
+  designer: ["canvas_edit", "canvas_read", "canvas_export", "request_review", "write_mockup", "fetch_image", "bash", "canvas", "mockup"],
+  engineer: ["propose_patch", "repo_read", "run_tests", "bash", "diff", "files", "tests"],
+  researcher: ["research", "add_source", "doc_write", "bash", "sources", "doc", "citations"],
+  analyst: ["describe", "answer", "write_table", "bash", "table"],
   writer: ["doc_write", "doc_suggest", "doc_comment", "doc_read", "doc"],
   lead: ["add_task", "update_task", "assign_task", "record_decision", "raise_item", "resolve_item", "find_skill", "search_skills", "plan", "board", "timeline", "decisions"],
   // Mira staffs a solo expert for a small task herself (DECISIONS → Team setup), so she searches skills too.
@@ -28,8 +30,8 @@ const H_SETS: Record<Archetype | "*", string[]> = {
   coordinator: ["assign_task", "plan", "board"],
 };
 
-/** H §3 "EXISTS" rows, plus the panes built since (plan: the state views); the only entries that are ready today. */
-const H_READY = ["file_tools", "chart", "markdown", "project", "plan"];
+/** H §3 "EXISTS" rows, plus what was built since (plan: the state views; bash: the workbench); the only ready entries. */
+const H_READY = ["file_tools", "chart", "markdown", "project", "plan", "bash"];
 
 /** Ready panes and the component that draws them; a ready pane must have one. */
 const PANE_COMPONENTS: Record<string, { file: string; component: string }> = {
@@ -38,7 +40,7 @@ const PANE_COMPONENTS: Record<string, { file: string; component: string }> = {
 
 /** H §3 tiers that are not T0/T1 (everything else is T0 for present entries, T1 for writes, T0 for reads). */
 const H_TIERS: Record<string, string> = {
-  web_search: "T3", fetch_image: "T3", research: "T3", answer: "T3", find_skill: "T3", search_skills: "T0", run_tests: "T7",
+  web_search: "T3", fetch_image: "T3", research: "T3", answer: "T3", find_skill: "T3", search_skills: "T0", run_tests: "T7", bash: "T7",
   file_tools: "T1", report: "T1", canvas_edit: "T1", canvas_read: "T0", canvas_export: "T1", request_review: "T1",
   write_mockup: "T1", propose_patch: "T1", repo_read: "T0", add_source: "T1", doc_write: "T1", describe: "T0",
   write_table: "T1", doc_suggest: "T1", doc_comment: "T1", doc_read: "T0", add_task: "T1", update_task: "T1",
@@ -49,6 +51,10 @@ const H_TIERS: Record<string, string> = {
 /** What exists in the repo right now: the deepagents file tools, and the two fences with parsers. */
 const RUNTIME_CALLS = new Set<string>((createFilesystemMiddleware().tools ?? []).map((t) => t.name));
 const REPO_FENCES = new Set([CHART_FENCE, PROJECT_FENCE].map((f) => f.replace(/^```/, "")));
+/** The tools the workbench's MCP server registers: they back ready calls that aren't deepagents file tools. */
+const WORKBENCH_CALLS = new Set(
+  [...readFileSync(new URL("../../server/workbench/server.mts", import.meta.url), "utf8").matchAll(/registerTool\(\s*"([^"]+)"/g)].map((m) => m[1]),
+);
 const MARKDOWN_TSX = readFileSync(new URL("../../components/Markdown.tsx", import.meta.url), "utf8");
 const PACKAGE_DEPS = Object.keys(
   (JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8")) as { dependencies: Record<string, string> })
@@ -109,7 +115,7 @@ describe("registry: H §4 load-time checks", () => {
 
   it("backs every ready entry with real calls, fences or components", () => {
     for (const d of REGISTRY.filter((x) => x.status === "ready")) {
-      for (const c of d.calls) expect(RUNTIME_CALLS.has(c), `${d.id}: tool ${c}`).toBe(true);
+      for (const c of d.calls) expect(RUNTIME_CALLS.has(c) || WORKBENCH_CALLS.has(c), `${d.id}: tool ${c}`).toBe(true);
       if (d.fence) expect(REPO_FENCES.has(d.fence), `${d.id}: fence ${d.fence}`).toBe(true);
       if (d.renderer?.startsWith("pane:")) {
         // A derived pane: its component exists and is exported.
@@ -151,12 +157,12 @@ describe("registry: H §3 contents", () => {
     }
   });
 
-  it("uses H's tiers, with every present entry at T0 and only run_tests at T7", () => {
+  it("uses H's tiers, with every present entry at T0 and only run_tests and bash at T7", () => {
     for (const d of REGISTRY) {
       if (d.kind === "present") expect(d.tier, d.id).toBe("T0");
       else expect(d.tier, d.id).toBe(H_TIERS[d.id]);
     }
-    expect(REGISTRY.filter((d) => d.tier === "T7").map((d) => d.id)).toEqual(["run_tests"]);
+    expect(REGISTRY.filter((d) => d.tier === "T7").map((d) => d.id).sort()).toEqual(["bash", "run_tests"]);
   });
 
   it("keeps kind, mechanism and calls consistent", () => {
@@ -165,7 +171,8 @@ describe("registry: H §3 contents", () => {
       if (d.mechanism === "fence" || d.kind === "present") expect(d.calls, d.id).toEqual([]);
       if (d.kind === "action" && d.mechanism === "artifact") expect(d.artifact?.writtenBy, d.id).toBe("self");
       if (d.renderer) expect(d.kind, d.id).toBe("present");
-      if (d.note) expect(d.kind, `${d.id} note`).toBe("present");
+      // Notes teach present entries; the one action with a note is bash, whose schema can't say what the box holds.
+      if (d.note && d.kind !== "present") expect(d.id, `${d.id} note`).toBe("bash");
     }
   });
 
@@ -197,6 +204,12 @@ describe("registry: H §3 contents", () => {
   it("teaches the chart fence with the existing CHARTS_NOTE", async () => {
     const { CHARTS_NOTE } = await import("../charts");
     expect(getTool("chart")).toMatchObject({ fence: "chart", renderer: "chart", note: CHARTS_NOTE, status: "ready" });
+  });
+
+  it("teaches bash with a note: the project folder, the installed tools, and a network closed but for package registries", () => {
+    expect(getTool("bash")).toMatchObject({ kind: "action", mechanism: "call", calls: ["bash"], status: "ready", note: BASH_NOTE });
+    for (const word of ["/project/", "python3", "node", "sqlite3", "jq", "ffmpeg", "imagemagick"]) expect(BASH_NOTE).toContain(word);
+    expect(BASH_NOTE).toMatch(/network/i);
   });
 
   it("looks tools up by id and returns undefined for unknown ids", () => {

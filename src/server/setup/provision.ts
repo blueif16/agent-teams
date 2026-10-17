@@ -4,15 +4,16 @@
  *   1. checkPlan: the plan comes back from the browser, so every field is checked again (archetypes, shape, skills
  *      the library can load, rehires that are still free). Then the text documents among the plan's uploads (the
  *      opening DM's files) are copied to <data>/projects/<pid>/files/inputs/, and charter.md lists them under Inputs.
- *   2. One db transaction: agents (new hires), the project (team, or dm for a solo expert), members, threads, and
- *      one kickoff in the lead's inbox (kind `assignment`: the charter plus "write the plan and assign first
- *      tasks"). The runtime's queue drains it; nothing here runs a model. Then `org` is announced.
+ *   2. One db transaction: agents (new hires), the project (team, or dm for a solo expert), members and threads.
+ *      Then `org` is announced.
  *   3. The vault, from the rows: per agent one seed commit with SOUL.md and MEMORY.md (archetype templates) and its
- *      skills/, and the charter at projects/<pid>/state/charter.md. Only missing files are written, so this step
- *      can run again.
+ *      skills/, the launch charter at projects/<pid>/charter.md, and each expert on the state roster (addMember).
+ *      Only missing files and members are written, so this step can run again.
+ *   4. One kickoff in the lead's inbox (kind `assignment`: the charter plus "write the plan and assign first tasks"),
+ *      last. Nothing here runs a model: the runtime wakes a thread when a row lands in its inbox.
  *
  * Idempotent on the client's nonce: the project id is derived from it, so a retried launch finds the project the
- * first attempt made, finishes any vault writes that didn't land, and creates nothing more. Server only.
+ * first attempt made, finishes any vault writes and the kickoff that didn't land, and creates nothing more. Server only.
  */
 import { createHash, randomUUID } from "node:crypto";
 import { memoryTemplate, soulTemplate } from "@/lib/agent-files";
@@ -36,6 +37,7 @@ import type { Composition } from "@/lib/skills/types";
 import type { Bus } from "@/server/cache/bus";
 import { TOPICS } from "@/server/cache/bus";
 import { getAgent } from "@/server/directory";
+import { addMember, readState } from "@/server/project-state";
 import type { RuntimeDb } from "@/server/runtime/db";
 import { threadId } from "@/server/runtime/threads";
 import { RUNTIME, VaultConflictError, type Vault } from "@/server/runtime/vault";
@@ -53,8 +55,8 @@ export class PlanError extends Error {
 
 export const KICKOFF = "Write the plan and assign first tasks.";
 /** You scope the project, so the charter's open questions are yours to ask; work that doesn't hang on them starts now. */
-const kickoffFor = (open: string[] = []) =>
-  open.length
+const kickoffFor = (hasOpen: boolean) =>
+  hasOpen
     ? `Ask the owner the charter's open questions in one short message, each with the default you'd pick, and start the work that doesn't depend on them. ${KICKOFF}`
     : KICKOFF;
 const NONCE = /^[A-Za-z0-9_-]{8,100}$/;
@@ -215,9 +217,10 @@ const composition = (m: CheckedMember, skills = m.skills): Composition => ({
 export async function provision(raw: unknown, nonce: string, deps: ProvisionDeps): Promise<{ projectId: string; created: boolean }> {
   const { db } = deps;
   const projectId = projectIdFor(nonce);
-  // A retry: the first attempt's rows stand; only finish the vault.
+  // A retry: the first attempt's rows stand; only finish the vault and the kickoff.
   if (db.projects.get(projectId)) {
     await seedVault(projectId, deps);
+    kickoff(projectId, db);
     return { projectId, created: false };
   }
 
@@ -273,15 +276,31 @@ export async function provision(raw: unknown, nonce: string, deps: ProvisionDeps
       db.members.add({ projectId, agentId: team[i].agentId, role: m.role, qualifications: m.qualifications });
       db.threads.ensure(team[i].agentId, projectId);
     });
-    db.inbox.add(threadId(lead, projectId), "assignment", { from: "mira", projectId, charter: spec, budgetUsd: plan.budgetUsd, instruction: kickoffFor(plan.charter.open) });
     return true;
   });
   if (created) deps.bus.emit(TOPICS.org);
   await seedVault(projectId, deps);
+  kickoff(projectId, db);
   return { projectId, created };
 }
 
-/** Writes whatever of the project's files the vault doesn't have yet: one seed commit per agent, then the charter. */
+/**
+ * The lead's kickoff (kind `assignment`: the charter plus "write the plan and assign first tasks"), once per project.
+ * It goes in last: an inbox row wakes its thread (the runtime), so the PM's run finds every row and file in place.
+ */
+function kickoff(projectId: string, db: RuntimeDb): void {
+  const project = db.projects.get(projectId)!;
+  const thread = threadId(project.leadAgentId!, projectId);
+  db.tx(() => {
+    if (db.inbox.has(thread, "assignment")) return;
+    db.inbox.add(thread, "assignment", { from: "mira", projectId, charter: project.specMd ?? "", budgetUsd: project.budgetUsd, instruction: kickoffFor(Boolean(project.specMd?.includes("## Open questions"))) });
+  });
+}
+
+/**
+ * Writes whatever of the project's files the vault doesn't have yet: one seed commit per agent, the charter, then one
+ * staffing commit per expert not yet on the state roster (assign_task gives work only to roster members).
+ */
 async function seedVault(projectId: string, { db, library, vault }: ProvisionDeps): Promise<void> {
   const project = db.projects.get(projectId)!;
   for (const m of db.members.list(projectId)) {
@@ -300,10 +319,18 @@ async function seedVault(projectId: string, { db, library, vault }: ProvisionDep
       trailers: { Archetype: agent.archetype, Project: projectId, ...(agent.composition.skills.length && { Skill: agent.composition.skills }) },
     });
   }
-  await writeMissing(vault, [{ path: `projects/${projectId}/state/charter.md`, content: () => project.specMd ?? "" }], {
+  // Beside state/, not in it: state/charter.md is set_charter's (the project-state format, behind an owner approval).
+  await writeMissing(vault, [{ path: `projects/${projectId}/charter.md`, content: () => project.specMd ?? "" }], {
     subject: `state(${projectId}): seed charter.md from the launch card`,
     trailers: { Project: projectId },
   });
+  if (project.kind !== "team") return;
+  const staffed = new Set((await readState(projectId)).roster.members.map((m) => m.agentId));
+  for (const m of db.members.list(projectId)) {
+    if (m.agentId === project.leadAgentId || staffed.has(m.agentId)) continue;
+    const { archetype } = db.agents.get(m.agentId)!;
+    await addMember(projectId, { agentId: m.agentId, role: m.role ?? archetype, archetype, thread: threadId(m.agentId, projectId) });
+  }
 }
 
 /** One seed commit of the files that don't exist yet; a file another writer created meanwhile is left alone. */

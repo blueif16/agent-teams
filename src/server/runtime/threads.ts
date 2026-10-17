@@ -51,6 +51,11 @@ export class ThreadQueue<J> {
     return this.lines.has(threadId);
   }
 
+  /** Every thread with a job running or waiting. */
+  busyThreads(): string[] {
+    return [...this.lines.keys()];
+  }
+
   /** Resolves once the thread has nothing running or waiting. */
   idle(threadId: string): Promise<void> {
     if (!this.isBusy(threadId)) return Promise.resolve();
