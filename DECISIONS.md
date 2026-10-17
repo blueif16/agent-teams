@@ -23,6 +23,7 @@ A fixed set. Nothing outside it is called.
 - Agents run on LangChain Deep Agents JS inside the Next.js server, with `ChatOpenAI` pointed at Crusoe. As of 2026-10-17 none do yet: replies are single chat completions, and the runtime is being built.
 - **Local first:** runs execute in the local Node server with state on disk. A hosted store comes later.
 - **One persistent Deep Agent per worker** (own thread and checkpointer), not a `task` sub-agent of the lead, so a DM reaches the agent doing the work.
+- **You.com is the default web search** for every agent's information gathering (2026-10-17). Researchers also get the Research API, and orchestrators source skills through a code pipeline: skill library first, then one deep research call, vetting and your approval. Details: `docs/design/team-setup.md` §3b.
 - NemoClaw (Nemo Cloud) is optional, only for running agent code in a sandbox.
 - LangChain throws on a 429 with no retry header, so every agent gets retry with backoff before its fallback.
 

@@ -87,6 +87,43 @@ E privacy · F orchestrator memory); cited as `[D §7]`.
 - Fetch chain to Crusoe: `privacyScrub → limit → fetch`. It's the only point that also catches summarization's own
   model call [E §8].
 
+## 3b. Search and research: You.com by default [`research/youcom-for-agent-teams-2026-10-17.md`]
+
+Decided (owner, 2026-10-17): You.com is the default web search for every information-gathering step. Tools are
+plain `tool()` wrappers over the REST endpoints (no new dependency), `YDC_API_KEY` stays server-side, and every call
+writes a ledger row (endpoint, tier, list price, latency) so search spend shows per agent.
+
+| Tool | Endpoint | Who gets it | Notes |
+|---|---|---|---|
+| `web_search` | `POST ydc-index.io/v1/search`, `extraction_mode: highlights` | **every agent (default)** | highlights return only the relevant passages, so Flash reads fewer tokens; $5 / 1k |
+| `fetch_page` | `POST ydc-index.io/v1/contents` | every agent | known URLs → Markdown; $1 / 1k pages |
+| `answer` | `POST api.you.com/v1/answer` | analyst, Mira | one-pass cited answer for a sanity check; $5 / 1k |
+| `research` | `POST api.you.com/v1/research` | researcher (all tiers), analyst, PM / HR / Mira (through the pipelines below) | tiers `lite` · `standard` · `deep` · `exhaustive` · `frontier` ($12–$1,200 / 1k); `output_schema` (not on `lite`); `source_control` (≤ 500 domains, freshness); `background: true` + SSE progress drives the "now" line |
+
+- **Researcher archetype** gets a `you-research` SKILL.md: when to use search vs answer vs each research tier, how to
+  write an `output_schema`, `source_control`, background mode, and budget rules. `exhaustive` and `frontier` go through
+  an approval card like any spend.
+- **Analyst** asks `output_schema` for the exact shape of a chart template, then writes the ` ```chart ` block.
+- **👀 Dig in** on a research reply reruns it one tier higher.
+- **Skill sourcing for orchestrators is code, not a search loop** (`find_skill(need, qualifications)`, one tool call
+  for the PM / HR / Mira; the loop lives in the runtime so Flash spends no tokens searching):
+  1. Look up the **skill library** (vetted picks, versioned per §8b). A hit costs $0.
+  2. On a miss, one Research call at `deep` with `output_schema {skill_name, repo_url, publisher,
+     is_official_publisher, install_command, last_updated, why_it_fits}` and `source_control` limited to github.com
+     and skills.sh (~$0.10, 20–26 s; plain search failed this test, Research passed both hard cases).
+  3. Vet in code: GitHub stars, drop forks and archived repos, rank by stars; scan the SKILL.md with the detector pack
+     and injection checks (You.com doesn't vet: it ranked a 1-star repo #2 as "official"; Snyk found 76 malicious
+     skills among 3,984).
+  4. The owner approves (on the launch card for a new hire, or its own card later).
+  5. Store the pick in the library with its provenance, so the next hire for that need doesn't search again.
+- **HR** uses the same pipeline to look for a better skill before replacing a weak agent.
+- **Privacy:** search and research are tier T3 (public read egress): queries are scanned before they leave, and
+  results come back labelled `untrusted` (§6).
+- **PROPOSED Q12 · Engineers' code-docs lookups** stay on You.com by default, or add Exa for that one archetype
+  (You.com 55% vs Exa 83% on an independent coding-docs benchmark).
+- **PROPOSED Q13 · Mira's daily news check** per active project (one research call per project per day, ~$0.36 per
+  team per day, estimated).
+
 ## 4. The lead's memory and compaction [F]
 
 - **Durable state** under `.data/projects/<pid>/state/`, written **only** by structured tools (mounted read-only for
@@ -199,6 +236,7 @@ Tracks run in parallel where they don't share files; each step ships with a test
 | **M lead memory** [F §10] | M1 state module + tools · M2 worker `report` → DAG/roster/deltas · M3 window opener + replacement summarizer (cache hit ≥ 0.8 from turn 3) · M4 compaction turn files unfiled items · M5 quiz + fallback · M6 Mira rollups + dream at close |
 | **P privacy** [E §10] | P1 detector pack + false-positive tests · P2 Crusoe + LangSmith scrub · P3 policy engine (a deny never relaxes) · P4 tool gate + approvals · P5 taint · P6 project boundary · P7 NL compiler (eval) · P8 UI |
 | **S setup flow** | S1 Mira triage + `project` card v2 · S2 PM brief/source/staff tools + agent library · S3 provisioning (`POST /api/projects`) + kickoff |
+| **W web tools** [§3b] | W1 `web_search` + `fetch_page` (You.com) as default tools, with ledger rows · W2 `research` + `answer` tools, researcher `you-research` skill, SSE → "now" line · W3 `find_skill` pipeline + skill library (library hit, deep research, vetting, approval, store) |
 | **U UI** | U1 Plan/team panels from state files · U2 approval cards from the runtime · U3 tool-call strip · U4 rules page |
 
 Order of dependence: R1–R4 → R5–R7 → M and S; P1–P3 can start any time; P4 after R6; U follows the step it renders.
