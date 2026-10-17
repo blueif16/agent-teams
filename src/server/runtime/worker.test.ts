@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readAgentFiles, writeAgentFile } from "@/lib/agent-files";
 import { compactionTriggers } from "@/lib/context-budget";
 import { MODELS } from "@/lib/models";
+import { PROJECT_FENCE } from "@/lib/project";
 import { workerBackend } from "./backends";
 import { openCheckpointer } from "./checkpointer";
 import { openRuntimeDb, type RuntimeDb } from "./db";
@@ -148,4 +149,15 @@ describe("summarization (D finding 7)", () => {
     const history = path.join(env.data, "history", "mira", "dm");
     expect(existsSync(history) ? readdirSync(history).filter((f) => f.endsWith(".md")) : []).not.toEqual([]);
   }, 60_000);
+});
+
+describe("Mira on the runtime", () => {
+  it("knows how to propose a project: her system prompt carries the option-card fence and the archetypes to staff from", async () => {
+    const { fake, agent } = mira([{ text: "Sure." }]);
+    await agent.invoke(say("Start a project to size the US market."));
+    const system = systemOf(fake.requests[0]);
+    expect(system).toContain(PROJECT_FENCE);
+    expect(system).toMatch(/"options":\[/);
+    expect(system).toContain("- researcher:");
+  }, 30_000);
 });
