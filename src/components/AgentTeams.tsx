@@ -7,7 +7,7 @@ import { AGENTS, CHIEF, CHIEF_ID, HQ, TEAMS, TEAMS_BY_ID } from "@/lib/data";
 import { excerpt, orderText, ORDERS_BY_KEY, type OrderKey } from "@/lib/orders";
 import { parseProject, PROJECT_FENCE, START_PROJECT, visibleText } from "@/lib/project";
 import { withChartSummaries } from "@/lib/charts";
-import { prefetch } from "@/lib/client-cache";
+import { prefetch, useCached, type Resource } from "@/lib/client-cache";
 import type { AgentStatus, Message, OrgSnapshot, PlanStep, Team } from "@/lib/types";
 import { ChiefMenu } from "./Chief";
 import { identityOf } from "./Identity";
@@ -16,6 +16,7 @@ import { Mascot } from "./Mascot";
 import { OrgContext } from "./org";
 import { IconButton, Toast } from "./ui";
 import { Rail, type SideMode } from "./Rail";
+import { archetypeList, skillLibrary } from "./Skills";
 import { Sidebar } from "./Sidebar";
 import { Conversation, type MessageHandlers } from "./Conversation";
 import { WorkspaceBody, WorkspaceTabs, type Tab } from "./Workspace";
@@ -34,6 +35,12 @@ const plain = (text: string) => text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
 const PANEL = { type: "spring", stiffness: 380, damping: 38 } as const;
 
 const CHIEF_VIEW: View = { kind: "dm", agentId: CHIEF_ID };
+
+/**
+ * GET /api/chat says whether CRUSOE_API_KEY is set: server config, not chat state. It changes only with a
+ * restart, which nothing announces (`config` is never sent); the stream's reconnect and window focus recheck it.
+ */
+const LIVE_REPLIES: Resource = { key: "/api/chat", topic: "config" };
 
 /** What a model sees of a thread: text, plus a line for each of the chief's proposals. */
 const toHistory = (msgs: Message[]) =>
@@ -113,7 +120,9 @@ export function AgentTeams() {
   const [reactions, setReactions] = useState<Record<string, Reaction[]>>({});
   const [memories, setMemories] = useState<Record<string, string[]>>({});
   const [plans] = useState<Record<string, PlanStep[]>>({});
-  const [live, setLive] = useState<boolean | null>(null);
+  // null while it's never been checked; painted from the cache after that.
+  const chat = useCached<{ live: boolean }>(LIVE_REPLIES);
+  const live = chat.data ? chat.data.live : chat.error ? false : null;
   const [prefill, setPrefill] = useState<{ key: string; text: string; nonce: number } | null>(null);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -138,17 +147,13 @@ export function AgentTeams() {
   const viewRef = useRef(view);
   viewRef.current = view;
 
-  useEffect(() => {
-    fetch("/api/chat")
-      .then((r) => r.json())
-      .then((d: { live: boolean }) => setLive(d.live))
-      .catch(() => setLive(false));
-  }, []);
-
-  // Mira's panel is the one opened most, so her stats and files are ready before it is.
+  // Mira's panel is the one opened most, so her stats and files are ready before it is; the Skills tab's
+  // library and chips too, so its first open paints at once.
   useEffect(() => {
     void prefetch(agentStats(CHIEF_ID));
     void prefetch(identityOf(CHIEF_ID));
+    void prefetch(skillLibrary);
+    void prefetch(archetypeList);
   }, []);
 
   const notify = useCallback((text: string) => {
