@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { CornerDownRight, Hand } from "lucide-react";
+import { CornerDownRight, Hand, X } from "lucide-react";
 import { AGENTS, CHIEF_ID } from "@/lib/data";
 import type { OrderKey } from "@/lib/orders";
 import { CHIEF_SHORTCUTS } from "@/lib/project";
 import type { Agent, AgentStatus, Message } from "@/lib/types";
 import { Mascot } from "./Mascot";
-import { POP, RichText, StatusDot } from "./ui";
+import { POP, RichText, SPRING, StatusDot } from "./ui";
 import { Composer } from "./Composer";
 import { ActionMenu, HoverBar, ReactionChips, type MenuTarget, type Reaction } from "./MessageActions";
 import { Markdown } from "./Markdown";
@@ -61,7 +62,7 @@ export function Conversation({
   prefill: { text: string; nonce: number } | null;
   reactions: Record<string, Reaction[]>;
   handlers: MessageHandlers;
-  onSend: (text: string) => void;
+  onSend: (text: string, images?: string[]) => void;
   onDecide: (id: string, d: "approved" | "declined") => void;
   onOpenAgent: (id: string) => void;
   onOpenTeam: (id: string) => void;
@@ -200,10 +201,13 @@ export function Conversation({
     } else if (m.kind === "text" && m.from === "you") {
       node = (
         <div className={`flex justify-end ${first ? "mt-5" : "mt-1.5"}`}>
-          <div className="group/msg relative max-w-[min(520px,85%)]">
-            <div className="rounded-[20px] bg-accent px-4 py-2.5 text-[15px] leading-[22px] text-white">
-              <RichText text={m.text} />
-            </div>
+          <div className="group/msg relative flex max-w-[min(520px,85%)] flex-col items-end gap-1.5">
+            {m.images?.length ? <SentImages ids={m.images} /> : null}
+            {m.text && (
+              <div className="rounded-[20px] bg-accent px-4 py-2.5 text-[15px] leading-[22px] text-white">
+                <RichText text={m.text} />
+              </div>
+            )}
             <span className="pointer-events-none absolute bottom-1.5 right-full mr-2 whitespace-nowrap text-[11.5px] text-muted opacity-0 transition-opacity group-hover/msg:opacity-100">
               {m.at}
             </span>
@@ -439,6 +443,84 @@ export function Conversation({
         )}
       </AnimatePresence>
     </section>
+  );
+}
+
+/** Images you sent, as 14 px rounded thumbnails; a click opens them in a lightbox. */
+function SentImages({ ids }: { ids: string[] }) {
+  const [open, setOpen] = useState<{ id: string; origin: string } | null>(null);
+  const single = ids.length === 1;
+  return (
+    <>
+      <div className="flex flex-wrap justify-end gap-1.5">
+        {ids.map((id) => (
+          <button
+            key={id}
+            type="button"
+            aria-label="Open image"
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              setOpen({ id, origin: `${r.left + r.width / 2}px ${r.top + r.height / 2}px` });
+            }}
+            className="tap block overflow-hidden rounded-[14px] bg-bubble shadow-[0_0_0_1px_rgba(0,0,0,0.06)] transition-shadow hover:shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_4px_14px_rgba(0,0,0,0.1)]"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- served as-is from /api/uploads */}
+            <img
+              src={`/api/uploads/${id}`}
+              alt="Image you sent"
+              className={single ? "block h-[200px] w-auto max-w-full object-cover" : "block size-[100px] object-cover sm:size-[120px]"}
+            />
+          </button>
+        ))}
+      </div>
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>{open && <Lightbox key={open.id} src={`/api/uploads/${open.id}`} origin={open.origin} onClose={() => setOpen(null)} />}</AnimatePresence>,
+          document.body,
+        )}
+    </>
+  );
+}
+
+/** A full-screen view of one image that grows out of its thumbnail. Esc, the backdrop or × closes it. */
+function Lightbox({ src, origin, onClose }: { src: string; origin: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Image" className="fixed inset-0 z-[60]" onClick={onClose}>
+      <motion.div className="absolute inset-0 bg-black/75" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} />
+      {/* Full-viewport layer, so the thumbnail's viewport position is its transform origin. */}
+      <motion.div
+        className="absolute inset-0 grid place-items-center p-6 sm:p-12"
+        style={{ transformOrigin: origin }}
+        initial={{ opacity: 0, scale: 0.25 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.25, transition: { duration: 0.16 } }}
+        transition={SPRING}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- served as-is from /api/uploads */}
+        <img src={src} alt="Image you sent, full size" className="max-h-full max-w-full rounded-[18px] object-contain shadow-[0_20px_60px_rgba(0,0,0,0.35)]" />
+      </motion.div>
+      <motion.button
+        type="button"
+        aria-label="Close image"
+        autoFocus
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute right-4 top-4"
+      >
+        <span className="tap grid size-9 place-items-center rounded-full bg-white/15 text-white hover:bg-white/25">
+          <X className="size-5" strokeWidth={2} />
+        </span>
+      </motion.button>
+    </div>
   );
 }
 

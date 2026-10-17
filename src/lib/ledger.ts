@@ -35,6 +35,9 @@ export interface CallEvent extends Base {
   vision?: boolean;
   /** LangSmith run id. */
   trace?: string;
+  /** For kind "run": the agent's thread (`a:{agent}:p:{project}`) and the runtime run the call was part of. */
+  thread?: string;
+  run?: string;
 }
 
 export interface OrderEvent extends Base {
