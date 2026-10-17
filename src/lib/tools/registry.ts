@@ -7,7 +7,7 @@
  * Artifact paths are relative to .data/vault/. Each artifact type has exactly one `pane:` renderer; other views of
  * the same file (board, timeline, decisions) carry the artifact but draw in that type's pane.
  */
-import { CANVAS_NOTE, CHARTS_NOTE, DOC_NOTE } from "./notes";
+import { BASH_NOTE, CANVAS_NOTE, CHARTS_NOTE, DOC_NOTE } from "./notes";
 import type { ToolDef } from "./types";
 
 const CANVAS = "projects/{pid}/work/canvas/{slug}.excalidraw";
@@ -51,6 +51,13 @@ export const REGISTRY: readonly ToolDef[] = [
     id: "mermaid", name: "Diagram", description: "Flowcharts and sequence diagrams drawn from Mermaid inline.",
     kind: "present", mechanism: "fence", tier: "T0", archetypes: ["*"], status: "planned", origin: "adopt",
     calls: [], fence: "mermaid", renderer: "mermaid", deps: ["@streamdown/mermaid@1.0.3"],
+  },
+
+  // ── the experts who compute: the workbench's sandboxed shell (src/server/workbench), one server per project
+  {
+    id: "bash", name: "Shell", description: "Runs commands in a sandbox in the project's folder (python3, node, sqlite3, jq, ffmpeg).",
+    kind: "action", mechanism: "call", tier: "T7", archetypes: ["engineer", "analyst", "designer", "researcher"], status: "ready",
+    origin: "exists", calls: ["bash"], note: BASH_NOTE,
   },
 
   // ── designer
