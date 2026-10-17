@@ -37,6 +37,8 @@ export interface LiveReply {
   thread: string;
   run: string;
   text: string;
+  /** Finished, its row not loaded yet: drawn settled, so it doesn't blink out in between. */
+  done?: boolean;
 }
 
 /** A project's conversation (a channel, or a DM project), optionally the page before row `before`. */
@@ -47,7 +49,7 @@ export function transcriptOf(projectId: string, before?: number): Resource {
 
 /** `a:{agentId}:p:{projectId}` (src/server/runtime/threads.ts). */
 export const threadOf = (agentId: string, projectId: string) => `a:${agentId}:p:${projectId}`;
-const agentOf = (thread: string) => /^a:([^:]+):p:/.exec(thread)?.[1] ?? thread;
+export const agentOf = (thread: string) => /^a:([^:]+):p:/.exec(thread)?.[1] ?? thread;
 
 export const replyId = (runId: string) => `run:${runId}`;
 
@@ -55,12 +57,13 @@ const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "num
 
 /** Saved rows as the messages a view draws: the owner's as their bubbles, each agent's as that agent. */
 export function savedMessages(rows: SavedRow[]): Message[] {
-  return rows.map((r) => {
+  return rows.flatMap((r): Message[] => {
     const id = r.ref ?? (r.role === "agent" && r.runId ? replyId(r.runId) : `m:${r.id}`);
     const at = clock(r.at);
-    if (r.role === "owner") return { id, kind: "text", from: "you", at, text: r.text, ...(r.uploads.length ? { images: r.uploads } : {}), saved: true };
-    // A project block is the option cards' input, not prose.
-    return { id, kind: "text", from: r.author, at, text: visibleText(r.text) || r.text, saved: true };
+    if (r.role === "owner") return [{ id, kind: "text", from: "you", at, text: r.text, ...(r.uploads.length ? { images: r.uploads } : {}), saved: true }];
+    // A project block is the option cards' input, not prose: a reply that's only a block draws nothing.
+    const text = visibleText(r.text);
+    return text ? [{ id, kind: "text", from: r.author, at, text, saved: true }] : [];
   });
 }
 
@@ -90,7 +93,8 @@ export function liveReplies(runs: LiveReply[], threads: string[], shown: Set<str
   const on = new Set(threads);
   return runs
     .filter((r) => on.has(r.thread) && r.text.trim() && !shown.has(replyId(r.run)))
-    .map((r) => ({ id: replyId(r.run), kind: "text", from: agentOf(r.thread), at: clock(new Date().toISOString()), text: visibleText(r.text) || "…", streaming: true }));
+    // No clock while it streams (render can't read the time); the saved row brings its own.
+    .map((r) => ({ id: replyId(r.run), kind: "text", from: agentOf(r.thread), at: "", text: visibleText(r.text) || "…", streaming: !r.done }));
 }
 
 /** Everything a view shows: saved rows, merged with the page's local messages, then the replies still streaming. */
