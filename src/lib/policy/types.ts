@@ -172,8 +172,10 @@ export interface RulesResponse {
   readBack: Record<string, string>;
   tiers: TierDefault[];
   detectors: DetectorSummary[];
-  /** When `agent` is given: the effective default per tier for that agent after its rules. */
-  capabilities?: { tier: Tier; name: string; effect: ToolEffect; firedRuleIds: string[] }[];
+  /** When `agent` is given: each capability for that agent after its rules, with whether its toolset has it. */
+  permissions?: Permission[];
+  /** The flow rules in force, grouped by what they protect. */
+  data: DataGuard[];
 }
 
 export interface RuleConflict {

@@ -1,18 +1,20 @@
 import { agentType } from "@/lib/agent-files";
 import { AGENTS } from "@/lib/data";
+import { dataGuards, permissionsFor, toolsetOf } from "@/lib/policy/capabilities";
 import { listDetectors } from "@/lib/policy/detectors";
-import { decide, globMatch } from "@/lib/policy/engine";
+import { globMatch } from "@/lib/policy/engine";
 import { readBackAll } from "@/lib/policy/readback";
 import { ARCHETYPES } from "@/lib/policy/schema";
 import { policyStore, RuleValidationError } from "@/lib/policy/store";
 import { TIERS } from "@/lib/policy/tiers";
-import type { Archetype, Rule, RulesResponse, Scope, ToolEffect } from "@/lib/policy/types";
+import type { Archetype, Rule, RulesResponse, Scope } from "@/lib/policy/types";
 
 /*
  * The privacy and tool rules (design §6) for the Rules tab. Nothing is enforced from here yet; this is the source of
  * truth the enforcement points will read.
- *   GET  /api/rules?agent=&project=   rules in force with read-backs, tiers, detectors; with `agent`, what it can do
- *                                     per tier (an agent launched at runtime also needs &archetype=)
+ *   GET  /api/rules?agent=&project=   rules in force with read-backs, tiers, detectors and what the flow rules protect
+ *                                     (`data`); with `agent`, what it can do per capability (`permissions`; an agent
+ *                                     launched at runtime also needs &archetype=)
  *   POST /api/rules { rules, mode }   save rules from a compile result, in enforce or shadow mode → 201 { rules }
  */
 
@@ -22,17 +24,6 @@ const isArchetype = (v: string | null): v is Archetype => ARCHETYPES.includes(v 
 function canApply(scope: Scope, q: { agentId?: string; archetype?: Archetype; projectId?: string }): boolean {
   const ok = (list: string[] | undefined, v: string | undefined) => v === undefined || list === undefined || list.some((p) => globMatch(p, v));
   return ok(scope.agents, q.agentId) && ok(scope.archetypes, q.archetype) && ok(scope.projects, q.projectId);
-}
-
-const asToolEffect = (o: string): ToolEffect => (o === "block" || o === "deny" ? "deny" : o === "ask" ? "ask" : "allow");
-const strictness: Record<ToolEffect, number> = { deny: 0, ask: 1, allow: 2 };
-
-function capabilities(rules: Rule[], agentId: string, archetype: Archetype, projectId: string, now: Date): NonNullable<RulesResponse["capabilities"]> {
-  return TIERS.map((t) => {
-    const decisions = t.tools.map((tool) => decide({ agentId, archetype, projectId, tool, args: {}, argSpans: [], contextLabels: [], sinks: [] }, rules, [], now));
-    const effect = decisions.map((d) => asToolEffect(d.effect)).reduce((a, b) => (strictness[b] < strictness[a] ? b : a), "allow" as ToolEffect);
-    return { tier: t.tier, name: t.name, effect, firedRuleIds: [...new Set(decisions.flatMap((d) => d.firedRuleIds))].sort() };
-  });
 }
 
 export async function GET(req: Request) {
@@ -57,8 +48,10 @@ export async function GET(req: Request) {
   }
 
   const rules = agentId || projectId ? all.filter((r) => canApply(r.scope, { agentId, archetype, projectId })) : all;
-  const body: RulesResponse = { rules, readBack: readBackAll(rules), tiers: TIERS, detectors: listDetectors() };
-  if (agentId && archetype) body.capabilities = capabilities(all, agentId, archetype, projectId ?? "", new Date());
+  const now = new Date();
+  const body: RulesResponse = { rules, readBack: readBackAll(rules), tiers: TIERS, detectors: listDetectors(), data: dataGuards(rules, now) };
+  // Relevance comes from the registry by archetype for now; resolveToolset(ArchetypeDef, composition) replaces it.
+  if (agentId && archetype) body.permissions = permissionsFor({ agentId, archetype, projectId: projectId ?? "" }, all, toolsetOf(archetype), now);
   return Response.json(body);
 }
 

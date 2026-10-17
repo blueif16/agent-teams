@@ -399,36 +399,6 @@ function RulesList({
   );
 }
 
-/** The agent's permission sheet: each tool tier's effective outcome after its rules. */
-function Capabilities({ name, data }: { name: string; data: RulesResponse }) {
-  if (!data.capabilities?.length) return null;
-  return (
-    <Section title={`What ${name} can do`}>
-      <ul>
-        {data.capabilities.map((c) => {
-          const tools = data.tiers.find((t) => t.tier === c.tier)?.tools ?? [];
-          const fired = c.firedRuleIds.length;
-          return (
-            <li key={c.tier} className="flex items-center gap-2.5 border-t border-line px-4 py-2 first:border-t-0">
-              <span className="w-5 shrink-0 font-mono text-[11.5px] text-muted">{c.tier}</span>
-              <span className="min-w-0 flex-1 truncate text-[13.5px] leading-[20px]" title={tools.join(", ")}>
-                <span className="font-medium">{c.name}</span>
-                {tools.length > 0 && <span className="font-mono text-[12px] text-muted"> · {tools.slice(0, 3).join(", ")}</span>}
-              </span>
-              {fired > 0 && (
-                <span className="shrink-0 text-[12px] text-muted" title={c.firedRuleIds.map((id) => data.readBack[id] ?? id).join("\n")}>
-                  {plural(fired, "rule")}
-                </span>
-              )}
-              <OutcomeChip pop label={c.effect} tone={OUTCOME_TONE[c.effect]} />
-            </li>
-          );
-        })}
-      </ul>
-    </Section>
-  );
-}
-
 const CONFLICT_LABEL: Record<RuleConflict["kind"], string> = {
   shadowed: "Already covered",
   tightens: "Tightens",
@@ -790,7 +760,6 @@ export function RulesTab({ agentId, projectId, onNotify }: { agentId?: string; p
           <DetectorChip key={d.id} d={d} />
         ))}
       </div>
-      {agentId && <Capabilities name={AGENTS[agentId]?.name ?? agentId} data={data} />}
       <RulesList
         data={data}
         fresh={fresh}
