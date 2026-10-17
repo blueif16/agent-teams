@@ -10,7 +10,7 @@ import { MODELS } from "@/lib/models";
 import type { Archetype } from "@/lib/policy/types";
 import { getArchetype } from "@/lib/skills/archetypes";
 import type { Composition } from "@/lib/skills/types";
-import type { Agent, AgentStatus, Team } from "@/lib/types";
+import type { Agent, AgentStatus, OrgPayload, Team } from "@/lib/types";
 import { getRuntimeDb, MIRA_DM_PROJECT, type AgentRow, type ProjectRow } from "./runtime/db";
 
 export interface AgentHome {
@@ -151,15 +151,8 @@ export function getTeam(id: string): Team | undefined {
   return p ? toTeam(p) : undefined;
 }
 
-/**
- * Live projects of one kind, oldest first. Not db.projects.list(): its numbered SQL parameters (?1, ?2) can't be
- * bound positionally by node:sqlite on Node 24.1, so it throws; rows still map through db.projects.get.
- */
-function liveProjects(kind: ProjectRow["kind"]): ProjectRow[] {
-  const db = getRuntimeDb();
-  const rows = db.sql.prepare("SELECT id FROM projects WHERE status = 'active' AND kind = ? ORDER BY created_at, rowid").all(kind) as { id: string }[];
-  return rows.flatMap(({ id }) => db.projects.get(String(id)) ?? []);
-}
+/** Live projects of one kind, oldest first. */
+const liveProjects = (kind: ProjectRow["kind"]) => getRuntimeDb().projects.list({ status: "active", kind });
 
 /** The channels: live team projects in the db, oldest first. */
 export function listTeams(): Team[] {
@@ -174,12 +167,6 @@ export function listDms(): Team[] {
 }
 
 /** GET /api/org: what the db adds to the constants. The client merges Mira and the company back in. */
-export interface OrgPayload {
-  teams: Team[];
-  dms: Team[];
-  agents: Agent[];
-}
-
 export function orgPayload(): OrgPayload {
   return {
     teams: listTeams(),
