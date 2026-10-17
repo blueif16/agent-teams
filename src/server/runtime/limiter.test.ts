@@ -150,3 +150,72 @@ describe("limitFetch", () => {
     expect(out).toBe(res);
   });
 });
+
+describe("calibration from responses", () => {
+  /** limitFetch over a fake Crusoe whose responses come from `respond`, counting what reached it. */
+  function crusoe(limiter: Limiter, respond: (n: number) => Response) {
+    const reached = { n: 0 };
+    const f = limitFetch(async () => respond(++reached.n), limiter);
+    return { f, reached };
+  }
+
+  it("blocks the next request to a model after a response says x-ratelimit-remaining-requests: 0", async () => {
+    // Another process (or a key shared elsewhere) spent the minute: locally only 1 of 30 is used.
+    const headers = crusoeHeaders({ limitRequests: 30, remainingRequests: 0, limitTokens: 500_000, remainingTokens: 499_900 });
+    const { f, reached } = crusoe(new Limiter(), () => completion(MAIN, { headers }));
+    await f(URL, post(MAIN, 100));
+
+    const next = track(f(URL, post(MAIN, 100)));
+    await vi.advanceTimersByTimeAsync(59_999);
+    expect(next.done).toBe(false);
+    expect(reached.n).toBe(1);
+    await vi.advanceTimersByTimeAsync(1); // the window that request opened has passed
+    expect(next.done).toBe(true);
+  });
+
+  it("does not read a missing x-ratelimit-remaining-requests header as 0", async () => {
+    const headers = crusoeHeaders({ limitTokens: 500_000, remainingTokens: 499_900 }); // no *-requests headers
+    const { f, reached } = crusoe(new Limiter(), () => completion(MAIN, { headers }));
+    await f(URL, post(MAIN, 100));
+
+    const next = track(f(URL, post(MAIN, 100)));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(next.done).toBe(true);
+    expect(reached.n).toBe(2);
+  });
+
+  it("holds a request that won't fit in the x-ratelimit-remaining-tokens a response reported", async () => {
+    // Crusoe says 2K tokens are left this minute; locally only ~100 have been counted.
+    const headers = crusoeHeaders({ limitRequests: 30, remainingRequests: 29, limitTokens: 500_000, remainingTokens: 2_000 });
+    const { f, reached } = crusoe(new Limiter(), () => completion(MAIN, { headers }));
+    await f(URL, post(MAIN, 100));
+
+    const next = track(f(URL, post(MAIN, 3_000)));
+    await vi.advanceTimersByTimeAsync(59_999);
+    expect(next.done).toBe(false);
+    expect(reached.n).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(next.done).toBe(true);
+  });
+
+  it("after a 429, holds the model until the minute that began with the window's first request has passed", async () => {
+    // A 429 with no x-ratelimit headers or retry-after, like the one in research/sandbox/verify3.mjs
+    // (and GLM-5.3 at capacity answering 429 to a single request, DECISIONS.md).
+    const rateLimited = () =>
+      new Response(JSON.stringify({ error: { message: "rate limited", type: "rate_limit_error", code: 429 } }), {
+        status: 429,
+        headers: { "content-type": "application/json" },
+      });
+    const { f, reached } = crusoe(new Limiter(), (n) => (n === 1 ? completion(MAIN) : rateLimited()));
+    await f(URL, post(MAIN, 100)); // t = 0, ok: the window starts here
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect((await f(URL, post(MAIN, 100))).status).toBe(429); // t = 10 s
+
+    const next = track(f(URL, post(MAIN, 100)));
+    await vi.advanceTimersByTimeAsync(49_999);
+    expect(next.done).toBe(false);
+    expect(reached.n).toBe(2);
+    await vi.advanceTimersByTimeAsync(1); // t = 60 s
+    expect(next.done).toBe(true);
+  });
+});
