@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowUp, Info, Loader, Lock, Quote, TriangleAlert } from "lucide-react";
+import { ArrowUp, Info, Loader, Lock, Quote, Trash2, TriangleAlert } from "lucide-react";
 import { AGENTS } from "@/lib/data";
 import type { CompileResult, DetectorSummary, Outcome, Rule, RuleConflict, RuleKind, RulesResponse, Scope } from "@/lib/policy/types";
 import { useOrg } from "./org";
-import { POP } from "./ui";
+import { POP, SPRING } from "./ui";
 
 /*
  * Rules tab (design §6, E-privacy §7 V4): the privacy and tool rules an agent or project runs under, from
@@ -165,8 +165,72 @@ function scopeChips(scope: Scope, channel: (projectId: string) => string): { lab
   return out;
 }
 
-function RuleRow({ rule, sentence, fresh, reveal }: { rule: Rule; sentence: string; fresh: boolean; reveal: boolean }) {
+/** The confirm step before a DELETE: anchored to the trash button, closes on Escape or a click outside. */
+function RemoveConfirm({
+  sentence,
+  busy,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  sentence: string;
+  busy: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+  return (
+    <>
+      <div className="fixed inset-0 z-30" onClick={onCancel} />
+      <motion.div
+        role="dialog"
+        aria-label="Remove this rule?"
+        initial={{ opacity: 0, scale: 0.94, y: -4 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.1 } }}
+        transition={SPRING}
+        style={{ transformOrigin: "top right" }}
+        className="absolute right-0 top-full z-40 mt-1.5 w-64 rounded-2xl bg-white p-3 text-left text-ink shadow-[0_8px_30px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05)]"
+      >
+        <p className="text-[13.5px] font-medium">Remove this rule?</p>
+        <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-[17px] text-ink-2">{sentence}</p>
+        {error && <p className="mt-1.5 text-[12px] leading-[16px] text-danger">{error}</p>}
+        <div className="mt-2.5 flex justify-end gap-1.5">
+          <button type="button" onClick={onCancel} className="tap rounded-full px-3 py-1 text-[13px] font-medium text-ink-2 hover:bg-bubble">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className="tap rounded-full bg-danger px-3 py-1 text-[13px] font-medium text-white hover:shadow-lg hover:shadow-danger/30 disabled:opacity-60"
+          >
+            {busy ? "Removing…" : "Remove"}
+          </button>
+        </div>
+      </motion.div>
+    </>
+  );
+}
+
+interface Removal {
+  confirming: boolean;
+  busy: boolean;
+  error: string | null;
+  onAsk: () => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+function RuleRow({ rule, sentence, fresh, reveal, removal }: { rule: Rule; sentence: string; fresh: boolean; reveal: boolean; removal: Removal }) {
   const org = useOrg();
+  // Defaults and locked rules stay; anything you or an approval added can go.
+  const removable = !rule.locked && rule.createdBy !== "default";
   const ref = useRef<HTMLLIElement>(null);
   // A rule you just saved scrolls into view, so you see it pop in.
   useEffect(() => {
@@ -199,7 +263,8 @@ function RuleRow({ rule, sentence, fresh, reveal }: { rule: Rule; sentence: stri
       ref={ref}
       initial={fresh ? { opacity: 0, y: 12, scale: 0.97 } : false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, height: 0, transition: { duration: 0.18 } }}
+      // Fade first, then close the gap, so the leaving text never overlaps the row below.
+      exit={{ opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0, transition: { opacity: { duration: 0.08 }, default: SPRING } }}
       transition={POP}
       className="border-t border-line px-4 py-2.5 first:border-t-0"
     >
@@ -213,12 +278,30 @@ function RuleRow({ rule, sentence, fresh, reveal }: { rule: Rule; sentence: stri
         </span>
         {meta && <span className="hidden shrink-0 items-center gap-1 @md:flex">{meta}</span>}
         <OutcomeChip {...outcome} />
-        <span className="grid size-7 shrink-0 place-items-center text-muted">
-          {rule.locked && (
+        <span className="relative grid size-7 shrink-0 place-items-center text-muted">
+          {rule.locked ? (
             <span role="img" aria-label="Locked" title="Locked: no grant can relax it, and it can't be removed here">
               <Lock className="size-3.5" />
             </span>
+          ) : (
+            removable && (
+              <button
+                type="button"
+                aria-label={`Remove rule: ${sentence}`}
+                aria-expanded={removal.confirming}
+                title="Remove"
+                onClick={removal.onAsk}
+                className={`tap grid size-7 place-items-center rounded-full hover:bg-danger-wash hover:text-danger ${removal.confirming ? "bg-danger-wash text-danger" : ""}`}
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            )
           )}
+          <AnimatePresence>
+            {removal.confirming && (
+              <RemoveConfirm sentence={sentence} busy={removal.busy} error={removal.error} onCancel={removal.onCancel} onConfirm={removal.onConfirm} />
+            )}
+          </AnimatePresence>
         </span>
       </div>
       {meta && <div className="mt-1 flex flex-wrap gap-1 @md:hidden">{meta}</div>}
@@ -234,7 +317,41 @@ function RuleRow({ rule, sentence, fresh, reveal }: { rule: Rule; sentence: stri
   );
 }
 
-function RulesList({ data, fresh, saved }: { data: RulesResponse; fresh: ReadonlySet<string>; saved: ReadonlySet<string> }) {
+function RulesList({
+  data,
+  fresh,
+  saved,
+  onRemoved,
+}: {
+  data: RulesResponse;
+  fresh: ReadonlySet<string>;
+  saved: ReadonlySet<string>;
+  onRemoved: () => void;
+}) {
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Removed rows leave at once, before the refetch lands.
+  const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
+  const cancel = useCallback(() => {
+    setConfirm(null);
+    setError(null);
+  }, []);
+  const remove = async (id: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/rules/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!res.ok) throw await failure(res, "Couldn't remove it");
+      setGone((g) => new Set(g).add(id));
+      setConfirm(null);
+      onRemoved();
+    } catch (e) {
+      setError(reason(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   if (data.rules.length === 0)
     return (
       <div className="mt-6 rounded-2xl bg-white px-4 py-6 text-center shadow-[0_0_0_1px_rgba(0,0,0,0.05)]">
@@ -247,14 +364,31 @@ function RulesList({ data, fresh, saved }: { data: RulesResponse; fresh: Readonl
   return (
     <>
       {GROUPS.map(({ kind, title }) => {
-        const rules = data.rules.filter((r) => r.kind === kind);
+        const rules = data.rules.filter((r) => r.kind === kind && !gone.has(r.id));
         if (rules.length === 0) return null;
         return (
           <Section key={kind} title={title} aside={<span className="text-[12px] tabular-nums text-muted">{rules.length}</span>}>
             <ul>
               <AnimatePresence initial={false}>
                 {rules.map((r) => (
-                  <RuleRow key={r.id} rule={r} sentence={data.readBack[r.id] ?? r.reason ?? `A ${r.kind} rule`} fresh={fresh.has(r.id)} reveal={fresh.has(r.id) && saved.has(r.id)} />
+                  <RuleRow
+                    key={r.id}
+                    rule={r}
+                    sentence={data.readBack[r.id] ?? r.reason ?? `A ${r.kind} rule`}
+                    fresh={fresh.has(r.id)}
+                    reveal={fresh.has(r.id) && saved.has(r.id)}
+                    removal={{
+                      confirming: confirm === r.id,
+                      busy: busy && confirm === r.id,
+                      error: confirm === r.id ? error : null,
+                      onAsk: () => {
+                        setError(null);
+                        setConfirm((c) => (c === r.id ? null : r.id));
+                      },
+                      onCancel: cancel,
+                      onConfirm: () => void remove(r.id),
+                    }}
+                  />
                 ))}
               </AnimatePresence>
             </ul>
@@ -656,7 +790,15 @@ export function RulesTab({ agentId, projectId, onNotify }: { agentId?: string; p
         ))}
       </div>
       {agentId && <Capabilities name={AGENTS[agentId]?.name ?? agentId} data={data} />}
-      <RulesList data={data} fresh={fresh} saved={saved} />
+      <RulesList
+        data={data}
+        fresh={fresh}
+        saved={saved}
+        onRemoved={() => {
+          reload();
+          onNotify("Rule removed");
+        }}
+      />
     </div>
   );
 }
