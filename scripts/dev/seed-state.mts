@@ -153,6 +153,7 @@ const staff = [
   { agentId: "bo", name: "Bo", archetype: "designer", role: "Product designer" },
   { agentId: "cy", name: "Cy", archetype: "engineer", role: "Frontend engineer" },
 ] as const;
+for (const s of staff) db.agents.create({ id: s.agentId, name: s.name, archetype: s.archetype });
 db.projects.create({
   id: PID,
   kind: "team",
@@ -166,7 +167,6 @@ db.projects.create({
   budgetUsd: 15,
 });
 for (const s of staff) {
-  db.agents.create({ id: s.agentId, name: s.name, archetype: s.archetype });
   db.members.add({ projectId: PID, agentId: s.agentId, role: s.role });
   db.threads.ensure(s.agentId, PID);
 }
