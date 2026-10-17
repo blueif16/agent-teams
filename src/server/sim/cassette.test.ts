@@ -227,3 +227,60 @@ describe("recording and replaying a stream", () => {
     expect(dec.decode(await bytesOf(res))).toContain("Café");
   });
 });
+
+/** Resolves to "timed out" if `p` hasn't settled within ms. */
+const within = <T,>(p: Promise<T>, ms = 1000) => Promise.race([p, sleep(ms).then(() => "timed out" as const)]);
+
+describe("recording while the caller streams", () => {
+  it("hands the caller the first chunk before the upstream has finished", async () => {
+    let release = () => {};
+    const hold = new Promise<void>((r) => (release = r));
+    const chunks = sseChunks();
+    const up = fakeUpstream([{ chunks: chunks.slice(0, 1), hold }]);
+    const rec = createCassette({ file, mode: "record", upstream: up.fetch });
+
+    const first = await within(
+      (async () => {
+        const reader = (await post(rec.fetch, chat("Draft the launch plan"))).body!.getReader();
+        return { reader, chunk: await reader.read() };
+      })(),
+    );
+
+    expect(first).not.toBe("timed out");
+    const { reader, chunk } = first as Exclude<typeof first, "timed out">;
+    expect(Buffer.from(chunk.value!).equals(Buffer.from(chunks[0]))).toBe(true);
+    expect(up.state.finished).toBe(0);
+    release();
+    expect((await reader.read()).done).toBe(true);
+  });
+
+  it("saves a cancelled recording as partial, with the chunks read so far", async () => {
+    const chunks = sseChunks();
+    const up = fakeUpstream([{ chunks: chunks.slice(0, 1), hold: new Promise(() => {}) }]);
+    const rec = createCassette({ file, mode: "record", upstream: up.fetch });
+
+    const res = await within(post(rec.fetch, chat("Draft the launch plan")));
+    expect(res).not.toBe("timed out");
+    const reader = (res as Response).body!.getReader();
+    await reader.read();
+    await reader.cancel();
+
+    const saved = (await readFile(file, "utf8")).trim().split("\n").slice(1).map((l) => JSON.parse(l));
+    expect(saved).toHaveLength(1);
+    expect(saved[0].response.partial).toBe(true);
+    expect(saved[0].response.chunks.map((c: { b64: string }) => c.b64)).toEqual([Buffer.from(chunks[0]).toString("base64")]);
+  });
+
+  it("cancels the upstream body when the caller cancels, so the model stops", async () => {
+    const up = fakeUpstream([{ chunks: sseChunks().slice(0, 1), hold: new Promise(() => {}) }]);
+    const rec = createCassette({ file, mode: "record", upstream: up.fetch });
+
+    const res = await within(post(rec.fetch, chat("Draft the launch plan")));
+    expect(res).not.toBe("timed out");
+    const reader = (res as Response).body!.getReader();
+    await reader.read();
+    await reader.cancel();
+
+    expect(up.state.cancelled).toBe(1);
+  });
+});
