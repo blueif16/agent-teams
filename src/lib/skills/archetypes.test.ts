@@ -3,7 +3,18 @@ import { agentType, INHERENT } from "@/lib/agent-files";
 import type { Agent } from "@/lib/types";
 import { ARCHETYPES, getArchetype } from "./archetypes";
 
-const FILE_TOOLS = ["ls", "read_file", "write_file", "edit_file", "glob", "grep"];
+/** The base set every archetype inherits (docs/research/H-archetype-toolsets.md §3); never listed per archetype. */
+const BASE = ["ls", "read_file", "write_file", "edit_file", "glob", "grep", "web_search", "fetch_page", "report", "chart", "mermaid"];
+/** H §3 curated sets: action ids in prompt order, then the archetype's panes. */
+const CURATED: Record<string, string[]> = {
+  designer: ["canvas_edit", "canvas_read", "canvas_export", "request_review", "write_mockup", "fetch_image", "canvas", "mockup"],
+  engineer: ["propose_patch", "repo_read", "run_tests", "diff", "files", "tests"],
+  researcher: ["research", "add_source", "doc_write", "sources", "doc"],
+  analyst: ["describe", "answer", "write_table", "table"],
+  writer: ["doc_write", "doc_suggest", "doc_comment", "doc_read", "doc"],
+  lead: ["add_task", "update_task", "assign_task", "record_decision", "raise_item", "resolve_item", "find_skill", "search_skills", "plan"],
+  chief: ["find_agent", "dispatch", "answer", "research", "find_skill", "search_skills", "dashboard", "inbox"],
+};
 const ids = ARCHETYPES.map((a) => a.id);
 const has = (id: string, tool: string) => getArchetype(id as never)!.tools.includes(tool);
 
@@ -26,19 +37,17 @@ describe("archetype definitions", () => {
     for (const other of ARCHETYPES.filter((a) => a.id !== "designer")) expect(designer.inherent).not.toEqual(other.inherent);
   });
 
-  it("gives every archetype web_search, fetch_page and the file tools", () => {
-    for (const a of ARCHETYPES) {
-      for (const tool of ["web_search", "fetch_page", ...FILE_TOOLS]) expect(a.tools, `${a.id} lacks ${tool}`).toContain(tool);
-    }
+  it("lists each archetype's curated registry ids from H §3, in prompt order", () => {
+    for (const a of ARCHETYPES) expect(a.tools, a.id).toEqual(CURATED[a.id]);
   });
 
-  it("gives research to the researcher only", () => {
-    expect(ids.filter((id) => has(id, "research"))).toEqual(["researcher"]);
+  it("never lists the base set (file tools, web_search, fetch_page, report, chart, mermaid): every archetype inherits it", () => {
+    for (const a of ARCHETYPES) for (const tool of BASE) expect(a.tools, `${a.id} lists base tool ${tool}`).not.toContain(tool);
   });
 
-  it("gives answer and chart to the analyst and the chief only", () => {
+  it("gives research to the researcher and the chief, answer to the analyst and the chief", () => {
+    expect(ids.filter((id) => has(id, "research")).sort()).toEqual(["chief", "researcher"]);
     expect(ids.filter((id) => has(id, "answer")).sort()).toEqual(["analyst", "chief"]);
-    expect(ids.filter((id) => has(id, "chart")).sort()).toEqual(["analyst", "chief"]);
   });
 
   it("gives search_skills and find_skill to the orchestrators (lead and chief) only", () => {
@@ -46,7 +55,7 @@ describe("archetype definitions", () => {
     expect(ids.filter((id) => has(id, "find_skill")).sort()).toEqual(["chief", "lead"]);
   });
 
-  it("never gives shell or delete tools by default (tier T7 stays off without a sandbox)", () => {
+  it("never lists raw shell or delete tools (T7 is the registry's run_tests, filtered until a sandbox exists)", () => {
     for (const a of ARCHETYPES) {
       expect(a.tools).not.toContain("execute");
       expect(a.tools).not.toContain("delete");
