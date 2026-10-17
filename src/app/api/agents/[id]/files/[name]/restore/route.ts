@@ -1,4 +1,5 @@
-import { getVault, OWNER } from "@/server/runtime/vault";
+import { agentVault } from "@/lib/agent-files";
+import { OWNER } from "@/server/runtime/vault";
 import { fileOr404, vaultError } from "../file";
 
 /**
@@ -15,7 +16,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/agents/[id]/fil
     return Response.json({ error: "Send { change: <change id> }." }, { status: 400 });
   }
 
-  const vault = getVault();
+  const vault = await agentVault();
   try {
     const commit = await vault.restore(file, body.change, OWNER);
     const content = (await vault.show(file)) ?? "";

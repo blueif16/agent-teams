@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, Heart, Pencil } from "lucide-react";
 import { cache, useCached, type Resource } from "@/lib/client-cache";
 import { AGENTS } from "@/lib/data";
+import { HistoryButton } from "./FileHistory";
 import { IconButton, inline, POP, SPRING } from "./ui";
 
 /*
@@ -279,8 +280,22 @@ export function IdentityTab({ agentId, onNotify }: { agentId: string; onNotify: 
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3">
             {(["soul", "memory"] as const).map((w, i) => (
-              <motion.div key={w} initial={{ opacity: 0, y: 10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ ...POP, delay: i * 0.05 }}>
+              <motion.div
+                key={w}
+                initial={{ opacity: 0, y: 10, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ ...POP, delay: i * 0.05 }}
+                className="relative"
+              >
                 <Card which={w} updated={data[w].updated} onOpen={() => setOpen({ which: w, edit: false })} />
+                {/* A sibling of the card's button, never inside it: the timeline of where this file came from. */}
+                <HistoryButton
+                  agentId={agentId}
+                  file={w}
+                  onNotify={onNotify}
+                  onRestored={(f) => cache.mutate<Identity>(resource.key, (d) => (d ? { ...d, [w]: f } : d))}
+                  className="absolute right-3 top-3"
+                />
               </motion.div>
             ))}
           </div>
