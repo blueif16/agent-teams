@@ -64,6 +64,8 @@ export interface Engine {
   runRule(rule: PreparedRule, text: string, lower: string): RawSpan[];
   /** Dedupes and applies precedence; returns spans sorted by position. */
   finalize(spans: RawSpan[]): RawSpan[];
+  /** Shannon entropy in bits per char, as gitleaks computes it. */
+  entropy(s: string): number;
 }
 
 export interface PreparedRule {
@@ -361,5 +363,5 @@ export function createEngine(): Engine {
     return kept.sort((a, b) => a.start - b.start || a.end - b.end || a.label.localeCompare(b.label) || a.detector.localeCompare(b.detector));
   }
 
-  return { prepare, runRule, finalize };
+  return { prepare, runRule, finalize, entropy: shannon };
 }

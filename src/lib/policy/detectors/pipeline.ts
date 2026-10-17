@@ -1,9 +1,10 @@
 /*
- * Scan orchestration behind `scan()`: the local pack in a worker with a timeout.
+ * Scan orchestration behind `scan()`: the local pack in a worker with a timeout, then optionally TypeSafe.
  */
 import { createEngine, type RawSpan, type RuleSpec } from "./engine";
 import type { ScanOptions, Span } from "./index";
 import { PACK_ALLOW, PACK_RULES } from "./pack";
+import { scanHosted, typesafeConfigured, type TypesafeEnv } from "./typesafe";
 import { ScanWorkerPool, type WorkerRun } from "./worker";
 
 export const DEFAULT_TIMEOUT_MS = 2000;
@@ -16,6 +17,8 @@ export interface ScanResult {
   /** The worker failed, so the local scan ran in-process (no timeout protection). */
   inProcess?: boolean;
   error?: string;
+  /** The hosted provider was asked but did not answer usably; `spans` are the local ones. */
+  degraded?: string;
 }
 
 export interface LocalScanOptions {
@@ -60,6 +63,20 @@ export async function scanLocal(text: string, opts: LocalScanOptions = {}): Prom
   return { spans: toSpans(engine.finalize(run.spans)), timedOut: run.timedOut };
 }
 
-export async function scanDetailed(text: string, opts: ScanOptions = {}): Promise<ScanResult> {
-  return scanLocal(text, { timeoutMs: opts.timeoutMs });
+export interface DetailedScanOptions extends ScanOptions, LocalScanOptions {
+  /** Where TYPESAFE_API_KEY and friends come from (default: process.env). */
+  env?: TypesafeEnv;
+  /** Test hook: the fetch used for TypeSafe. */
+  fetch?: typeof fetch;
+  /** Budget for the TypeSafe call (default TYPESAFE_TIMEOUT_MS); timeoutMs bounds the local scan. */
+  hostedTimeoutMs?: number;
+}
+
+/** The local pack, then (when asked and configured) TypeSafe on the text with every local hit replaced. */
+export async function scanDetailed(text: string, opts: DetailedScanOptions = {}): Promise<ScanResult> {
+  const local = await scanLocal(text, { timeoutMs: opts.timeoutMs, extraRules: opts.extraRules });
+  if (!opts.hosted || !typesafeConfigured(opts.env)) return local;
+  const hosted = await scanHosted(text, local.spans, { env: opts.env, fetch: opts.fetch, timeoutMs: opts.hostedTimeoutMs });
+  const spans = [...local.spans, ...hosted.spans].sort((a, b) => a.start - b.start || a.end - b.end);
+  return { ...local, spans, ...(hosted.degraded ? { degraded: hosted.degraded } : {}) };
 }
