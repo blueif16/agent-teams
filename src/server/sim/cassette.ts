@@ -204,7 +204,8 @@ function replay(entry: CassetteEntry): Response {
  */
 function record(res: Response, started: number, save: (response: CassetteEntry["response"]) => void): Response {
   const type = res.headers.get("content-type");
-  const head = { status: res.status, headers: type ? { "content-type": type } : {}, ttfbMs: Math.round(performance.now() - started) };
+  const headers: Record<string, string> = type ? { "content-type": type } : {};
+  const head = { status: res.status, headers, ttfbMs: Math.round(performance.now() - started) };
   const chunks: CassetteChunk[] = [];
   let saved = false;
   const finish = (partial: boolean) => {
