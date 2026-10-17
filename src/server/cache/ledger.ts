@@ -89,6 +89,8 @@ export class LedgerCache {
         if (!changed || changed.toString() === name) void this.catchUp();
       });
       this.watcher.on("error", (e) => console.warn("The ledger watcher stopped:", e.message));
+      // On macOS a new watcher isn't live for up to ~100 ms under load; catch up once after that.
+      setTimeout(() => !this.closed && void this.catchUp(), 250).unref?.();
     } catch (e) {
       console.warn("Can't watch the ledger for other writers:", (e as Error).message);
     }
