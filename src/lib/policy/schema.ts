@@ -149,6 +149,12 @@ export const RuleSchema: z.ZodType<Rule> = z.discriminatedUnion("kind", [
   ClassifierRuleSchema,
 ]);
 
+/** A fresh rule id: `r_` + 10 random lowercase letters and digits. Ids are always made by code, never by a model. */
+export function newRuleId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  return `r_${Array.from(bytes, (b) => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join("")}`;
+}
+
 /** "rules.0.scope: Unrecognized key: agent" lines, for errors and the compiler's repair turn. */
 export function issueLines(error: z.ZodError, prefix: (string | number)[] = []): string[] {
   return error.issues.map((i) => `${[...prefix, ...i.path].join(".") || "(root)"}: ${i.message}`);
