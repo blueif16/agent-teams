@@ -122,6 +122,7 @@ Details and evidence: `docs/design/team-setup.md`.
   - **Client:** every GET a component makes goes through `useCached`/`prefetch` (`src/lib/client-cache.ts`), which is stale-while-revalidate and kept in `sessionStorage`. It refreshes on SSE topics from `/api/events`, never on a polling timer.
   - **Writes:** POST/DELETE stay plain `fetch`, and the server announces the change.
   - A test keeps every component GET on the cache.
+- File access goes by zone (owner requirement, 2026-10-17). Each folder an agent can see is open, shared, deliverable, protected or forbidden, with a plain reason. An agent writes only its own deliverables; for example, a researcher writes only `research.md`. Protected and forbidden zones are locked rules. The NL compiler knows the zones, so plain words become the right path rules.
 - Reactions are orders: 👍 go, 👀 dig in, 🔁 redo, ✋ hold, 📌 remember.
 - The UI copies OpenAI dots and Meta Muse, and every click gets feedback.
 - A mascot always opens that agent; only `#channel` opens the team panel.
