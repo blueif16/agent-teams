@@ -15,7 +15,10 @@ import { readBack } from "./readback";
 import { ARCHETYPES, issueLines, newRuleId, RuleSchema } from "./schema";
 import { TIERS, TOOL_CATALOG } from "./tiers";
 import type { Archetype, ArgConstraint, CompileResult, Rule } from "./types";
+import { FILE_READ_TOOLS, FILE_WRITE_TOOLS, fileAccessProblem, WRITE_SCOPES, ZONES } from "./zones";
 import * as z from "zod";
+
+const zoneReason = (id: string) => ZONES.find((zone) => zone.id === id)!.reason;
 
 export interface CompileInput {
   text: string;
@@ -29,6 +32,8 @@ export interface CompileContext {
   projects: string[];
   /** Every rule in force (defaults included). */
   rules: Rule[];
+  /** Each agent's task deliverables from the PM (agent id → paths), when known. */
+  deliverables?: Record<string, string[]>;
   now: Date;
 }
 
@@ -105,6 +110,32 @@ What owners' words usually mean here (each sink is listed in <facts>):
   or allowed without asking? Ask, recommending the existing ask, unless the sentence says "without asking".
 </owner_words>
 
+<files>
+Files have their own map in <facts>.files. Read it before writing any rule about files, folders, documents, reports,
+notes, paths, "read-only", "edit" or "write".
+- zones: every path falls in one zone. severity: open (scratch: anyone writes) · shared (/project/**: every agent reads,
+  each writes only its own deliverables) · deliverable (an agent's own output) · protected (never written by file
+  tools; it changes through the lead's tools, dreaming or the owner) · forbidden (never read or written).
+- agents.<id>: archetype, canWrite (every project path that agent may write today) and deliverables (paths the lead
+  assigned it). Each agent already writes ONLY its canWrite paths and scratch; the rest of /project is read-only to it.
+- writeTools change files, readTools read them. File rules constrain the arg "path" only (it also covers file_path),
+  with op path_glob or path_not_glob and paths from the map or the sentence.
+File rules come in exactly three shapes:
+1. "X can only write Y", "X is read-only except Y" → one deny for X on ["write_file","edit_file","delete_file"] with
+   {"path":"path","op":"path_not_glob","value":[Y]}. Take Y from X's canWrite or deliverables (a researcher's report
+   is /project/research.md). Write it even when canWrite already says the same: the owner's rule keeps holding when
+   the lead assigns X more work later.
+2. "Let X edit / write / update Z" → one allow for X on ["write_file","edit_file"] with
+   {"path":"path","op":"path_glob","value":[Z]}. Z is the narrowest path the words name: a deliverable or canWrite path
+   of any agent in the map when the words point at it, else the path the sentence gives, under /project/
+   ("notes/x.md" → "/project/notes/x.md"). This is the only way to widen what an agent writes. Never "/project/**" or
+   "/project/*": that is everyone's shared folder. If two paths fit the words, ask.
+3. "X can't read / open Z" → one deny for X on ["read_file","ls","glob","grep"] with {"path":"path","op":"path_glob","value":[Z]}.
+Refuse to open a protected or forbidden zone: write NO rule for that part, and add one assumption naming the zone's
+label and severity and copying its reason word for word ("Team plan & decisions is protected: <reason>"). Their
+rules are locked; no sentence can loosen them.
+</files>
+
 <the_bar>
 Required, every one:
 1. Every part of the sentence is covered by a rule, an assumption or a question. Keeping data away from a place is a
@@ -117,8 +148,11 @@ Required, every one:
 5. If a word maps to more than one tool, label, sink or scope and the choice changes what is enforced, do NOT pick:
    write the rules for the clear part and ask a question with 2-3 options, recommended first.
 6. If a rule in force already does what the sentence asks, write no new rule and say so in an assumption with its ids.
+7. Every file rule has one of the three shapes in <files>, and a part that would open a protected or forbidden zone is
+   refused in an assumption with the zone's reason.
 Must NOT: invent tools, agents, projects, domains or labels; write an allow or a grant broader than the sentence;
-try to relax a locked rule (it can't be relaxed: say so in an assumption); write anything outside the JSON.
+try to relax a locked rule (it can't be relaxed: say so in an assumption); open a protected or forbidden file zone;
+write anything outside the JSON.
 </the_bar>
 
 <example>
@@ -133,12 +167,21 @@ Sentence: "Rex can email dana@kestrel.example without asking until Friday."   (n
 Sentence: "Engineers shouldn't touch the web."
 {"rules":[{"kind":"tool","scope":{"archetypes":["engineer"]},"match":{"tools":["web_search","fetch_page"]},"effect":"deny"}],"assumptions":[],"questions":[{"q":"Should engineers also lose the research and answer tools?","options":["Yes, no web tools at all","No, only search and opening pages"]}]}
 </example>
+<example>
+Sentence: "Lin should only ever touch its own data folder."   (files.agents.lin: analyst, canWrite ["/project/data/**"])
+{"rules":[{"kind":"tool","scope":{"agents":["lin"]},"match":{"tools":["write_file","edit_file","delete_file"]},"effect":"deny","args":[{"path":"path","op":"path_not_glob","value":["/project/data/**"]}],"reason":"Lin writes only its data folder"}],"assumptions":["Lin could already write only data/ and scratch; this rule keeps it so when the lead assigns more."],"questions":[]}
+</example>
+<example>
+Sentence: "Let Kim tidy up the skills library and draft notes/tidy.md."
+{"rules":[{"kind":"tool","scope":{"agents":["kim"]},"match":{"tools":["write_file","edit_file"]},"effect":"allow","args":[{"path":"path","op":"path_glob","value":["/project/notes/tidy.md"]}]}],"assumptions":["Skills library is protected: ${zoneReason("skills")}"],"questions":[]}
+</example>
 
 <self_check>
 Before answering, check silently: (a) one JSON object with exactly the keys rules, assumptions, questions; (b) every
 rule uses only names from <facts> and the fields above, with no id; (c) every part of the sentence is covered by a
 rule, an assumption or a question; (d) at most 3 questions, each with 2-3 options; (e) nothing allows more than the
-sentence does. Fix whatever fails, then output the JSON only.
+sentence does; (f) every file rule has a <files> shape, constrains only "path", and opens no protected or forbidden
+zone. Fix whatever fails, then output the JSON only.
 </self_check>`;
 
 const SINK_MEANINGS: Record<string, string> = {
@@ -175,6 +218,18 @@ function facts(input: CompileInput, ctx: CompileContext) {
     },
     sinks: SINK_MEANINGS,
     rulesInForce: ctx.rules.map((r) => ({ id: r.id, kind: r.kind, ...(r.locked ? { locked: true } : {}), readBack: readBack(r) })),
+    files: {
+      zones: ZONES.map(({ id, label, severity, paths, reason }) => ({ id, label, severity, paths, reason })),
+      writeTools: FILE_WRITE_TOOLS,
+      readTools: FILE_READ_TOOLS,
+      agents: Object.fromEntries(
+        ctx.agents.flatMap((a) => {
+          if (!a.archetype) return [];
+          const deliverables = ctx.deliverables?.[a.id] ?? [];
+          return [[a.id, { archetype: a.archetype, canWrite: [...new Set([...WRITE_SCOPES[a.archetype], ...deliverables])], deliverables }]];
+        }),
+      ),
+    },
   };
 }
 
@@ -257,6 +312,7 @@ const SINK = /^(\*|model:(\*|crusoe)|trace:(\*|langsmith)|web|email|calendar|api
 const HOST = /^(\*\.)?([a-z0-9-]+\.)+[a-z0-9-]{2,}$/i;
 const HOST_OPS = new Set<ArgConstraint["op"]>(["host_in", "host_not_in", "domain_in", "domain_not_in"]);
 const KNOWN_TOOLS = [...new Set([...TIERS.flatMap((t) => t.tools), ...Object.keys(TOOL_CATALOG)])];
+const FILE_TOOLS = [...FILE_READ_TOOLS, ...FILE_WRITE_TOOLS];
 
 const argBase = (p: string) => p.split(/[.[]/)[0];
 const toolKnown = (p: string) => p === "*" || KNOWN_TOOLS.some((t) => globMatch(p, t) || globMatch(t, p));
@@ -319,6 +375,23 @@ function checkRule(r: Rule, at: string, ctx: CompileContext, classifierLabels: S
     constraints(r.args, `${at}.args`, argsOf([r.tool]));
   } else if (r.kind === "budget") {
     (r.match?.tools ?? []).forEach((t, j) => toolKnown(t) || issues.push(`${at}.match.tools.${j}: unknown tool "${t}"`));
+  }
+
+  // File zones: an allow or a grant on file tools names its files, and opens no protected or forbidden zone.
+  const opening = r.kind === "grant" ? { tools: [r.tool], args: r.args } : r.kind === "tool" && r.effect === "allow" ? { tools: r.match.tools, args: r.args } : null;
+  const fileTools = opening ? FILE_TOOLS.filter((t) => opening.tools.some((p) => globMatch(p, t))) : [];
+  if (opening && fileTools.length) {
+    const writes = fileTools.some((t) => FILE_WRITE_TOOLS.includes(t));
+    const globs = (opening.args ?? []).flatMap((c, j) => (c.path === "path" && c.op === "path_glob" ? [{ c, j }] : []));
+    if (writes && !globs.length && opening.tools.every((p) => FILE_TOOLS.includes(p)))
+      issues.push(
+        `${at}: an allow on file writes must name its files with {"path":"path","op":"path_glob","value":[...]}; each agent already writes only its own files, so one without paths changes nothing`,
+      );
+    for (const { c, j } of globs)
+      for (const v of [c.value].flat()) {
+        const problem = typeof v === "string" ? fileAccessProblem(v, writes) : "It isn't a path.";
+        if (problem) issues.push(`${at}.args.${j}.value: "${String(v)}" can't be opened. ${problem} Write no rule for it; say so in an assumption that gives this reason.`);
+      }
   }
 
   // A grant or an allow can't get around a locked rule that always asks or denies a tool.

@@ -11,6 +11,8 @@ import { endLLMRun, orderFeedback, startLLMRun } from "@/lib/tracing";
 import type { AgentStatus, OrgSnapshot } from "@/lib/types";
 import { isImageUpload } from "@/lib/uploads";
 import { getAgent, getTeam } from "@/server/directory";
+import { getRuntimeDb } from "@/server/runtime/db";
+import { announceMessage, saveTo } from "@/server/runtime/transcript";
 import { imageParts, inlineTexts, type ImagePart } from "@/server/uploads";
 
 /** Prompts look agents and teams up in the directory: the constants, then the runtime db. */
@@ -102,6 +104,11 @@ export async function POST(req: Request) {
     heartbeat?: boolean;
     /** For a team the chief launched: its goal, members and spec. */
     project?: ProjectContext;
+    /**
+     * Save this exchange to the agent's thread transcript: the owner's `text` (with the uploads) now, the reply
+     * when it ends. For messages the runtime can't take yet (images); ignored unless the thread is the agent's.
+     */
+    record?: { thread: string; text: string; ref?: string; replyRef?: string };
   };
   const { agentId, mode, history, images = [], order } = body;
   const agent = getAgent(agentId);
@@ -116,6 +123,12 @@ export async function POST(req: Request) {
     attached = await inlineTexts(ids.filter((id) => !isImageUpload(id)));
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 400 });
+  }
+  const saving = body.heartbeat ? undefined : saveTo(body.record, agentId);
+  if (saving) {
+    const uploads = Array.isArray(body.uploads) ? body.uploads : [];
+    getRuntimeDb().messages.add({ threadId: saving.thread, role: "owner", author: "owner", text: saving.text, uploads, ref: saving.ref });
+    announceMessage(saving.thread);
   }
   const chief = agentId === CHIEF_ID;
   const project = chief ? undefined : cleanProject(body.project);
@@ -240,6 +253,10 @@ export async function POST(req: Request) {
               // Partial or keep-alive line; skip.
             }
           }
+        }
+        if (saving && text) {
+          getRuntimeDb().messages.add({ threadId: saving.thread, role: "agent", author: agentId, text, ref: saving.replyRef });
+          announceMessage(saving.thread);
         }
         controller.close();
       } finally {

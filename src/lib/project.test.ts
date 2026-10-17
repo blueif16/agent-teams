@@ -48,6 +48,11 @@ describe("parseProject (v2 fence with options)", () => {
     ]);
   });
 
+  it("keeps up to 3 open questions for the PM to settle with the owner", () => {
+    const p = parseProject(reply({ ...proposal, open: [" Which price band? ", "Bluetooth or one-way link?", "", "Rugged or detox framing?", "A fourth?"] }))!;
+    expect(p.open).toEqual(["Which price band?", "Bluetooth or one-way link?", "Rugged or detox framing?"]);
+  });
+
   it(`caps the options at ${MAX_OPTIONS}`, () => {
     const many = Array.from({ length: 6 }, (_, i) => ({ ...balanced, label: `Option ${i + 1}` }));
     const p = parseProject(reply({ ...proposal, options: many }))!;

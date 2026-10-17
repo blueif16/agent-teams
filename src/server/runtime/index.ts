@@ -17,6 +17,7 @@ import { inboxDrain, type DmPayload } from "./inbox";
 import type { Limiter } from "./limiter";
 import { executeRun } from "./run";
 import { parseThreadId, ThreadQueue } from "./threads";
+import { announceMessage } from "./transcript";
 import { buildWorker, type Worker } from "./worker";
 
 export interface RuntimeOptions {
@@ -35,6 +36,8 @@ export interface SendResult {
   /** The run that will answer, when one is known. */
   runId?: string;
   inboxId: number;
+  /** Its row in the thread's transcript. */
+  messageId: number;
 }
 
 export class UnknownThreadError extends Error {
@@ -68,19 +71,37 @@ export class Runtime {
   }
 
   /**
-   * An owner message to a thread; `images` are upload ids, sent as image parts (attachUploads() in
-   * src/server/uploads.ts turns a message's uploads into these). Throws UnknownThreadError for a thread the
-   * runtime db doesn't have.
+   * An owner message to a thread, saved to its transcript as it's accepted. `ref` is the sender's id for it.
+   * Attachments (attachUploads() in src/server/uploads.ts makes them): `attachments` are <attachment> blocks for the
+   * model only, `images` image upload ids sent as image parts, `uploads` every id, kept on the transcript row.
+   * Throws UnknownThreadError for a thread the runtime db doesn't have.
    */
-  send(threadId: string, message: { text: string; from?: string; images?: string[]; uploads?: string[] }): SendResult {
+  send(
+    threadId: string,
+    message: { text: string; from?: string; ref?: string; attachments?: string; images?: string[]; uploads?: string[] },
+  ): SendResult {
     if (!this.db.threads.get(threadId)) throw new UnknownThreadError(threadId);
-    const { text, from = "owner", images, uploads } = message;
-    const item = this.db.inbox.add<DmPayload>(threadId, "dm", { text, from, ...(images?.length && { images }), ...(uploads?.length && { uploads }) });
-    if (this.queue.isBusy(threadId)) return { delivered: "inbox", runId: this.active.get(threadId), inboxId: item.id };
-    const run = this.db.runs.create({ threadId, trigger: "dm", lane: "interactive" });
+    const from = message.from ?? "owner";
+    const { images, uploads } = message;
+    const forModel = [message.text, message.attachments].filter(Boolean).join("\n\n");
+    const busy = this.queue.isBusy(threadId);
+    const { item, run, saved } = this.db.tx(() => {
+      const item = this.db.inbox.add<DmPayload>(threadId, "dm", { text: forModel, from, ...(images?.length && { images }), ...(uploads?.length && { uploads }) });
+      const run = busy ? undefined : this.db.runs.create({ threadId, trigger: "dm", lane: "interactive" });
+      const runId = run?.id ?? this.active.get(threadId) ?? null;
+      const saved = this.db.messages.add({ threadId, runId, role: "owner", author: from, text: message.text, uploads, ref: message.ref });
+      return { item, run, saved };
+    });
+    announceMessage(threadId);
+    if (!run) return { delivered: "inbox", runId: this.active.get(threadId), inboxId: item.id, messageId: saved.id };
     // A failure is on the run row (and, with streaming, on the thread's events); nobody awaits it here.
     this.queue.enqueue(threadId, { runId: run.id }).catch(() => {});
-    return { delivered: "run", runId: run.id, inboxId: item.id };
+    return { delivered: "run", runId: run.id, inboxId: item.id, messageId: saved.id };
+  }
+
+  /** The run in progress on the thread, if one is. */
+  activeRun(threadId: string): string | undefined {
+    return this.active.get(threadId);
   }
 
   /** Resolves once nothing runs or waits on the thread. */
@@ -130,7 +151,14 @@ export class Runtime {
     // Stats teams are projects; a DM or company thread counts toward the company (Mira's HQ team).
     const team = project.kind === "team" ? project.id : HQ.id;
     return executeRun(
-      { db: this.db, worker: this.worker(threadId), events: this.events, activate, ledger: { team, agent: agent.id, asked: MODELS[agent.modelTier] } },
+      {
+        db: this.db,
+        worker: this.worker(threadId),
+        events: this.events,
+        activate,
+        announce: announceMessage,
+        ledger: { team, agent: agent.id, asked: MODELS[agent.modelTier] },
+      },
       threadId,
       runId,
     );

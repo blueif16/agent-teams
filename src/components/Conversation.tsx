@@ -55,6 +55,7 @@ export function Conversation({
   onLaunchProject,
   onEditProposal,
   onRequestChanges,
+  onLoadEarlier,
 }: {
   view: View;
   messages: Message[];
@@ -75,11 +76,14 @@ export function Conversation({
   onEditProposal: (msgId: string, update: (m: Extract<Message, { kind: "proposal" }>) => Extract<Message, { kind: "proposal" }>) => void;
   /** "Request changes" on the option cards: sent to Mira as a normal message. */
   onRequestChanges: (text: string) => void;
+  /** Older messages are saved past the first one shown: a button at the top loads them. */
+  onLoadEarlier?: () => void;
 }) {
   const { teamsById, agents } = useOrg();
   const scroller = useRef<HTMLDivElement>(null);
   const mounted = useRef(false);
-  // Messages present on mount render still; anything newer animates in.
+  // Messages present on mount render still, and so do saved ones (history arriving from the cache); anything
+  // said on this page animates in.
   const [initialIds] = useState(() => new Set(messages.map((m) => m.id)));
   // Reactions present on mount don't replay their acknowledgement.
   const [initialReactions] = useState(
@@ -180,7 +184,7 @@ export function Conversation({
     const prev = messages[i - 1];
     const author = authorOf(m);
     const first = !prev || authorOf(prev) !== author || author === null;
-    const fresh = !initialIds.has(m.id);
+    const fresh = !initialIds.has(m.id) && !m.saved;
     let node: React.ReactNode;
 
     if (m.kind === "status") {
@@ -358,6 +362,15 @@ export function Conversation({
         >
           {channel && (
             <p className="mx-auto mb-6 max-w-[460px] text-center text-[13.5px] leading-[20px] text-ink-2">{team.goal}</p>
+          )}
+          {onLoadEarlier && (
+            <button
+              type="button"
+              onClick={onLoadEarlier}
+              className="tap mx-auto mb-2 block rounded-full px-3 py-1 text-[12.5px] text-muted transition-colors hover:bg-bubble hover:text-ink-2"
+            >
+              Show earlier messages
+            </button>
           )}
           {rows}
           <AnimatePresence>

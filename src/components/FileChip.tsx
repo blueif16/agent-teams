@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
 import { formatBytes, textExt, textUploadName } from "@/lib/uploads";
 
@@ -7,30 +6,12 @@ import { formatBytes, textExt, textUploadName } from "@/lib/uploads";
  * The composer shows it while it uploads; your bubble shows it as a link that opens the raw file in a new tab.
  */
 
-/** Sizes the composer learned from POST /api/uploads, so a fresh bubble needn't ask again. */
+/**
+ * Sizes the composer learned from POST /api/uploads, for your bubbles. A bubble from an earlier session (the
+ * transcript keeps only ids) shows the type without the size.
+ */
 const sizes = new Map<string, number>();
 export const rememberUploadSize = (id: string, bytes: number) => void sizes.set(id, bytes);
-
-/** A text upload's size: remembered, else one HEAD request for its Content-Length. */
-function useUploadSize(id: string): number | undefined {
-  const [bytes, setBytes] = useState(() => sizes.get(id));
-  useEffect(() => {
-    if (sizes.has(id)) return;
-    let live = true;
-    fetch(`/api/uploads/${encodeURIComponent(id)}`, { method: "HEAD" })
-      .then((r) => {
-        const n = Number(r.headers.get("content-length"));
-        if (!r.ok || !Number.isFinite(n)) return;
-        sizes.set(id, n);
-        if (live) setBytes(n);
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [id]);
-  return bytes;
-}
 
 export function FileChip({ name, bytes }: { name: string; bytes?: number }) {
   const ext = textExt(name)?.toUpperCase();
@@ -52,7 +33,7 @@ export function FileChip({ name, bytes }: { name: string; bytes?: number }) {
 
 function SentFile({ id }: { id: string }) {
   const name = textUploadName(id) ?? id;
-  const bytes = useUploadSize(id);
+  const bytes = sizes.get(id);
   return (
     <a
       href={`/api/uploads/${encodeURIComponent(id)}`}
