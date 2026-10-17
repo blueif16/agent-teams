@@ -1,9 +1,11 @@
 /*
  * A worker: the persistent Deep Agent for one agent row on one project (research D §1, §2, §7), bound to its
  * thread `a:{agent}:p:{project}`.
- *   - Tools: its archetype's ready toolset (resolveToolset, no sandbox). Today that is the file tools; the
- *     fences (charts, Markdown, project cards) are prompt notes. write_todos is added for the plan stream.
- *     deepagents' execute, delete and task are not built: no sandbox exists, and helpers would double the RPM.
+ *   - Tools: its archetype's ready toolset (resolveToolset; with the sandbox only when the runtime binds bash). The
+ *     file tools are deepagents'; the fences (charts, Markdown, project cards) and bash's box are prompt notes;
+ *     every other tool comes in through deps.tools (the runtime's toolkit.ts). write_todos is added for the plan
+ *     stream. deepagents' execute, delete and task are not built: bash is the workbench's, and helpers would
+ *     double the RPM.
  *   - Files: workerBackend (backends.ts); /home/ is read-only.
  *   - Prompt: a stable identity + tool notes first (prefix cache), HomeFiles' SOUL/MEMORY block last.
  *   - Model: the agent's tier on Crusoe through the process limiter, thinking on, fallback outside retry.
@@ -48,8 +50,10 @@ export interface WorkerDeps {
   /** Under the limiter; default the global fetch. Tests pass a fake Crusoe. */
   fetch?: typeof fetch;
   limiter?: Limiter;
-  /** Implementations of non-file tools (assign, web, …), added as they are. */
+  /** Implementations of non-file tools (assign, web, bash, …): the runtime's toolkit.ts. */
   tools?: StructuredToolInterface[];
+  /** A sandboxed bash is among `tools`: resolve the toolset with the sandbox, so T7 entries (and their notes) stay. */
+  sandbox?: boolean;
   /** Run between the built-ins and HomeFiles (the runtime's InboxDrain). */
   middleware?: AgentMiddleware[];
 }
@@ -74,7 +78,7 @@ export function identityPrompt(agent: AgentRow, project: ProjectRow, notes: stri
 export function buildWorker(agent: AgentRow, project: ProjectRow, deps: WorkerDeps) {
   const archetype = getArchetype(agent.archetype);
   if (!archetype) throw new Error(`Agent ${agent.id} has an unknown archetype "${agent.archetype}"`);
-  const toolset = resolveToolset(archetype, agent.config.composition, { sandbox: false });
+  const toolset = resolveToolset(archetype, agent.config.composition, { sandbox: deps.sandbox ?? false });
   const calls = toolset.tools.flatMap((t) => t.calls);
   const fileTools = calls.filter((c): c is FileTool => FILE_TOOLS.has(c));
   // deepagents requires read_file in any explicit list; an archetype without file tools still reads.

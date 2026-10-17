@@ -1,5 +1,5 @@
 /*
- * Prompt usage notes, one per present tool (docs/research/H-archetype-toolsets.md §6). Constants only: they go in
+ * Prompt usage notes, one per present tool plus the bash shell (docs/research/H-archetype-toolsets.md §6). Constants only: they go in
  * the archetype's "Showing your work" section ahead of SOUL.md, so every agent of an archetype shares those bytes
  * (prefix caching). Never template them with ids, revs, dates or project names; open artifacts and their revs go
  * in the window opener and <state_delta> lines instead.
@@ -20,3 +20,6 @@ x and y are pixels inside the frame; leave them out and the item goes in the nex
 
 /** The writer's and researcher's docs: create vs suggest vs comment, exact unique anchors, citations, chat rule. */
 export const DOC_NOTE = `Docs: long or reusable text goes in a doc, not a reply. To create or rewrite your own doc, use doc_write. If the owner has edited a doc, never rewrite it: propose changes with doc_suggest, where each edit has "find" (an exact passage that appears once, as short as possible), "replace" and a short "why". If a find matches no passage or several, that edit fails: pick a longer passage and send it again. To leave a remark, use doc_comment. Cite sources as [S1], [S2] using the ids add_source returned; if a claim has no source, give it no marker. In chat, say what you changed in one sentence.`;
+
+/** The experts' workbench shell (src/server/workbench): where it runs, what it holds, and what it can reach. */
+export const BASH_NOTE = `Shell: bash runs one command at a time in a sandbox whose working directory is this project's folder, the same files you see at /project/ (a file bash writes to out.txt is /project/out.txt for your file tools). Use it for computation: parsing data, maths, converting files, small scripts. python3, node, sqlite3, jq, ffmpeg and imagemagick are installed. The network is closed except the package registries (pip and npm installs work); fetch web pages with your web tools instead. You can write only in that folder and $TMPDIR; what the sandbox blocks comes back in violations, so don't retry it.`;

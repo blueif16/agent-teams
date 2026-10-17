@@ -41,7 +41,7 @@ export const CAPABILITIES: Capability[] = [
   { id: "apis", label: "Call outside services", tools: ["http_*", "api_*"] },
   { id: "money", label: "Spend money", tools: ["purchase_*", "pay_*"] },
   { id: "accounts", label: "Use passwords and accounts", tools: ["connect_oauth", "read_credential"] },
-  { id: "code", label: "Run code", tools: ["execute", "shell", "run_tests"] },
+  { id: "code", label: "Run code", tools: ["execute", "shell", "bash", "run_tests"] },
 ];
 
 /** One call in an agent's toolset; `planned` when no ready registry entry provides it. */

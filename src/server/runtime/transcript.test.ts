@@ -85,7 +85,7 @@ describe("the transcript", () => {
     await settled();
 
     // Compaction as summarization does it: the old messages go, a summary takes their place.
-    const graph = rt.worker(T).graph;
+    const graph = (await rt.worker(T)).graph;
     const config = { configurable: { thread_id: T } };
     await graph.updateState(config, { messages: [new RemoveMessage({ id: REMOVE_ALL_MESSAGES }), new HumanMessage("Summary: revenue talk.")] });
     const kept = ((await graph.getState(config)).values as { messages: BaseMessage[] }).messages.map((m) => m.text);
