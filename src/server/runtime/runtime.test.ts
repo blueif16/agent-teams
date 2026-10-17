@@ -2,6 +2,8 @@ import path from "node:path";
 import { tool } from "langchain";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
+import { DEFAULT_RULES } from "@/lib/policy/defaults";
+import type { Rule } from "@/lib/policy/types";
 import { openCheckpointer } from "./checkpointer";
 import { openRuntimeDb, type RuntimeDb } from "./db";
 import { Runtime } from "./index";
@@ -30,6 +32,8 @@ afterEach(async () => {
   db.close();
   await env.cleanup();
 });
+
+const ALLOW_SLEEP: Rule = { id: "r_sleep1", kind: "tool", scope: {}, match: { tools: ["sleep"] }, effect: "allow", createdBy: "owner" };
 
 /** A tool that sleeps, and says when it started. */
 function sleeper() {
@@ -73,7 +77,8 @@ describe("send() on a busy thread", () => {
   it("delivers a DM sent during a 2 s tool call before the next model call, in the same run, with no fork", async () => {
     const { sleep, running } = sleeper();
     const fake = fakeCrusoe([{ toolCalls: [{ name: "sleep", args: { ms: 2000 } }] }, { text: "Added the cost line." }]);
-    rt = new Runtime({ db, checkpointer, fetch: fake.fetch, tools: () => [sleep] });
+    // `sleep` is in no tool tier, so the tool gate would ask the owner first (approvals.ts); this test is about the inbox.
+    rt = new Runtime({ db, checkpointer, fetch: fake.fetch, tools: () => [sleep], rules: async () => [...DEFAULT_RULES, ALLOW_SLEEP] });
 
     const first = rt.send(T, { text: "Start the report." });
     expect(first.delivered).toBe("run");
