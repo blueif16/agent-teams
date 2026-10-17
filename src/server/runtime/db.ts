@@ -146,6 +146,13 @@ export interface MessageRow {
   at: string;
 }
 
+export interface PageOptions {
+  /** Only rows older than this id. */
+  before?: number;
+  /** Default 200. */
+  limit?: number;
+}
+
 export interface MessagePage {
   /** Oldest first. */
   messages: MessageRow[];
@@ -559,18 +566,23 @@ export class RuntimeDb {
         .run(m.threadId, m.runId ?? null, m.role, m.author, m.text, JSON.stringify(m.uploads ?? []), m.ref ?? null, new Date().toISOString());
       return this.one(toMessage, "SELECT * FROM messages WHERE id = ?", lastInsertRowid)!;
     },
-    /** The latest `limit` rows (before row `before`, when given), oldest first. */
-    page: (threadId: string, { before, limit = 200 }: { before?: number; limit?: number } = {}): MessagePage => {
-      const rows = this.all(
-        toMessage,
-        "SELECT * FROM messages WHERE thread_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
-        threadId,
-        before ?? Number.MAX_SAFE_INTEGER,
-        limit + 1,
-      );
-      return { messages: rows.slice(0, limit).reverse(), more: rows.length > limit };
-    },
+    /** A thread's latest `limit` rows (before row `before`, when given), oldest first. */
+    page: (threadId: string, opts: PageOptions = {}): MessagePage =>
+      this.messagePage("SELECT * FROM messages WHERE thread_id = ? AND id < ? ORDER BY id DESC LIMIT ?", threadId, opts),
+    /** The same over every thread of a project (a channel's members), merged in the order it was said. */
+    projectPage: (projectId: string, opts: PageOptions = {}): MessagePage =>
+      this.messagePage(
+        "SELECT m.* FROM messages m JOIN threads t ON t.id = m.thread_id WHERE t.project_id = ? AND m.id < ? ORDER BY m.id DESC LIMIT ?",
+        projectId,
+        opts,
+      ),
   };
+
+  // Ids increase as rows are written, so id order is the order things were said, across threads too.
+  private messagePage(sql: string, key: string, { before, limit = 200 }: PageOptions): MessagePage {
+    const rows = this.all(toMessage, sql, key, before ?? Number.MAX_SAFE_INTEGER, limit + 1);
+    return { messages: rows.slice(0, limit).reverse(), more: rows.length > limit };
+  }
 
   readonly inbox = {
     add: <P>(threadId: string, kind: InboxKind, payload: P): InboxRow<P> => {

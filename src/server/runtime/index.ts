@@ -10,8 +10,6 @@ import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { BaseCheckpointSaver } from "@langchain/langgraph";
 import { HQ } from "@/lib/data";
 import { MODELS } from "@/lib/models";
-import { getServerCache } from "@/server/cache";
-import { TOPICS } from "@/server/cache/bus";
 import { openCheckpointer } from "./checkpointer";
 import { getRuntimeDb, type AgentRow, type ProjectRow, type RuntimeDb } from "./db";
 import { ThreadEvents } from "./events";
@@ -19,6 +17,7 @@ import { inboxDrain, type DmPayload } from "./inbox";
 import type { Limiter } from "./limiter";
 import { executeRun } from "./run";
 import { parseThreadId, ThreadQueue } from "./threads";
+import { announceMessage } from "./transcript";
 import { buildWorker, type Worker } from "./worker";
 
 export interface RuntimeOptions {
@@ -39,11 +38,6 @@ export interface SendResult {
   inboxId: number;
   /** Its row in the thread's transcript. */
   messageId: number;
-}
-
-/** Tells the app a thread's transcript has a new row (bus topic `messages:<thread>`). */
-export function announceMessage(threadId: string): void {
-  getServerCache().bus.emit(TOPICS.messages(threadId));
 }
 
 export class UnknownThreadError extends Error {
