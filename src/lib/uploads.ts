@@ -17,6 +17,11 @@ export const isImageUpload = (id: string) => IMAGE_ID.test(id);
 
 /** A text upload's file name, or null when the id isn't a text upload. */
 export const textUploadName = (id: string): string | null => TEXT_ID.exec(id)?.[1] ?? null;
+export const isTextUpload = (id: string) => TEXT_ID.test(id);
+
+/** What the composer's file picker offers. The server checks the bytes; this only saves a pointless upload. */
+export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+export const ACCEPT = [...IMAGE_TYPES, ...Object.keys(TEXT_TYPES).map((e) => `.${e}`)].join(",");
 
 /** The text extension of a file name ("Spec.MD" → "md"), or null when it isn't one we take. */
 export function textExt(name: string): TextExt | null {

@@ -100,7 +100,7 @@ interface SendOptions {
   replyQuote?: string;
   /** This message is a reaction order; the server records it as a performance signal. */
   order?: { key: OrderKey; text: string; trace?: string };
-  /** Upload ids attached to this message (at most 4). */
+  /** Upload ids attached to this message (at most 8, 4 of them images). */
   images?: string[];
 }
 
