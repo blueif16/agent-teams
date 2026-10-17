@@ -29,7 +29,8 @@ export const CAPABILITIES: Capability[] = [
     label: "Plan and track work",
     tools: ["write_todos", "add_task", "update_task", "assign_task", "record_decision", "raise_item", "resolve_item", "note_owner_pref", "update_member", "log_progress", "report"],
   },
-  { id: "team", label: "Work with teammates", tools: ["task", "dispatch", "find_agent", "request_review"] },
+  // search_skills staffs a role from the local library (no egress); find_skill stays a web search, since a miss goes out.
+  { id: "team", label: "Work with teammates", tools: ["task", "dispatch", "find_agent", "request_review", "search_skills"] },
   { id: "memory", label: "Update its own memory", tools: ["dream_write", "propose_soul"] },
   { id: "web.search", label: "Search the web", tools: ["web_search", "research", "answer", "find_skill"] },
   { id: "web.open", label: "Open web pages", tools: ["fetch_page", "web_fetch", "fetch_image"] },
