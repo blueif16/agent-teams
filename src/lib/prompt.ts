@@ -24,7 +24,7 @@ function describeMessage(m: Message, dir: PromptDirectory): string | null {
     case "approval":
       return `${name(m.from)} asked for approval: ${m.title} (${m.state})`;
     case "proposal":
-      return `${name(m.from)} proposed the "${m.project.name}" project (${m.state})`;
+      return m.proposal ? `${name(m.from)} proposed options for the "${m.proposal.name}" project (${m.state})` : null;
     case "status":
       return null;
   }

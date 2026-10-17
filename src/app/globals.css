@@ -215,11 +215,31 @@ body {
   }
 }
 
+/* A quiet line while Mira's options are being staffed: the text's own gray, with a soft highlight sweeping across. */
+.shimmer-text {
+  background: linear-gradient(90deg, #9a9a9a 0%, #9a9a9a 40%, #d9d9d9 50%, #9a9a9a 60%, #9a9a9a 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 1.7s linear infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 110% 0;
+  }
+  100% {
+    background-position: -110% 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mascot-bob,
   .typing-dot,
   .pulse-dot,
-  .listening-ring {
+  .listening-ring,
+  .shimmer-text {
     animation: none;
   }
   .tap:active,
