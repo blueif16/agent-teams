@@ -65,7 +65,7 @@ E privacy · F orchestrator memory); cited as `[D §7]`.
     analyst, writer. Each has an Inherent section, qualifications vocabulary, and its own **curated toolset** of the
     high-quality tools it uses most, including **presentation tools** that render in the work pane (the analyst's
     charts today; an infinite canvas and its tools for the designer). An agent built from an archetype inherits the
-    toolset and its renderers. Toolsets per archetype: `docs/research/H-archetype-toolsets.md` (pending).
+    toolset and its renderers. Toolsets per archetype, the registry (`src/lib/tools/types.ts`) and the presentation rule (fence for small read-once data, versioned artifact for anything edited, revised or approved, derived views from state files): `docs/research/H-archetype-toolsets.md`. The designer's canvas is Excalidraw (MIT; tldraw needs a paid production key).
   - **Skill library** (`skills/index.json`, `skills/library/<id>/`): curated SKILL.md packages from the open
     ecosystem, permissively licensed, vetted, scanned. Orchestrators search it first; only a miss goes to You.com.
   - **Composition** (not a primitive): an archetype plus the skills chosen for one role. The orchestrator composes it
@@ -278,6 +278,7 @@ Tracks run in parallel where they don't share files; each step ships with a test
 | **S setup flow** | S1 Mira triage + `project` card v2 · S2 PM brief/source/staff tools + agent library · S3 provisioning (`POST /api/projects`) + kickoff |
 | **W web tools** [§3b] | W1 `web_search` + `fetch_page` (You.com) as default tools, with ledger rows · W2 `research` + `answer` tools, researcher `you-research` skill, SSE → "now" line · W3 `find_skill` pipeline + skill library (library hit, deep research, vetting, approval, store) |
 | **V vault** [G §9] | V1 writer + queue + trailers (25 concurrent writes → 25 clean commits) · V2 scrub + forget/erase (no secret anywhere in history; change ids survive) · V3 writers wired (dream, state tools, owner edits, 📌) · V4 lineage index (full rebuild = incremental) · V5 seeding from parents (filter, merge, Held-Back, pins) · V6 History + Lineage UI |
+| **X toolsets** [H §7] | X1 registry + resolver *(building)* · X2 pure canvas ops *(building)* · X3 canvas tools + vault storage · X4 CanvasPane (Excalidraw) + artifact tabs · X5 doc + sources artifacts · X6 plan / board / dashboard / diff / table views + `describe` |
 | **U UI** | U1 Plan/team panels from state files · U2 approval cards from the runtime · U3 tool-call strip · U4 rules page |
 
 Order of dependence: R1–R4 → R5–R7 → M and S; P1–P3 can start any time; P4 after R6; U follows the step it renders.
