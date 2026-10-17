@@ -23,9 +23,8 @@ export interface ScanOptions {
 
 /** Labelled spans of sensitive data in `text`. Never throws. */
 export async function scan(text: string, opts: ScanOptions = {}): Promise<Span[]> {
-  void opts;
   try {
-    return (await scanDetailed(text)).spans;
+    return (await scanDetailed(text, opts)).spans;
   } catch {
     return [];
   }
