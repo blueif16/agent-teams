@@ -203,9 +203,6 @@ export function Conversation({
           <span className="text-[13.5px] text-ink-2">{m.task}</span>
         </div>
       );
-    } else if (!agents[author!]) {
-      // An author the org doesn't know (yet): nothing to draw.
-      node = null;
     } else if (m.kind === "text" && m.from === "you") {
       node = (
         <div className={`flex justify-end ${first ? "mt-5" : "mt-1.5"}`}>
@@ -222,6 +219,9 @@ export function Conversation({
           </div>
         </div>
       );
+    } else if (!agents[author!]) {
+      // An author the org doesn't know (yet): nothing to draw.
+      node = null;
     } else {
       const agent = agents[author!];
       const msgReactions = reactions[m.id] ?? [];
