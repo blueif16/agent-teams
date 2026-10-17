@@ -94,7 +94,7 @@ describe("workerBackend through the agent", () => {
 describe("the compiled agent's tools", () => {
   const FILE_TOOLS = ["edit_file", "glob", "grep", "ls", "read_file", "write_file"];
 
-  it("are the archetype's ready file tools plus write_todos: no execute, shell, delete or task", async () => {
+  it("are the archetype's ready file tools plus write_todos and Mira's start_team: no execute, shell, delete or task", async () => {
     const { fake, agent } = mira([{ text: "Hi." }]);
     await agent.invoke(say("Hello"));
 
@@ -102,7 +102,8 @@ describe("the compiled agent's tools", () => {
     const node = (agent.graph.nodes as unknown as Record<string, { bound?: { tools?: { name: string }[] } }>).tools;
     const executable = (node?.bound?.tools ?? []).map((t) => t.name).sort();
     const offered = (fake.requests[0].tools ?? []).map((t) => t.function.name).sort();
-    expect(executable).toEqual([...FILE_TOOLS, "write_todos"].sort());
+    // start_team: the owner asked for Mira to start teams herself (2026-10-17).
+    expect(executable).toEqual([...FILE_TOOLS, "write_todos", "start_team"].sort());
     expect(offered).toEqual(executable);
     for (const name of ["execute", "shell", "delete", "task"]) expect(executable).not.toContain(name);
   }, 30_000);

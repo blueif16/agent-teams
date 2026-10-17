@@ -85,8 +85,17 @@ describe.skipIf(!LIVE)("live eval: Mira proposes instead of quizzing the owner",
     expect(p?.options.length ?? 0).toBeGreaterThanOrEqual(2);
   }, 240_000);
 
+  it("starts the team herself when the owner says go: a project with a PM exists afterwards", async () => {
+    process.env.SKILLS_DIR ??= path.join(process.cwd(), "skills");
+    await turn(ASKS[0]);
+    await turn("Go, start it.");
+    const started = db.projects.list().filter((p) => p.id !== "dm");
+    if (!started.length) console.log("NO TEAM STARTED");
+    expect(started).toHaveLength(1);
+    expect(db.members.list(started[0].id).map((m) => db.agents.get(m.agentId)?.archetype)[0]).toBe("lead");
+  }, 360_000);
+
   it.each([
-    "Ok, go ahead.",
     "Why are the agents still blocked? What do you need from me?",
   ])("after proposing, leaves the details to the PM instead of quizzing the owner: %s", async (follow) => {
     await turn(ASKS[0]);

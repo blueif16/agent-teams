@@ -250,7 +250,21 @@ describe("the tool gate", () => {
     expect(db.runs.get(runId!)?.status).toBe("done");
   }, 30_000);
 
-  it.each(["start_team", "set_charter"])("runs %s without asking: the owner's go on the launch is the approval", async (name) => {
+  it("runs Mira's start_team without asking: the owner's go is the approval", async () => {
+    // The real tool (worker.ts gives it to the chief); empty args fail its own validation, after the gate let it through.
+    const fake = fakeCrusoe([{ toolCalls: [{ name: "start_team", args: {} }] }, { text: "Done." }]);
+    rt = runtime(fake, fakeYou());
+
+    const { runId } = rt.send(T, { text: "Go." });
+    await rt.idle(T);
+
+    expect(db.approvals.pending({ thread: T })).toEqual([]);
+    expect(db.runs.get(runId!)?.status).toBe("done");
+    expect(fake.requests).toHaveLength(2);
+    expect(toolResults(fake.requests[1]).join("\n")).not.toMatch(/blocked by the owner's rules/);
+  }, 30_000);
+
+  it.each(["set_charter"])("runs %s without asking", async (name) => {
     let ran = false;
     const stub = tool(
       async () => {

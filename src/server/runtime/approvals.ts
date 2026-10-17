@@ -25,11 +25,11 @@ import { Command, interrupt } from "@langchain/langgraph";
 import { createMiddleware, type AgentMiddleware } from "langchain";
 import { HQ } from "@/lib/data";
 import { record as ledgerRecord, type LedgerEvent } from "@/lib/ledger";
-import { explain } from "@/lib/policy/engine";
+import { explain, strictest } from "@/lib/policy/engine";
 import { readBack } from "@/lib/policy/readback";
 import { policyStore } from "@/lib/policy/store";
 import { tierOf, TOOL_CATALOG } from "@/lib/policy/tiers";
-import type { PolicyEvent, Rule } from "@/lib/policy/types";
+import type { Outcome, PolicyEvent, Rule } from "@/lib/policy/types";
 import { getArchetype } from "@/lib/skills/archetypes";
 import { resolveToolset } from "@/lib/tools/resolve";
 import { getServerCache } from "@/server/cache";
@@ -102,11 +102,16 @@ export interface GateOptions {
   rules: () => Promise<Rule[]>;
   /** A new approval was created. */
   onAsk: (approval: ApprovalRow) => void;
+  /**
+   * The worker's code tools run in the workbench sandbox: T7's default deny (code execution without a sandbox) doesn't
+   * apply to them, the rules still do.
+   */
+  sandbox?: boolean;
   now?: () => Date;
 }
 
 /** The gate: decide() before every tool call (see the header). */
-export function toolGate({ db, agent, project, threadId, currentRun, rules: loadRules, onAsk, now = () => new Date() }: GateOptions): AgentMiddleware {
+export function toolGate({ db, agent, project, threadId, currentRun, rules: loadRules, onAsk, sandbox = false, now = () => new Date() }: GateOptions): AgentMiddleware {
   return createMiddleware({
     name: "ToolGate",
     wrapToolCall: async (request, handler) => {
@@ -124,7 +129,9 @@ export function toolGate({ db, agent, project, threadId, currentRun, rules: load
       };
       const rules = await loadRules();
       const at = now();
-      const { effect } = explain(event, rules, [], at).decision;
+      const ex = explain(event, rules, [], at);
+      let effect = ex.decision.effect;
+      if (sandbox && tierOf(call.name)?.tier === "T7") effect = ex.contributions.filter((c) => c.ruleId !== null).reduce<Outcome>((acc, c) => strictest(acc, c.outcome), "allow");
       const card = ASKS[call.name];
 
       if (effect === "block" || effect === "deny") {
@@ -199,9 +206,15 @@ export class Approvals {
   }
 
   /** R6 hook for one worker: the gated tools its toolset grants (research), and the gate over every tool. */
-  forWorker(agent: AgentRow, project: ProjectRow, threadId: string, currentRun: () => string | undefined): { tools: StructuredToolInterface[]; middleware: AgentMiddleware } {
+  forWorker(
+    agent: AgentRow,
+    project: ProjectRow,
+    threadId: string,
+    currentRun: () => string | undefined,
+    { sandbox = false }: { sandbox?: boolean } = {},
+  ): { tools: StructuredToolInterface[]; middleware: AgentMiddleware } {
     const archetype = getArchetype(agent.archetype);
-    const granted = archetype ? resolveToolset(archetype, agent.config.composition, { sandbox: false }).tools.map((d) => d.id) : [];
+    const granted = archetype ? resolveToolset(archetype, agent.config.composition, { sandbox }).tools.map((d) => d.id) : [];
     const tools = granted.includes("research") ? [researchTool({ agentId: agent.id, team: statsTeam(project) }, this.o.research)] : [];
     const middleware = toolGate({
       db: this.o.db,
@@ -211,6 +224,7 @@ export class Approvals {
       currentRun,
       rules: this.rules,
       onAsk: (approval) => this.changed(approval, approval.runId ?? currentRun() ?? ""),
+      sandbox,
     });
     return { tools, middleware };
   }

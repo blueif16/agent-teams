@@ -486,6 +486,17 @@ export class RuntimeDb {
     if (this.sql.isOpen) this.sql.close();
   }
 
+  private readonly inboxListeners = new Set<(threadId: string) => void>();
+
+  /**
+   * Hear every inbox row added, by its thread id. Called after the synchronous work that added it, so a transaction
+   * around the add has committed (or rolled back: check `inbox.pending`). Returns the unsubscribe.
+   */
+  onInbox(fn: (threadId: string) => void): () => void {
+    this.inboxListeners.add(fn);
+    return () => void this.inboxListeners.delete(fn);
+  }
+
   /** Runs `fn` in one transaction: all of it lands or none. Not reentrant. */
   tx<T>(fn: () => T): T {
     this.sql.exec("BEGIN IMMEDIATE");
@@ -661,8 +672,24 @@ export class RuntimeDb {
       const { lastInsertRowid } = this.sql
         .prepare("INSERT INTO inbox (thread_id, kind, payload_json, created_at) VALUES (?, ?, ?, ?)")
         .run(threadId, kind, JSON.stringify(payload), new Date().toISOString());
-      return this.one(toInbox<P>, "SELECT * FROM inbox WHERE id = ?", lastInsertRowid)!;
+      const row = this.one(toInbox<P>, "SELECT * FROM inbox WHERE id = ?", lastInsertRowid)!;
+      queueMicrotask(() => {
+        for (const fn of [...this.inboxListeners]) {
+          try {
+            fn(threadId);
+          } catch (e) {
+            console.warn(`An inbox listener failed on ${threadId}:`, (e as Error).message);
+          }
+        }
+      });
+      return row;
     },
+    /** Threads with undelivered items, in the order their oldest one arrived. */
+    pendingThreads: (): string[] =>
+      (this.sql.prepare("SELECT thread_id FROM inbox WHERE delivered_at IS NULL GROUP BY thread_id ORDER BY MIN(id)").all() as Raw[]).map((r) => String(r.thread_id)),
+    /** Whether the thread ever got an item of `kind`, delivered or not. */
+    has: (threadId: string, kind: InboxKind): boolean =>
+      this.sql.prepare("SELECT 1 FROM inbox WHERE thread_id = ? AND kind = ? LIMIT 1").get(threadId, kind) !== undefined,
     /** Undelivered items, oldest first (only `kinds` when given). */
     pending: <P = unknown>(threadId: string, kinds?: InboxKind[]): InboxRow<P>[] => {
       const only = kinds?.length ? ` AND kind IN (${placeholders(kinds.length)})` : "";
