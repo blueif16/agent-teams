@@ -1,0 +1,11 @@
+# Never upload secrets or local records.
+.env
+.env*.local
+.data
+# Local build output and tooling the deploy doesn't need.
+.next
+node_modules
+.claude
+crusoe
+scripts
+tsconfig.tsbuildinfo

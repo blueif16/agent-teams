@@ -1,0 +1,39 @@
+{
+  "name": "agent-teams",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@langchain/core": "^1.2.18",
+    "@langchain/langgraph": "^1.5.0",
+    "@langchain/openai": "^1.6.2",
+    "@rive-app/react-canvas": "^4.36.0",
+    "@streamdown/code": "^2.0.0",
+    "deepagents": "^1.15.0",
+    "langchain": "^1.5.18",
+    "lucide-react": "^1.58.0",
+    "motion": "^14.3.0",
+    "next": "16.4.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-is": "^19.3.0",
+    "recharts": "^3.10.1",
+    "streamdown": "^2.7.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.2",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
