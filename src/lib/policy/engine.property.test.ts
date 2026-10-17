@@ -104,10 +104,10 @@ const arbFlowRule = (actions: FlowRule["action"][]): fc.Arbitrary<FlowRule> =>
       createdBy: "owner" as const,
     }));
 
-const arbGrant: fc.Arbitrary<GrantRule> = fc
+const grantOn = (tool: fc.Arbitrary<string>): fc.Arbitrary<GrantRule> => fc
   .tuple(
     arbScope,
-    fc.constantFrom(...TOOL_PATTERNS),
+    tool,
     rarely(fc.array(arbConstraint, { minLength: 1, maxLength: 1 })),
     fc.constantFrom<GrantRule["grantScope"]>("once", "thread", "project", "until", "always"),
     rarely(fc.record({ max: fc.integer({ min: 1, max: 2 }), used: fc.integer({ min: 0, max: 2 }) }, { requiredKeys: [] })),
@@ -126,6 +126,7 @@ const arbGrant: fc.Arbitrary<GrantRule> = fc
     ...meta,
     createdBy: "approval" as const,
   }));
+const arbGrant = grantOn(fc.constantFrom(...TOOL_PATTERNS));
 
 const ACTIONS: FlowRule["action"][] = ["allow", "redact", "mask", "hash", "tokenize", "ask", "block"];
 const arbRule: fc.Arbitrary<Rule> = fc.oneof(arbToolRule(["allow", "ask", "deny"]), arbFlowRule(ACTIONS));
@@ -176,8 +177,15 @@ describe("decide: properties", () => {
 
   it("adding a grant only ever lifts an ask, and changes nothing else", () => {
     let liftedCount = 0;
+    // Calls lean toward tools that ask by default, and the extra grant usually names the call's tool, so it often applies.
+    const arbAskingEvent = fc
+      .tuple(arbEvent, fc.constantFrom("send_email", "zz_tool", ...TOOLS))
+      .map(([e, tool]) => ({ ...e, tool }));
+    const arbCase = fc
+      .tuple(arbAskingEvent, arbRules, arbGrants)
+      .chain(([e, rules, grants]) => fc.tuple(fc.constant(e), fc.constant(rules), fc.constant(grants), grantOn(fc.constantFrom(e.tool, e.tool, ...TOOL_PATTERNS))));
     fc.assert(
-      fc.property(arbEvent, arbRules, arbGrants, arbGrant, (e, rules, grants, g) => {
+      fc.property(arbCase, ([e, rules, grants, g]) => {
         const before = decide(e, rules, grants, NOW);
         const after = decide(e, rules, [...grants, { ...g, id: "r_extra000" }], NOW);
         expect(after.transforms).toEqual(before.transforms);
@@ -194,7 +202,8 @@ describe("decide: properties", () => {
 
   it("the decision does not depend on rule or grant order", () => {
     let multi = 0;
-    const arbCase = fc.tuple(arbEvent, arbRules, arbGrants).chain(([e, rules, grants]) =>
+    const arbManyRules = fc.array(arbRule, { minLength: 2, maxLength: 8 }).map((rs) => withIds(rs, "rule"));
+    const arbCase = fc.tuple(arbEvent, arbManyRules, arbGrants).chain(([e, rules, grants]) =>
       fc.tuple(
         fc.constant(e),
         fc.constant(rules),

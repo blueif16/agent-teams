@@ -9,8 +9,11 @@
  * - Flow rules match labels on arg spans and in the context. Rewrites (tokenize/redact/hash/mask) need a located span;
  *   block/ask/allow also fire on a label that is only in the context, because anything the agent writes may derive
  *   from it.
- * - Most restrictive wins (OUTCOME_ORDER). When no tool rule matches, the default is "ask".
+ * - Most restrictive wins (OUTCOME_ORDER). When no enforced tool rule matches, the tool's tier decides (tiers.ts);
+ *   a tool in no tier asks.
  */
+import { globMatch } from "./glob";
+import { tierOf } from "./tiers";
 import { OUTCOME_ORDER } from "./types";
 import type { ArgConstraint, Condition, Decide, Decision, FlowRule, GrantRule, Label, Outcome, PolicyEvent, Rule, Scope, ToolRule } from "./types";
 
@@ -25,20 +28,8 @@ export const strictest = (a: Outcome, b: Outcome): Outcome => (rank(a) <= rank(b
 
 // ---------- globs ----------
 
+export { globMatch };
 const escapeRe = (s: string) => s.replace(/[.+?^${}()|[\]\\/]/g, "\\$&");
-const globCache = new Map<string, RegExp>();
-
-/** `*` matches any run of characters (dots and colons included); everything else is literal. */
-export function globMatch(pattern: string, value: string): boolean {
-  let re = globCache.get(pattern);
-  if (!re) {
-    if (globCache.size > 2000) globCache.clear();
-    re = new RegExp(`^${pattern.split("*").map(escapeRe).join(".*")}$`, "s");
-    globCache.set(pattern, re);
-  }
-  return re.test(value);
-}
-
 const anyGlob = (patterns: readonly string[], value: string) => patterns.some((p) => globMatch(p, value));
 const labelsHit = (patterns: readonly Label[], labels: readonly Label[]) => labels.some((l) => anyGlob(patterns, l));
 
@@ -298,7 +289,8 @@ export function explain(e: PolicyEvent, rules: Rule[], grants: GrantRule[], now:
     }
   }
 
-  if (!toolMatched) contributions.push({ ruleId: null, outcome: "ask", locked: false });
+  // No enforced tool rule matched: the tool's tier decides, and a tool in no tier asks.
+  if (!toolMatched) contributions.push({ ruleId: null, outcome: tierOf(e.tool)?.effect ?? "ask", locked: false });
 
   let effect = contributions.reduce<Outcome>((acc, c) => strictest(acc, c.outcome), "allow");
 
