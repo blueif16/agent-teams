@@ -1,68 +1,46 @@
 /*
  * The browser side of the runtime's thread API (src/app/api/threads/[id]/…): send an owner message to an
- * agent's thread and follow the run that answers it over SSE. Opens the event stream first, so no token is
- * missed, then posts. Client only.
+ * agent's thread and follow the run that answers it. The run's events come on the app's one GET /api/runs stream
+ * (src/lib/live-runs.ts), connected before the post so nothing is missed. Client only.
  */
+import { connectRuns, followRun } from "./live-runs";
 
 export interface ThreadReplyHandlers {
-  /** The answer so far, each time a token arrives. */
+  /** The thread took the message: `runId` is the run that answers it (known before any text). */
+  accepted?(runId: string): void;
+  /** The answer so far, each time it grows. */
   text(acc: string): void;
-  /** The agent's "now" line (Reading brief.md, Planning, …). */
-  now(line: string): void;
 }
 
-type Ev = { type: string; run: string; text?: string; message?: string };
+export interface ThreadReply {
+  /** "inbox": a run already going gets it before its next model call, and answers for both. */
+  delivered: "run" | "inbox";
+  runId?: string;
+  /** The final answer ("" for an inbox delivery). */
+  text: string;
+  /** The answer's transcript row. */
+  message?: number;
+  /** The run ended while the stream was down; `text` may be partial and the transcript has the answer. */
+  lost?: boolean;
+}
 
-/** Resolves with the run's final answer; rejects when the post or the run fails. */
-export function sendToThread(threadId: string, text: string, on: ThreadReplyHandlers): Promise<string> {
-  const base = `/api/threads/${encodeURIComponent(threadId)}`;
-  return new Promise((resolve, reject) => {
-    const source = new EventSource(`${base}/events`);
-    let run: string | undefined;
-    let acc = "";
-    let settled = false;
-    let posted = false;
-    const finish = (err: Error | null, answer = "") => {
-      if (settled) return;
-      settled = true;
-      source.close();
-      if (err) reject(err);
-      else resolve(answer);
-    };
-    // Before the post answers, events from any run count (a DM delivered into a run already going).
-    const mine = (e: Ev) => !run || e.run === run;
-    const on_ = (type: string, fn: (e: Ev) => void) =>
-      source.addEventListener(type, (m) => {
-        const e = JSON.parse((m as MessageEvent<string>).data) as Ev;
-        if (mine(e)) fn(e);
-      });
-    on_("token", (e) => {
-      acc += e.text ?? "";
-      on.text(acc);
-    });
-    on_("now", (e) => on.now(e.text ?? ""));
-    on_("done", (e) => finish(null, e.text || acc));
-    on_("error", (e) => finish(new Error(e.message || "The run failed.")));
-    source.onerror = () => {
-      // EventSource retries on its own; give up only if it closed for good.
-      if (source.readyState === EventSource.CLOSED) finish(new Error("Lost the connection to the agent."));
-    };
-    source.onopen = async () => {
-      // Once only: EventSource reopens after a drop, and the message must not be sent twice.
-      if (posted || settled) return;
-      posted = true;
-      try {
-        const res = await fetch(`${base}/messages`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
-        });
-        const body = (await res.json().catch(() => ({}))) as { runId?: string; error?: string };
-        if (!res.ok) return finish(new Error(body.error ?? `Request failed (${res.status})`));
-        run = body.runId;
-      } catch (e) {
-        finish(e as Error);
-      }
-    };
+/** Resolves when the run that answers is done; rejects when the post or the run fails. `ref` is saved with the message. */
+export async function sendToThread(threadId: string, text: string, on: ThreadReplyHandlers, { ref }: { ref?: string } = {}): Promise<ThreadReply> {
+  await connectRuns();
+  const res = await fetch(`/api/threads/${encodeURIComponent(threadId)}/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, ref }),
   });
+  const body = (await res.json().catch(() => ({}))) as { delivered?: "run" | "inbox"; runId?: string; error?: string };
+  if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status})`);
+  if (body.delivered !== "run" || !body.runId) return { delivered: "inbox", runId: body.runId, text: "" };
+  on.accepted?.(body.runId);
+  let shown = "";
+  const run = await followRun(body.runId, (r) => {
+    if (r.text === shown) return;
+    shown = r.text;
+    on.text(r.text);
+  });
+  return { delivered: "run", runId: body.runId, text: run.text, message: run.message, lost: run.lost };
 }

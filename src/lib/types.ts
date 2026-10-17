@@ -58,6 +58,8 @@ export interface Agent {
 interface MessageBase {
   id: string;
   at: string;
+  /** Loaded from the saved transcript (src/lib/transcript.ts), not said on this page: it draws without the entrance. */
+  saved?: boolean;
 }
 
 export type Message =

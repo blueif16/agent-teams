@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronDown, GitBranch, HistoryIcon, MessageSquareQuote, MoonStar, RotateCcw, Sprout, X } from "lucide-react";
@@ -52,6 +52,42 @@ const diffOf = (agentId: string, file: AgentFileName, change: string): Resource 
   key: `${filesRoute(agentId, file)}/diff?to=${encodeURIComponent(change)}`,
   topic: filesTopic(agentId),
 });
+
+/** Where a timeline reads one file's versions from: an agent file, or a project's state file. */
+export interface HistorySource {
+  history: Resource;
+  diff: (change: string) => Resource;
+  /** POST endpoint that restores a version; absent for files only their tools write (read-only here). */
+  restore?: string;
+  /** The file's name, e.g. SOUL.md or dag.json. */
+  file: string;
+  /** Whose file it is, for the header and the empty state: "Mira", "#pricing". */
+  owner: string;
+}
+
+export const agentHistorySource = (agentId: string, file: AgentFileName): HistorySource => ({
+  history: historyOf(agentId, file),
+  diff: (change) => diffOf(agentId, file, change),
+  restore: `${filesRoute(agentId, file)}/restore`,
+  file: AGENT_FILES[file],
+  owner: nameOf(agentId),
+});
+
+/**
+ * A project state file (projects/<pid>/state/<file>), read-only: only the PM's state tools write it. `task` keeps
+ * the versions that touched one task (their Task trailer).
+ */
+export function stateHistorySource(pid: string, file: string, opts: { task?: string; owner?: string } = {}): HistorySource {
+  const base = `/api/projects/${encodeURIComponent(pid)}/state`;
+  const q = `file=${encodeURIComponent(file)}`;
+  const topic = `state:${pid}`;
+  return {
+    history: { key: `${base}/history?${q}${opts.task ? `&task=${encodeURIComponent(opts.task)}` : ""}`, topic },
+    diff: (change) => ({ key: `${base}/diff?${q}&to=${encodeURIComponent(change)}`, topic }),
+    file: opts.task ? `${opts.task} in ${file}` : file,
+    owner: opts.owner ?? `#${pid}`,
+  };
+}
 
 // Relative times re-read the clock once a minute; render code never calls Date.now() itself.
 const MINUTE = 60_000;
@@ -191,8 +227,8 @@ const SEG: Record<DiffSegment["op"], string> = {
   del: "rounded-[3px] bg-[#fde3e1] text-[#a1261d] line-through decoration-[#a1261d]/50",
 };
 
-function WordDiff({ agentId, file, change }: { agentId: string; file: AgentFileName; change: string }) {
-  const { data, error } = useCached<FileDiff>(diffOf(agentId, file, change));
+function WordDiff({ source, change }: { source: HistorySource; change: string }) {
+  const { data, error } = useCached<FileDiff>(source.diff(change));
   if (!data && error) return <p className="py-2 text-[12.5px] text-[#c4321b]">Couldn&apos;t load this change ({error}).</p>;
   if (!data) return <p className="py-2 text-[12.5px] text-muted">Loading the change…</p>;
   const { hunks } = data;
@@ -297,12 +333,17 @@ function ConfirmRestore({
 
 /** The timeline of one agent file, newest first. */
 export function FileHistory({ agentId, file, onNotify, onRestored }: FileHistoryProps) {
-  const name = AGENT_FILES[file];
-  const agentName = nameOf(agentId);
-  const resource = historyOf(agentId, file);
+  return <Timeline source={agentHistorySource(agentId, file)} onNotify={onNotify} onRestored={onRestored} />;
+}
+
+/** The timeline of any versioned file, newest first; `focus` opens one change and scrolls to it. */
+export function Timeline({ source, focus, onNotify, onRestored }: { source: HistorySource; focus?: string } & Pick<FileHistoryProps, "onNotify" | "onRestored">) {
+  const name = source.file;
+  const agentName = source.owner;
+  const resource = source.history;
   const { data: history, error } = useCached<FileHistoryData>(resource);
   const now = useNow();
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(focus ?? null);
   const [confirm, setConfirm] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [restoreError, setRestoreError] = useState<string | null>(null);
@@ -319,7 +360,8 @@ export function FileHistory({ agentId, file, onNotify, onRestored }: FileHistory
     setBusy(true);
     setRestoreError(null);
     try {
-      const res = await fetch(`${filesRoute(agentId, file)}/restore`, {
+      if (!source.restore) return;
+      const res = await fetch(source.restore, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ change: c.change }),
@@ -389,6 +431,7 @@ export function FileHistory({ agentId, file, onNotify, onRestored }: FileHistory
             return (
               <motion.li
                 key={c.change}
+                ref={c.change === focus ? (el: HTMLLIElement | null) => el?.scrollIntoView({ block: "center" }) : undefined}
                 layout="position"
                 initial={{ opacity: 0, y: 12, scale: 0.97 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -436,10 +479,12 @@ export function FileHistory({ agentId, file, onNotify, onRestored }: FileHistory
                       className="overflow-hidden"
                     >
                       <div className="px-1 pb-3 pt-1.5">
-                        <WordDiff agentId={agentId} file={file} change={c.change} />
+                        <WordDiff source={source} change={c.change} />
                         <div className="mt-2 flex items-center gap-2 px-1">
                           {i === 0 ? (
                             <span className="text-[12px] text-muted">This is the current version.</span>
+                          ) : !source.restore ? (
+                            <span className="text-[12px] text-muted">Only the PM&apos;s tools write this file.</span>
                           ) : (
                             <button
                               type="button"
@@ -497,18 +542,7 @@ export interface HistoryButtonProps extends FileHistoryProps {
  */
 export function HistoryButton({ agentId, file, onNotify, onRestored, tone = "card", className = "" }: HistoryButtonProps) {
   const [open, setOpen] = useState(false);
-  const isClient = useSyncExternalStore(noop, () => true, () => false);
-  const titleId = useId();
   const name = AGENT_FILES[file];
-  const close = useCallback(() => setOpen(false), []);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, close]);
-
   return (
     <>
       <button
@@ -527,6 +561,36 @@ export function HistoryButton({ agentId, file, onNotify, onRestored, tone = "car
       >
         <HistoryIcon className="size-[17px]" strokeWidth={2.1} />
       </button>
+      <HistorySheet open={open} onClose={() => setOpen(false)} source={agentHistorySource(agentId, file)} onNotify={onNotify} onRestored={onRestored} />
+    </>
+  );
+}
+
+/**
+ * A file's History in a sheet: a drawer from the right on wide screens, a bottom sheet on phones. `focus` opens
+ * one change (a compaction's saved file, say) and scrolls to it.
+ */
+export function HistorySheet({
+  open,
+  onClose,
+  source,
+  focus,
+  onNotify,
+  onRestored,
+}: { open: boolean; onClose: () => void; source: HistorySource; focus?: string } & Pick<FileHistoryProps, "onNotify" | "onRestored">) {
+  const isClient = useSyncExternalStore(noop, () => true, () => false);
+  const titleId = useId();
+  const close = onClose;
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, close]);
+
+  return (
+    <>
       {isClient &&
         createPortal(
           <AnimatePresence>
@@ -559,7 +623,7 @@ export function HistoryButton({ agentId, file, onNotify, onRestored, tone = "car
                         History
                       </h2>
                       <p className="truncate text-[12.5px] text-muted">
-                        {nameOf(agentId)} · <span className="font-mono text-[12px]">{name}</span>
+                        {source.owner} · <span className="font-mono text-[12px]">{source.file}</span>
                       </p>
                     </div>
                     <button
@@ -573,7 +637,7 @@ export function HistoryButton({ agentId, file, onNotify, onRestored, tone = "car
                     </button>
                   </div>
                   <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 md:px-4">
-                    <FileHistory agentId={agentId} file={file} onNotify={onNotify} onRestored={onRestored} />
+                    <Timeline key={`${source.history.key}#${focus ?? ""}`} source={source} focus={focus} onNotify={onNotify} onRestored={onRestored} />
                   </div>
                 </motion.div>
               </div>
