@@ -12,6 +12,7 @@ import { GET, POST } from "@/app/api/rules/route";
 import { DEFAULT_RULES } from "@/lib/policy/defaults";
 import { listDetectors } from "@/lib/policy/detectors";
 import type { CompileResult, Rule, RulesResponse } from "@/lib/policy/types";
+import type { FileZoneView } from "@/lib/policy/zones";
 
 let dir: string;
 beforeEach(async () => {
@@ -83,6 +84,18 @@ describe("GET /api/rules", () => {
     const res = await get("?agent=zed&archetype=researcher");
     expect(res.status).toBe(200);
     expect(((await res.json()) as RulesResponse).permissions).toHaveLength(15);
+  });
+
+  it("gives an agent its Files section, and counts its file rules in what it can write", async () => {
+    const body = (await (await get("?agent=zed&archetype=researcher&project=acme")).json()) as RulesResponse & { files?: FileZoneView[] };
+    expect(body.files?.slice(0, 2).map((f) => [f.label, f.access])).toEqual([
+      ["Its report (research.md)", "edit"],
+      ["Project files", "read"],
+    ]);
+    expect(body.files?.find((f) => f.id === "secrets")).toMatchObject({ label: "Secrets & settings", access: "never" });
+    const write = body.permissions?.find((p) => p.id === "files.write");
+    expect(write?.limits[0]).toMatchObject({ access: "deny", text: expect.stringMatching(/^A researcher writes only its report \(research\.md\)/) });
+    expect((await (await get("?project=acme")).json()) as object).not.toHaveProperty("files");
   });
 
   it("lists only the rules that can apply to the agent and project asked about", async () => {

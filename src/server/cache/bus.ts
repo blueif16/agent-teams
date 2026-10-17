@@ -12,6 +12,7 @@
  *   skills             the skill library changed (skills/index.json or a vendored file)
  *   messages:<thread>  a row was added to a thread's transcript (src/server/runtime/db.ts)
  *   messages:project:<id>  …to the transcript of one of a project's threads (a channel's, or a DM's)
+ *   state:<pid>        one of a project's state files changed (projects/<pid>/state/** in the vault)
  *   org                a team, DM project or agent was created (the setup flow's launch)
  *   config             never sent: code and .env.local change only with a restart, and a client
  *                      revalidates what it shows when its stream reconnects
@@ -35,7 +36,14 @@ export const TOPICS = {
   skills: "skills",
   messages: (threadId: string) => `messages:${threadId}`,
   projectMessages: (projectId: string) => `messages:project:${projectId}`,
+  state: (pid: string) => `state:${pid}`,
   org: "org",
+};
+
+/** The `state:<pid>` topic a vault path announces, if it is one of a project's state files. */
+export const stateTopicOf = (vaultPath: string): string | null => {
+  const pid = /^projects\/([^/]+)\/state\//.exec(vaultPath)?.[1];
+  return pid ? TOPICS.state(pid) : null;
 };
 
 export class Bus {

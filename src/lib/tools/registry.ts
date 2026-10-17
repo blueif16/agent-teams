@@ -244,9 +244,10 @@ export const REGISTRY: readonly ToolDef[] = [
     calls: ["search_skills"],
   },
   {
+    // Built: src/components/state/PlanView.tsx, in the team panel and full size in the workspace.
     id: "plan", name: "Plan", description: "The project's task graph with owners, status and blockers.",
-    kind: "present", mechanism: "artifact", tier: "T0", archetypes: ["lead", "coordinator", "chief"], status: "planned",
-    origin: "adopt", calls: [], renderer: "pane:plan", artifact: { type: "plan", path: DAG, writtenBy: DAG_WRITERS },
+    kind: "present", mechanism: "artifact", tier: "T0", archetypes: ["lead", "coordinator", "chief"], status: "ready",
+    origin: "exists", calls: [], renderer: "pane:plan", artifact: { type: "plan", path: DAG, writtenBy: DAG_WRITERS },
     deps: ["@xyflow/react@12.12.0", "@dagrejs/dagre@3.1.1"],
   },
   {

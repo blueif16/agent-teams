@@ -78,6 +78,8 @@ export interface Charter {
   due?: string;
   metric?: string;
   scope: { must: string[]; wont: string[] };
+  /** Details Mira left undecided: the PM asks the owner after launch (Mira staffs; the PM scopes). At most 3. */
+  open?: string[];
 }
 
 export interface Proposal extends Charter {
@@ -174,6 +176,7 @@ export function normalizeCharter(raw: unknown): Charter | null {
     due: cleanDue(r.due),
     metric: clean(r.metric, 200) || undefined,
     scope: { must: cleanList(scope.must, 160), wont: cleanList(scope.wont, 160) },
+    ...(cleanList(r.open, 200, 3).length ? { open: cleanList(r.open, 200, 3) } : {}),
   };
 }
 
