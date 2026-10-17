@@ -1,8 +1,9 @@
 /*
- * Starting a project (docs/design/team-setup.md §1). Mira triages a request to "project" (a PM plus experts) or
- * "solo" (one expert in a DM) and replies with one sentence and a ```project fence of JSON (v2), naming roles by
- * archetype. parseProject turns the fence into a Proposal; POST /api/projects/plan staffs it into a LaunchPlan for
- * the launch card; POST /api/projects provisions the approved plan. Shared by the client and the server: no I/O.
+ * Starting a project (docs/design/team-setup.md §1). Mira replies with one sentence and a ```project fence of JSON
+ * (v2): a shared charter (goal, due, metric, scope) and 2–3 options, each triaged to "project" (a PM plus experts)
+ * or "solo" (one expert in a DM), with roles named by archetype. parseProject turns the fence into a Proposal;
+ * POST /api/projects/plan staffs every option for the option cards; POST /api/projects provisions the one the owner
+ * picked (a LaunchPlan). Shared by the client and the server: no I/O.
  */
 import type { Composition } from "./skills/types";
 
@@ -36,6 +37,8 @@ export const isStaffable = (a: unknown): a is StaffableArchetype => typeof a ===
 
 /** Q6: at most 3 experts at launch, besides the PM; the PM asks to hire more later. */
 export const MAX_EXPERTS = 3;
+/** The option cards in one reply. */
+export const MAX_OPTIONS = 3;
 export const DEFAULT_BUDGET_USD = 5;
 export const MAX_BUDGET_USD = 1000;
 const MAX_LIST = 6;
@@ -50,19 +53,36 @@ export interface ProposalRole {
   qualifications: string[];
 }
 
-export interface Proposal {
-  kind: "project" | "solo";
+export type ProjectKind = "project" | "solo";
+
+/** One way to staff the work, shown as one option card. */
+export interface ProposalOption {
+  /** "Lean", "Balanced", "Full". */
+  label: string;
+  /** One line on why this option. */
+  summary: string;
+  kind: ProjectKind;
+  /** A project: the PM first, then 1 to MAX_EXPERTS experts. Solo: exactly one role. */
+  roles: ProposalRole[];
+  budgetUsd: number;
+  etaDays?: number;
+}
+
+/** What every option shares. */
+export interface Charter {
   name: string;
-  /** kebab-case; a solo proposal has no channel once launched, it lives in a DM. */
+  /** kebab-case; a solo launch has no channel, it lives in a DM. */
   channel: string;
   goal: string;
   /** YYYY-MM-DD. */
   due?: string;
   metric?: string;
   scope: { must: string[]; wont: string[] };
-  /** A project: the PM first, then 1 to MAX_EXPERTS experts. Solo: exactly one role. */
-  roles: ProposalRole[];
-  budgetUsd: number;
+}
+
+export interface Proposal extends Charter {
+  /** 1 to MAX_OPTIONS. */
+  options: ProposalOption[];
 }
 
 /** The PM a project gets when Mira's fence leaves the lead out. */
@@ -111,36 +131,63 @@ function cleanRole(raw: unknown): ProposalRole | null {
   return { archetype, role, need: clean(r.need, 200), qualifications: cleanList(r.qualifications, 60) };
 }
 
-/** A proposal from untrusted JSON (the fence, or a client): null when unusable; lists capped, strings trimmed. */
-export function normalizeProposal(raw: unknown): Proposal | null {
+/** A whole number of days, 1 to a year, else undefined. */
+export function cleanEta(v: unknown): number | undefined {
+  const n = typeof v === "number" ? v : Number.NaN;
+  return Number.isFinite(n) && n >= 1 ? Math.min(Math.round(n), 365) : undefined;
+}
+
+/**
+ * The roles a launch staffs. A project: its first PM role (or DEFAULT_PM) first, then up to MAX_EXPERTS experts.
+ * Solo: the first role. Null when nothing is left to staff.
+ */
+export function staffRoles(kind: ProjectKind, roles: ProposalRole[]): ProposalRole[] | null {
+  if (kind === "solo") return roles.length ? [roles[0]] : null;
+  const experts = roles.filter((x) => x.archetype !== "lead");
+  if (!experts.length) return null;
+  return [roles.find((x) => x.archetype === "lead") ?? DEFAULT_PM, ...experts.slice(0, MAX_EXPERTS)];
+}
+
+function cleanOption(raw: unknown, i: number): ProposalOption | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  const all = (Array.isArray(r.roles) ? r.roles : []).slice(0, 50).map(cleanRole).filter((x): x is ProposalRole => !!x);
+  // Without a kind, one expert is solo (default to one expert, design §0) and anything more is a project.
+  const kind: ProjectKind = r.kind === "solo" || r.kind === "project" ? r.kind : all.length === 1 && all[0].archetype !== "lead" ? "solo" : "project";
+  const roles = staffRoles(kind, all);
+  if (!roles) return null;
+  return { label: clean(r.label, 24) || `Option ${i + 1}`, summary: clean(r.summary, 140), kind, roles, budgetUsd: cleanBudget(r.budgetUsd), etaDays: cleanEta(r.etaDays) };
+}
+
+/** The shared charter from untrusted JSON: null without a goal. */
+export function normalizeCharter(raw: unknown): Charter | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
   const goal = clean(r.goal, 300);
   if (!goal) return null;
-  const roles = (Array.isArray(r.roles) ? r.roles : []).slice(0, 50).map(cleanRole).filter((x): x is ProposalRole => !!x);
-  const experts = roles.filter((x) => x.archetype !== "lead");
-  const kind = r.kind === "solo" || r.kind === "project" ? r.kind : roles.length > 1 ? "project" : "solo";
-  let staffed: ProposalRole[];
-  if (kind === "solo") {
-    if (!roles.length) return null;
-    staffed = [roles[0]];
-  } else {
-    if (!experts.length) return null;
-    staffed = [roles.find((x) => x.archetype === "lead") ?? DEFAULT_PM, ...experts.slice(0, MAX_EXPERTS)];
-  }
   const name = clean(r.name, 60) || goal.split(" ").slice(0, 4).join(" ");
   const scope = (r.scope && typeof r.scope === "object" ? r.scope : {}) as Record<string, unknown>;
   return {
-    kind,
     name,
     channel: slug(clean(r.channel, 60) || name) || "new-project",
     goal,
     due: cleanDue(r.due),
     metric: clean(r.metric, 200) || undefined,
     scope: { must: cleanList(scope.must, 160), wont: cleanList(scope.wont, 160) },
-    roles: staffed,
-    budgetUsd: cleanBudget(r.budgetUsd),
   };
+}
+
+/** A proposal from untrusted JSON (the fence, or a client): null when unusable; lists capped, strings trimmed. */
+export function normalizeProposal(raw: unknown): Proposal | null {
+  const charter = normalizeCharter(raw);
+  if (!charter) return null;
+  const options = ((raw as Record<string, unknown>).options as unknown[] | undefined) ?? [];
+  const usable = (Array.isArray(options) ? options : [])
+    .slice(0, 20)
+    .map(cleanOption)
+    .filter((o): o is ProposalOption => !!o)
+    .slice(0, MAX_OPTIONS);
+  return usable.length ? { ...charter, options: usable } : null;
 }
 
 /** Read the project block from a finished reply; null when there is none or it's unusable. Never throws. */
@@ -192,9 +239,41 @@ export interface RosterEntry {
   rehire?: string;
 }
 
+/** One option, staffed: what its card shows. */
+export interface OptionPlan {
+  label: string;
+  summary: string;
+  kind: ProjectKind;
+  etaDays?: number;
+  budgetUsd: number;
+  /** A project: the PM first. Solo: one entry. */
+  roster: RosterEntry[];
+}
+
+/** POST /api/projects/plan: every option staffed, under the shared charter. */
+export interface LaunchOptions {
+  charter: Charter;
+  options: OptionPlan[];
+}
+
+/** POST /api/projects: the option the owner picked, with the charter as they edited it. */
 export interface LaunchPlan {
-  charter: Pick<Proposal, "kind" | "name" | "channel" | "goal" | "due" | "metric" | "scope">;
+  charter: Charter & { kind: ProjectKind };
   /** A project: the PM first. Solo: one entry. */
   roster: RosterEntry[];
   budgetUsd: number;
+  /** Which option this was, for the charter. */
+  option?: { label: string; summary: string; etaDays?: number };
+}
+
+/** The LaunchPlan for one option card, with the owner's edits to the shared charter and the budget. */
+export function launchPlanOf(options: LaunchOptions, index: number, edits: { goal?: string; due?: string | null; budgetUsd?: number } = {}): LaunchPlan {
+  const o = options.options[index];
+  const due = edits.due === null ? undefined : (edits.due ?? options.charter.due);
+  return {
+    charter: { ...options.charter, goal: edits.goal?.trim() || options.charter.goal, due, kind: o.kind },
+    roster: o.roster,
+    budgetUsd: edits.budgetUsd ?? o.budgetUsd,
+    option: { label: o.label, summary: o.summary, etaDays: o.etaDays },
+  };
 }
