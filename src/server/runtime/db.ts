@@ -38,6 +38,8 @@ export interface ProjectRow {
   status: ProjectStatus;
   leadAgentId: string | null;
   specMd: string | null;
+  /** Spend cap for the whole project in USD (Q2: warn at 80%, pause at 100%); null = none set. */
+  budgetUsd: number | null;
   createdAt: string;
   closedAt: string | null;
 }
@@ -230,6 +232,10 @@ const MIGRATIONS: ((db: DatabaseSync, now: string) => void)[] = [
       now,
     );
   },
+  // 2: a project's budget (the launch card sets it).
+  (db) => {
+    db.exec("ALTER TABLE projects ADD COLUMN budget_usd REAL");
+  },
 ];
 
 // ---------------------------------------------------------------------------------------------- rows
@@ -249,6 +255,7 @@ const toProject = (r: Raw): ProjectRow => ({
   status: r.status as ProjectStatus,
   leadAgentId: str(r.lead_agent_id),
   specMd: str(r.spec_md),
+  budgetUsd: r.budget_usd == null ? null : Number(r.budget_usd),
   createdAt: String(r.created_at),
   closedAt: str(r.closed_at),
 });
@@ -380,15 +387,33 @@ export class RuntimeDb {
       const id = p.id ?? ulid();
       this.sql
         .prepare(
-          `INSERT INTO projects (id, kind, channel, name, goal, success_metric, due_at, status, lead_agent_id, spec_md, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO projects (id, kind, channel, name, goal, success_metric, due_at, status, lead_agent_id, spec_md, budget_usd, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run(id, p.kind, p.channel ?? null, p.name, p.goal ?? null, p.successMetric ?? null, p.dueAt ?? null, p.status ?? "proposed", p.leadAgentId ?? null, p.specMd ?? null, new Date().toISOString());
+        .run(
+          id,
+          p.kind,
+          p.channel ?? null,
+          p.name,
+          p.goal ?? null,
+          p.successMetric ?? null,
+          p.dueAt ?? null,
+          p.status ?? "proposed",
+          p.leadAgentId ?? null,
+          p.specMd ?? null,
+          p.budgetUsd ?? null,
+          new Date().toISOString(),
+        );
       return this.projects.get(id)!;
     },
     get: (id: string) => this.one(toProject, "SELECT * FROM projects WHERE id = ?", id),
-    list: (filter: { status?: ProjectStatus; kind?: ProjectKind } = {}) =>
-      this.all(toProject, "SELECT * FROM projects WHERE (?1 IS NULL OR status = ?1) AND (?2 IS NULL OR kind = ?2) ORDER BY created_at, rowid", filter.status ?? null, filter.kind ?? null),
+    list: (filter: { status?: ProjectStatus; kind?: ProjectKind } = {}): ProjectRow[] =>
+      // Named parameters: node:sqlite (Node 24.1) can't bind positional values to numbered ones (?1).
+      (
+        this.sql
+          .prepare("SELECT * FROM projects WHERE (:status IS NULL OR status = :status) AND (:kind IS NULL OR kind = :kind) ORDER BY created_at, rowid")
+          .all({ status: filter.status ?? null, kind: filter.kind ?? null }) as Raw[]
+      ).map(toProject),
     setStatus: (id: string, status: ProjectStatus): void => {
       const closed = status === "done" || status === "archived" ? new Date().toISOString() : null;
       this.sql.prepare("UPDATE projects SET status = ?, closed_at = COALESCE(?, closed_at) WHERE id = ?").run(status, closed, id);
@@ -407,6 +432,13 @@ export class RuntimeDb {
     },
     get: (id: string) => this.one(toAgent, "SELECT * FROM agents WHERE id = ?", id),
     list: () => this.all(toAgent, "SELECT * FROM agents WHERE retired_at IS NULL ORDER BY created_at, rowid"),
+    /** Sets the fields given; `config` replaces the whole config (read, change, write). Undefined if no such agent. */
+    update: (id: string, patch: { config?: AgentConfig; status?: AgentStatus }): AgentRow | undefined => {
+      this.sql
+        .prepare("UPDATE agents SET config_json = COALESCE(?, config_json), status = COALESCE(?, status) WHERE id = ?")
+        .run(patch.config === undefined ? null : JSON.stringify(patch.config), patch.status ?? null, id);
+      return this.agents.get(id);
+    },
   };
 
   readonly members = {
