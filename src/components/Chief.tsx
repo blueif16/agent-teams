@@ -167,8 +167,8 @@ function MemberRow({ entry }: { entry: RosterEntry }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline gap-1.5">
-          <span className="truncate text-[13.5px] font-semibold">{rehire?.name ?? entry.name}</span>
-          <span className="truncate text-[12px] text-muted">{entry.role}</span>
+          <span className="shrink-0 text-[13.5px] font-semibold">{rehire?.name ?? entry.name}</span>
+          <span className="min-w-0 truncate text-[12px] text-muted">{entry.role}</span>
           {rehire && <span className={`${chipCls} shrink-0 bg-accent-wash font-medium text-accent`}>Rehire</span>}
         </span>
         <span className="mt-1 flex flex-wrap gap-1">
@@ -191,7 +191,7 @@ function MemberRow({ entry }: { entry: RosterEntry }) {
 function OptionCard({ o, picked, dim, layoutId, onPick }: { o: OptionPlan; picked: boolean; dim: boolean; layoutId: string; onPick: () => void }) {
   const experts = o.roster.filter((r) => r.archetype !== "lead").length;
   return (
-    <motion.div animate={{ opacity: dim ? 0.45 : 1 }} transition={{ duration: 0.2 }} className="w-[272px] shrink-0 snap-start sm:w-[296px]">
+    <motion.div animate={{ opacity: dim ? 0.45 : 1 }} transition={{ duration: 0.2 }} className="w-[82%] max-w-[296px] shrink-0 snap-start">
       <div
         onClick={onPick}
         className="lift relative flex h-full cursor-pointer flex-col rounded-[20px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,0.07)] hover:shadow-[0_6px_22px_rgba(0,0,0,0.08),0_0_0_1px_rgba(0,0,0,0.08)]"
@@ -208,7 +208,7 @@ function OptionCard({ o, picked, dim, layoutId, onPick }: { o: OptionPlan; picke
           ))}
         </ul>
         <div className="mt-2 flex items-center gap-2 border-t border-line pt-3">
-          <span className="flex min-w-0 flex-1 items-center gap-3 text-[12.5px] tabular-nums text-ink-2">
+          <span className="flex min-w-0 flex-1 items-center gap-2.5 whitespace-nowrap text-[12.5px] tabular-nums text-ink-2">
             <span className="flex items-center gap-1" title="Budget">
               <Wallet className="size-3.5 text-muted" strokeWidth={1.9} />
               {money(o.budgetUsd)}

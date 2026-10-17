@@ -90,16 +90,18 @@ export function Conversation({
   const team = (channel ? teamsById[view.teamId] : teamsById[dmAgent?.teamId ?? ""]) ?? teamsById.company;
   const last = messages[messages.length - 1];
   const lastLen = last?.kind === "text" ? last.text.length : 0;
+  // Mira's option cards arrive taller than the shimmer line they replace: bring them, and Launch, into view.
+  const cardsArrived = last?.kind === "proposal" && last.state === "ready";
 
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 240;
-    if (!mounted.current || nearBottom) {
+    if (!mounted.current || nearBottom || cardsArrived) {
       el.scrollTo({ top: el.scrollHeight, behavior: mounted.current ? "smooth" : "auto" });
     }
     mounted.current = true;
-  }, [messages.length, lastLen, typingAgentId]);
+  }, [messages.length, lastLen, typingAgentId, cardsArrived]);
 
   const active = team.agents.filter((a) => status[a.id] === "working").length;
   const needs = team.agents.filter((a) => status[a.id] === "needs-you").length;
