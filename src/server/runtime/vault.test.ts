@@ -482,3 +482,43 @@ describe("the app's vault", () => {
     expect((await heard).topic).toBe("files:agent:mira");
   });
 });
+
+describe("writeMany", () => {
+  const files = [
+    { path: "projects/p1/state/dag.json", content: '{"tasks":[]}\n' },
+    { path: "projects/p1/state/roster.json", content: '{"members":[]}\n' },
+    { path: "projects/p1/state/journal/1.md", content: "- t1 reported done\n" },
+  ];
+
+  it("writes several files in exactly one commit that every file's history shares", async () => {
+    const vault = new Vault({ dir });
+    const commit = await vault.writeMany({ files, author: PIP, source: "report", subject: "state(p1): t1 reported done", trailers: { Task: "t1" } });
+
+    expect(git(dir, "rev-list", "--count", "HEAD").trim()).toBe("1");
+    for (const f of files) {
+      expect(await vault.show(f.path)).toBe(f.content);
+      expect((await vault.history(f.path)).commits.map((c) => c.change)).toEqual([commit!.change]);
+    }
+  });
+
+  it("rejects the whole commit when one file's expected blob is stale, and changes no file", async () => {
+    const vault = new Vault({ dir });
+    await vault.writeMany({ files, author: PIP, source: "report" });
+    const stale = await vault.blob(files[0].path);
+    await vault.write({ path: files[0].path, content: '{"tasks":[1]}\n', author: OWNER, source: "owner" });
+
+    await expect(
+      vault.writeMany({
+        files: [
+          { path: files[0].path, content: '{"tasks":[2]}\n', expectedBlob: stale },
+          { path: files[1].path, content: '{"members":[2]}\n' },
+        ],
+        author: PIP,
+        source: "report",
+      }),
+    ).rejects.toBeInstanceOf(VaultConflictError);
+    expect(await vault.show(files[0].path)).toBe('{"tasks":[1]}\n');
+    expect(await vault.show(files[1].path)).toBe(files[1].content);
+    expect(git(dir, "rev-list", "--count", "HEAD").trim()).toBe("2");
+  });
+});
