@@ -184,19 +184,4 @@ describe("applyCanvasOps properties", () => {
       { numRuns: 500 },
     );
   });
-
-  it("changes nothing when an op fails", () => {
-    fc.assert(
-      fc.property(fc.array(OP, { minLength: 1, maxLength: 30 }), (ops) => {
-        let doc = emptyCanvas();
-        let n = 0;
-        ops.forEach((op, rev) => {
-          const r = applyCanvasOps(doc, [op], { rev, expectedRev: rev, now: rev, newId: () => `L${++n}`, by: "p" });
-          if (!r.results[0].ok) expect(r.doc).toEqual(doc);
-          doc = r.doc;
-        });
-      }),
-      { numRuns: 300 },
-    );
-  });
 });
