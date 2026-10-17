@@ -78,7 +78,10 @@ interface SendOptions {
   order?: { key: OrderKey; text: string; trace?: string };
 }
 
-export function AgentTeams() {
+const NO_TEAMS: Team[] = [];
+
+/** `initialTeams`: teams that exist before Mira launches any (the dev harness only; the app starts with none). */
+export function AgentTeams({ initialTeams = NO_TEAMS }: { initialTeams?: Team[] } = {}) {
   const wide = useMedia("(min-width: 1024px)", true);
   const medium = useMedia("(min-width: 768px)", true);
 
@@ -128,7 +131,7 @@ export function AgentTeams() {
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   // Teams the chief launched; they show everywhere a team shows.
-  const [extraTeams, setExtraTeams] = useState<Team[]>([]);
+  const [extraTeams, setExtraTeams] = useState<Team[]>(initialTeams);
   const org = useMemo(() => {
     const teams = [...TEAMS, ...extraTeams];
     return { teams, teamsById: { ...TEAMS_BY_ID, ...Object.fromEntries(extraTeams.map((t) => [t.id, t])) } };
@@ -548,6 +551,7 @@ export function AgentTeams() {
         setActiveTab(id);
       }}
       onCloseTab={closeTab}
+      onOpenTab={openTab}
     />
   );
 
@@ -699,7 +703,8 @@ export function AgentTeams() {
               {workspace && wide && (
                 <motion.section
                   key="workspace"
-                  className="flex w-[44%] max-w-[820px] min-w-[420px] flex-col border-l border-line bg-pane"
+                  // A full-size Plan or Decisions tab gets the room a graph needs.
+                  className={`flex min-w-[420px] flex-col border-l border-line bg-pane ${shownTab?.type === "plan" || shownTab?.type === "decisions" ? "w-[66%] max-w-[1240px]" : "w-[44%] max-w-[820px]"}`}
                   initial={{ opacity: 0, x: 40 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 40 }}

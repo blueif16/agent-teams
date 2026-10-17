@@ -1,5 +1,5 @@
-import { Fragment, useState, type ReactNode } from "react";
-import { ChartColumn, Check, Fingerprint, Hash, List, Loader, Pause, Pin, Play, Puzzle, Shield } from "lucide-react";
+import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
+import { ChartColumn, Check, CircleHelp, Fingerprint, Gavel, Hash, List, Loader, Network, Pause, Pin, Play, Puzzle, ScrollText, Shield, Users } from "lucide-react";
 import { motion } from "motion/react";
 import { AGENTS, CHIEF_ID } from "@/lib/data";
 import type { AgentStatus, PlanStep } from "@/lib/types";
@@ -11,6 +11,9 @@ import { AgentPerformance, TeamPerformance } from "./Performance";
 import { RulesTab } from "./Rules";
 import { AgentSkillsTab } from "./Skills";
 import { SPRING, StatusChip } from "./ui";
+import { prefetch } from "@/lib/client-cache";
+import { projectState } from "./state/resource";
+import { PmStatus, StateTabBody, TeamStateEnv, useProjectState, type StateTab } from "./state/StateViews";
 
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -29,7 +32,7 @@ function Segmented<T extends string>({
   onChange,
 }: {
   id: string;
-  items: { key: T; label: string; icon: ReactNode }[];
+  items: { key: T; label: string; icon: ReactNode; dot?: boolean }[];
   value: T;
   onChange: (key: T) => void;
 }) {
@@ -57,7 +60,10 @@ function Segmented<T extends string>({
                   className="absolute inset-0 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
                 />
               )}
-              <span className="relative">{item.icon}</span>
+              <span className="relative">
+                {item.icon}
+                {item.dot && <span aria-hidden className="absolute -right-1 -top-0.5 size-[7px] rounded-full bg-amber shadow-[0_0_0_2px_#f1f1f1]" />}
+              </span>
             </button>
           </Fragment>
         );
@@ -257,6 +263,7 @@ export function TeamPanel({
   doing,
   onOpenAgent,
   onOpenChannel,
+  onOpenFull,
   onNotify,
 }: {
   teamId: string;
@@ -264,12 +271,31 @@ export function TeamPanel({
   doing: Record<string, string>;
   onOpenAgent: (id: string) => void;
   onOpenChannel: (teamId: string) => void;
+  /** Opens the team's Plan or Decisions full size in the workspace. */
+  onOpenFull?: (teamId: string, view: "plan" | "decisions") => void;
   onNotify: (text: string) => void;
 }) {
   const t = useOrg().teamsById[teamId];
-  const [tab, setTab] = useState<"overview" | "performance" | "rules">("overview");
+  const [tab, setTab] = useState<"overview" | StateTab | "performance" | "rules">("overview");
+  // The PM's state for this team, ready before any of its tabs opens.
+  useEffect(() => {
+    void prefetch(projectState(t.id, t.leadId));
+  }, [t.id, t.leadId]);
+  const { data: state } = useProjectState(t.id, t.leadId);
+  const waiting = state ? state.pm.waiting.questions + state.pm.waiting.approvals : 0;
+  const openFull = useCallback((view: "plan" | "decisions") => onOpenFull?.(t.id, view), [onOpenFull, t.id]);
 
   return (
+    <TeamStateEnv
+      pid={t.id}
+      channel={t.channel}
+      leadId={t.leadId}
+      status={status}
+      onOpenAgent={onOpenAgent}
+      onOpenTab={setTab}
+      onOpenFull={onOpenFull ? openFull : undefined}
+      onNotify={onNotify}
+    >
     <div className="mx-auto max-w-[560px] px-5 pb-10 pt-8">
       <div className="flex flex-col items-center text-center">
         <span className="flex items-end -space-x-3">
@@ -308,11 +334,21 @@ export function TeamPanel({
         onChange={setTab}
         items={[
           { key: "overview", label: "Overview", icon: <List className={icon} /> },
+          { key: "plan", label: "Plan", icon: <Network className={icon} /> },
+          { key: "decisions", label: "Decisions", icon: <Gavel className={icon} /> },
+          { key: "open", label: waiting ? `Open: ${waiting} waiting on you` : "Open", icon: <CircleHelp className={icon} />, dot: waiting > 0 },
+          { key: "team", label: "Team", icon: <Users className={icon} /> },
+          { key: "charter", label: "Charter", icon: <ScrollText className={icon} /> },
           { key: "performance", label: "Performance", icon: <ChartColumn className={icon} /> },
           { key: "rules", label: "Permissions", icon: <Shield className={icon} /> },
         ]}
       />
 
+      {(tab === "plan" || tab === "decisions" || tab === "open" || tab === "team" || tab === "charter") && (
+        <TabBody tab={tab}>
+          <StateTabBody tab={tab} pid={t.id} leadId={t.leadId} />
+        </TabBody>
+      )}
       {tab === "performance" && (
         <TabBody tab={tab}>
           <TeamPerformance teamId={t.id} onOpenAgent={onOpenAgent} />
@@ -325,6 +361,7 @@ export function TeamPanel({
       )}
       {tab === "overview" && (
         <TabBody tab={tab}>
+          <PmStatus pid={t.id} leadId={t.leadId} now={doing[t.leadId]} />
           {t.launched?.spec && (
             <Group title="Spec">
               <div className="px-4 py-2 [&_h4:first-child]:mt-1">
@@ -361,5 +398,6 @@ export function TeamPanel({
         </TabBody>
       )}
     </div>
+    </TeamStateEnv>
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Columns2, Ellipsis, Hash, Puzzle, X } from "lucide-react";
+import { Columns2, Ellipsis, Gavel, Hash, Network, Puzzle, X } from "lucide-react";
 import { AGENTS } from "@/lib/data";
 import { useOrg } from "./org";
 import type { AgentStatus, PlanStep, Team } from "@/lib/types";
@@ -8,10 +8,13 @@ import { Mascot } from "./Mascot";
 import { IconButton, SPRING } from "./ui";
 import { AgentPanel, TeamPanel } from "./Panels";
 import { SkillsView } from "./Skills";
+import { StateTabBody, TeamStateEnv } from "./state/StateViews";
 
 export type Tab = { id: string } & (
   | { type: "agent"; agentId: string }
   | { type: "team"; teamId: string }
+  /** A team's Plan or Decisions, full size ("Open full" in the team panel). */
+  | { type: "plan" | "decisions"; teamId: string }
   | { type: "skills" }
 );
 
@@ -27,8 +30,17 @@ function tabMeta(tab: Tab, teamsById: Record<string, Team>): { title: string; ic
     case "team": {
       const t = teamsById[tab.teamId];
       return {
-        title: `#${t.channel} plan`,
+        title: `#${t.channel}`,
         icon: <Hash className="size-[15px] text-ink-2" />,
+      };
+    }
+    case "plan":
+    case "decisions": {
+      const t = teamsById[tab.teamId];
+      const Icon = tab.type === "plan" ? Network : Gavel;
+      return {
+        title: `#${t.channel} ${tab.type === "plan" ? "plan" : "decisions"}`,
+        icon: <Icon className="size-[15px] text-ink-2" />,
       };
     }
     case "skills":
@@ -124,6 +136,7 @@ export function WorkspaceBody({
   onOpenSkills,
   onCloseOthers,
   onCloseTab,
+  onOpenTab,
 }: {
   tab: Tab | undefined;
   status: Record<string, AgentStatus>;
@@ -138,8 +151,10 @@ export function WorkspaceBody({
   onOpenSkills: () => void;
   onCloseOthers: (id: string) => void;
   onCloseTab: (id: string) => void;
+  onOpenTab: (tab: Tab) => void;
 }) {
   const [menu, setMenu] = useState(false);
+  const { teamsById } = useOrg();
   if (!tab) return null;
 
   return (
@@ -216,8 +231,21 @@ export function WorkspaceBody({
             doing={doing}
             onOpenAgent={onOpenAgent}
             onOpenChannel={onOpenChannel}
+            onOpenFull={(teamId, view) => onOpenTab({ id: `${view}:${teamId}`, type: view, teamId })}
             onNotify={onNotify}
           />
+        )}
+        {(tab.type === "plan" || tab.type === "decisions") && (
+          <TeamStateEnv
+            pid={tab.teamId}
+            channel={teamsById[tab.teamId].channel}
+            leadId={teamsById[tab.teamId].leadId}
+            status={status}
+            onOpenAgent={onOpenAgent}
+            onNotify={onNotify}
+          >
+            <StateTabBody tab={tab.type} pid={tab.teamId} leadId={teamsById[tab.teamId].leadId} full />
+          </TeamStateEnv>
         )}
       </motion.div>
     </>
