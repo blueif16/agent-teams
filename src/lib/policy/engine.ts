@@ -9,6 +9,9 @@
  * - Flow rules match labels on arg spans and in the context. Rewrites (tokenize/redact/hash/mask) need a located span;
  *   block/ask/allow also fire on a label that is only in the context, because anything the agent writes may derive
  *   from it.
+ * - Paths are matched as the file system resolves them (normPath): "..", "//" and trailing slashes resolved, case and
+ *   Unicode form folded. A path that escapes (not absolute, or ".." out of its top-level folder) meets every
+ *   restricting path constraint and no relaxing one.
  * - Most restrictive wins (OUTCOME_ORDER). When no enforced tool rule matches, the tool's tier decides (tiers.ts);
  *   a tool in no tier asks.
  */
@@ -86,16 +89,22 @@ export function hostOf(raw: unknown): string | null {
 
 const normDomain = (d: string) => d.trim().toLowerCase().replace(/^\*?\./, "").replace(/\.$/, "");
 
-/** POSIX normalize without node:path, so the engine also runs in the browser. */
-function normPath(p: string): string {
-  const abs = p.startsWith("/");
+/**
+ * A path as the file system will resolve it: "." and empty segments dropped (so "//" and a trailing "/" go), ".."
+ * resolved, in NFC. POSIX without node:path, so the engine also runs in the browser. null when the path escapes: it
+ * isn't absolute, or a ".." climbs out of its top-level folder (each agent mount is one, so that is a jump between
+ * mounts or past the root). Case is folded by the glob match, the way macOS compares names.
+ */
+export function normPath(p: string): string | null {
+  if (!p.startsWith("/")) return null;
   const out: string[] = [];
-  for (const seg of p.split("/")) {
+  for (const seg of p.normalize("NFC").split("/")) {
     if (!seg || seg === ".") continue;
-    if (seg === "..") out.pop();
-    else out.push(seg);
+    if (seg !== "..") out.push(seg);
+    else if (out.length > 1) out.pop();
+    else return null;
   }
-  return (abs ? "/" : "") + out.join("/");
+  return `/${out.join("/")}`;
 }
 
 const pathGlobCache = new Map<string, RegExp>();
@@ -104,13 +113,16 @@ function pathGlob(glob: string, p: string): boolean {
   if (!re) {
     if (pathGlobCache.size > 2000) pathGlobCache.clear();
     const src = glob
+      .normalize("NFC")
       .split("**")
       .map((part) => part.split("*").map((s) => s.split("?").map(escapeRe).join("[^/]")).join("[^/]*"))
       .join(".*");
-    re = new RegExp(`^${src}$`, "s");
+    // u + i: Unicode case folding, so "ſ" or the Kelvin sign can't stand in for "s" or "k" unseen.
+    re = new RegExp(`^${src}$`, "isu");
     pathGlobCache.set(glob, re);
   }
-  return re.test(normPath(p));
+  const norm = normPath(p);
+  return norm !== null && re.test(norm);
 }
 
 const regexCache = new Map<string, RegExp | null>();
@@ -183,7 +195,9 @@ export function constraintHolds(c: ArgConstraint, args: Record<string, unknown>,
   if (!values.length) return false;
   const base = NEGATION[c.op];
   const test = base ? (v: unknown) => !positive(base, v, c.value) : (v: unknown) => positive(c.op as PositiveOp, v, c.value);
-  return relaxing ? values.every(test) : values.some(test);
+  // A path that escapes can't be placed anywhere, so it meets every restricting path test and no relaxing one.
+  const judge = c.op === "path_glob" || c.op === "path_not_glob" ? (v: unknown) => (typeof v === "string" && normPath(v) === null ? !relaxing : test(v)) : test;
+  return relaxing ? values.every(judge) : values.some(judge);
 }
 
 const allHold = (cs: ArgConstraint[] | undefined, args: Record<string, unknown>, relaxing: boolean) =>
