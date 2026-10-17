@@ -696,16 +696,14 @@ const HANDLERS: { [K in CanvasOp["op"]]: Handler<K> } = {
     const missing = [...new Set(op.ids)].filter((id) => !s.get(id));
     if (missing.length) fail(`delete: no element ${missing.join(", ")}`);
     const gone = new Set<string>();
+    // An element takes its label (bound text) and the arrows bound to it, with their labels.
     const drop = (e: CanvasElement) => {
       if (gone.has(e.id)) return;
       gone.add(e.id);
-      const label = s.labelOf(e);
-      if (label) gone.add(label.id);
+      for (const t of s.els) if (s.isLabel(t) && t.containerId === e.id) drop(t);
       for (const a of s.arrowsTo(e.id)) drop(a);
     };
     for (const id of op.ids) drop(s.get(id)!);
-    // Labels whose container went, even if the container didn't list them.
-    for (const e of s.els) if (s.isLabel(e) && gone.has(e.containerId!)) drop(e);
     const deleted = s.els.filter((e) => gone.has(e.id)).map((e) => e.id);
     const released: string[] = [];
     for (const e of s.els) {
