@@ -9,11 +9,11 @@ const BASE = ["ls", "read_file", "write_file", "edit_file", "glob", "grep", "web
 const CURATED: Record<string, string[]> = {
   designer: ["canvas_edit", "canvas_read", "canvas_export", "request_review", "write_mockup", "fetch_image", "canvas", "mockup"],
   engineer: ["propose_patch", "repo_read", "run_tests", "diff", "files", "tests"],
-  researcher: ["research", "add_source", "doc_write", "sources", "doc"],
+  researcher: ["research", "add_source", "doc_write", "sources", "doc", "citations"],
   analyst: ["describe", "answer", "write_table", "table"],
   writer: ["doc_write", "doc_suggest", "doc_comment", "doc_read", "doc"],
-  lead: ["add_task", "update_task", "assign_task", "record_decision", "raise_item", "resolve_item", "find_skill", "search_skills", "plan"],
-  chief: ["find_agent", "dispatch", "answer", "research", "find_skill", "search_skills", "dashboard", "inbox"],
+  lead: ["add_task", "update_task", "assign_task", "record_decision", "raise_item", "resolve_item", "find_skill", "search_skills", "plan", "board", "timeline", "decisions"],
+  chief: ["project", "find_agent", "dispatch", "answer", "research", "find_skill", "search_skills", "plan", "dashboard", "inbox"],
 };
 const ids = ARCHETYPES.map((a) => a.id);
 const has = (id: string, tool: string) => getArchetype(id as never)!.tools.includes(tool);
