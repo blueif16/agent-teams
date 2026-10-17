@@ -464,3 +464,90 @@ describe("a miss in replay", () => {
     expect(body.diff).toHaveLength(20);
   });
 });
+
+/** Records one answer that arrives 60 ms after the request, then a chunk every 80 ms: about 300 ms in all. */
+async function recordTimed(): Promise<number> {
+  const words = ["One ", "two ", "three ", "four"];
+  const rec = await recordAll([chat("Draft the launch plan")], [{ ttfbMs: 60, gapMs: 80, chunks: words.map((w) => enc.encode(w)) }]);
+  return rec.entries()[0].response.chunks.reduce((sum, c) => sum + c.dt, 0);
+}
+
+/** ms from the request to the end of the body. */
+async function timeReplay(speed?: number): Promise<number> {
+  const play = createCassette({ file, mode: "replay", upstream: offline, speed });
+  const t0 = performance.now();
+  await bytesOf(await post(play.fetch, chat("Draft the launch plan")));
+  return performance.now() - t0;
+}
+
+describe("replay pace", () => {
+  it("takes about the recorded time at speed 1", async () => {
+    const total = await recordTimed();
+    expect(total).toBeGreaterThanOrEqual(280); // the fake's own delays, as recorded
+
+    const elapsed = await timeReplay(1);
+
+    expect(elapsed).toBeGreaterThanOrEqual(total - 20);
+    expect(elapsed).toBeLessThan(total + 150);
+  });
+
+  it("takes about a quarter of the recorded time at speed 4", async () => {
+    const total = await recordTimed();
+
+    const elapsed = await timeReplay(4);
+
+    expect(elapsed).toBeGreaterThanOrEqual(total / 4 - 20);
+    expect(elapsed).toBeLessThan(total / 2);
+  });
+
+  it("doesn't wait at all by default", async () => {
+    const total = await recordTimed();
+
+    const elapsed = await timeReplay();
+
+    expect(elapsed).toBeLessThan(total / 6);
+  });
+
+  it("refuses a speed that isn't positive", () => {
+    expect(() => createCassette({ file, mode: "replay", speed: 0 })).toThrow(/speed/);
+  });
+});
+
+describe("aborting a replay", () => {
+  it("errors the stream with an AbortError at once, without waiting out the gaps", async () => {
+    await recordTimed();
+    const play = createCassette({ file, mode: "replay", upstream: offline, speed: 1 });
+    const ctl = new AbortController();
+    const reader = (await post(play.fetch, chat("Draft the launch plan"), { signal: ctl.signal })).body!.getReader();
+    await reader.read();
+
+    const t0 = performance.now();
+    ctl.abort();
+    const next = await reader.read().then(
+      () => "a chunk",
+      (e: Error) => e.name,
+    );
+
+    expect(next).toBe("AbortError");
+    expect(performance.now() - t0).toBeLessThan(100); // the rest of the recording is ~240 ms away
+  });
+
+  it("stops a replay at the default speed too", async () => {
+    await recordAll([chat("Draft the launch plan")], [{ chunks: sseChunks() }]);
+    const play = createCassette({ file, mode: "replay", upstream: offline });
+    const ctl = new AbortController();
+    const reader = (await post(play.fetch, chat("Draft the launch plan"), { signal: ctl.signal })).body!.getReader();
+    await reader.read();
+
+    ctl.abort();
+
+    await expect(reader.read()).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("rejects at once when the signal is already aborted, as fetch does", async () => {
+    await recordAll([chat("Draft the launch plan")], [{ chunks: sseChunks() }]);
+    const play = createCassette({ file, mode: "replay", upstream: offline });
+
+    await expect(post(play.fetch, chat("Draft the launch plan"), { signal: AbortSignal.abort() })).rejects.toMatchObject({ name: "AbortError" });
+  });
+});
