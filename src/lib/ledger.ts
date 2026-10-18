@@ -58,6 +58,8 @@ export interface ToolEvent extends Base {
   tool: string;
   /** The provider endpoint, e.g. "ydc-index.io/v1/search"; absent when the call was refused before going out. */
   endpoint?: string;
+  /** The provider's price tier, when it has several (You.com Research: lite … frontier). */
+  tier?: string;
   ms: number;
   /** USD at the provider's list price. */
   cost: number;

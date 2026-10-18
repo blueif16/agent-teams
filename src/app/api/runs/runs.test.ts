@@ -2,6 +2,8 @@ import path from "node:path";
 import { tool } from "langchain";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { DEFAULT_RULES } from "@/lib/policy/defaults";
+import type { Rule } from "@/lib/policy/types";
 import { openCheckpointer } from "@/server/runtime/checkpointer";
 import { openRuntimeDb, type RuntimeDb } from "@/server/runtime/db";
 import { Runtime, setRuntime } from "@/server/runtime";
@@ -82,7 +84,9 @@ describe("GET /api/runs", () => {
   it("opens with what a run in flight has said so far, then streams the rest tagged with its thread", async () => {
     const { sleep, running } = sleeper();
     const fake = fakeCrusoe([{ text: "Reading the brief.", toolCalls: [{ name: "sleep", args: { ms: 1500 } }] }, { text: "It ships Friday." }]);
-    const rt = new Runtime({ db, checkpointer, fetch: fake.fetch, tools: () => [sleep] });
+    // `sleep` is in no tool tier, so the tool gate would ask the owner first (runtime/approvals.ts); this test is about streaming.
+    const allowSleep: Rule = { id: "r_sleep1", kind: "tool", scope: {}, match: { tools: ["sleep"] }, effect: "allow", createdBy: "owner" };
+    const rt = new Runtime({ db, checkpointer, fetch: fake.fetch, tools: () => [sleep], rules: async () => [...DEFAULT_RULES, allowSleep] });
     setRuntime(rt);
     const { runId } = rt.send(T, { text: "What does the brief say?" });
     await running;

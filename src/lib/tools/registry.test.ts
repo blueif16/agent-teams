@@ -7,6 +7,7 @@ import { createFilesystemMiddleware } from "deepagents";
 import { describe, expect, it } from "vitest";
 import { CHART_FENCE } from "../charts";
 import { PROJECT_FENCE } from "../project";
+import { researchTool } from "../../server/runtime/tools/research";
 import type { Archetype } from "../policy/types";
 import { BASH_NOTE } from "./notes";
 import { getTool, REGISTRY } from "./registry";
@@ -30,8 +31,10 @@ const H_SETS: Record<Archetype | "*", string[]> = {
   coordinator: ["assign_task", "plan", "board"],
 };
 
-/** H §3 "EXISTS" rows, plus what was built since (plan: the state views; bash: the workbench); the only ready entries. */
+/** H §3 "EXISTS" rows, plus what was built since (plan: the state views; bash: the workbench); ready besides SHIPPED. */
 const H_READY = ["file_tools", "chart", "markdown", "project", "plan", "bash"];
+/** R6: You.com Research, on every agent whose toolset has it, behind the approval gate (src/server/runtime/approvals.ts). */
+const SHIPPED = ["research"];
 
 /** Ready panes and the component that draws them; a ready pane must have one. */
 const PANE_COMPONENTS: Record<string, { file: string; component: string }> = {
@@ -48,8 +51,8 @@ const H_TIERS: Record<string, string> = {
   dispatch: "T1",
 };
 
-/** What exists in the repo right now: the deepagents file tools, and the two fences with parsers. */
-const RUNTIME_CALLS = new Set<string>((createFilesystemMiddleware().tools ?? []).map((t) => t.name));
+/** What exists in the repo right now: the deepagents file tools, the runtime's research tool, and the two fences with parsers. */
+const RUNTIME_CALLS = new Set<string>([...(createFilesystemMiddleware().tools ?? []).map((t) => t.name), researchTool({ agentId: "x", team: "x" }).name]);
 const REPO_FENCES = new Set([CHART_FENCE, PROJECT_FENCE].map((f) => f.replace(/^```/, "")));
 /** The tools the workbench's MCP server registers: they back ready calls that aren't deepagents file tools. */
 const WORKBENCH_CALLS = new Set(
@@ -109,8 +112,8 @@ describe("registry: H §4 load-time checks", () => {
   });
 
   it("marks ready exactly the entries that exist in the repo now", () => {
-    expect(REGISTRY.filter((d) => d.status === "ready").map((d) => d.id).sort()).toEqual([...H_READY].sort());
-    for (const d of REGISTRY.filter((x) => x.status === "ready")) expect(d.origin, d.id).toBe("exists");
+    expect(REGISTRY.filter((d) => d.status === "ready").map((d) => d.id).sort()).toEqual([...H_READY, ...SHIPPED].sort());
+    for (const d of REGISTRY.filter((x) => H_READY.includes(x.id))) expect(d.origin, d.id).toBe("exists");
   });
 
   it("backs every ready entry with real calls, fences or components", () => {

@@ -14,6 +14,7 @@
  *   messages:project:<id>  …to the transcript of one of a project's threads (a channel's, or a DM's)
  *   state:<pid>        one of a project's state files changed (projects/<pid>/state/** in the vault)
  *   org                a team, DM project or agent was created (the setup flow's launch)
+ *   approvals          an agent asked the owner to approve a tool call, or the owner decided one (runtime/approvals.ts)
  *   config             never sent: code and .env.local change only with a restart, and a client
  *                      revalidates what it shows when its stream reconnects
  */
@@ -38,6 +39,7 @@ export const TOPICS = {
   projectMessages: (projectId: string) => `messages:project:${projectId}`,
   state: (pid: string) => `state:${pid}`,
   org: "org",
+  approvals: "approvals",
 };
 
 /** The `state:<pid>` topic a vault path announces, if it is one of a project's state files. */

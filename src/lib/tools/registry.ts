@@ -3,7 +3,8 @@
  * it presents work. Archetypes list ids from here; the base set ("*") comes with every archetype.
  *
  * `status: "ready"` only for what runs in the repo today (deepagents file tools, the chart and project fences,
- * Markdown via Streamdown); everything else is planned and is dropped by resolveToolset unless asked for.
+ * Markdown via Streamdown, and `research`, which the runtime registers behind the approval gate); everything else is
+ * planned and is dropped by resolveToolset unless asked for.
  * Artifact paths are relative to .data/vault/. Each artifact type has exactly one `pane:` renderer; other views of
  * the same file (board, timeline, decisions) carry the artifact but draw in that type's pane.
  */
@@ -139,7 +140,7 @@ export const REGISTRY: readonly ToolDef[] = [
   // ── researcher (shares doc_write and the doc pane with the writer)
   {
     id: "research", name: "Research", description: "Cited multi-source answers (You.com Research).",
-    kind: "action", mechanism: "call", tier: "T3", archetypes: ["researcher", "chief"], status: "planned", origin: "adopt",
+    kind: "action", mechanism: "call", tier: "T3", archetypes: ["researcher", "chief"], status: "ready", origin: "adopt",
     calls: ["research"],
   },
   {

@@ -27,6 +27,9 @@ export const TIERS: TierDefault[] = [
       "note_owner_pref",
       "update_member",
       "log_progress",
+      "set_charter",
+      // Mira's launch: the owner's "go" on the option card is the approval, so the tool gate doesn't ask again.
+      "start_team",
     ],
     effect: "allow",
   },
@@ -88,7 +91,7 @@ export const TOOL_CATALOG: Record<string, CatalogEntry> = {
   web_search: { sinks: ["web"], args: ["query"] },
   fetch_page: { sinks: ["web"], args: ["url", "urls[*]"] },
   web_fetch: { sinks: ["web"], args: ["url"] },
-  research: { sinks: ["web"], args: ["query", "tier"] },
+  research: { sinks: ["web"], args: ["question", "tier", "output_schema"] },
   answer: { sinks: ["web"], args: ["query"] },
   find_skill: { sinks: ["web"], args: ["need"] },
   send_email: { sinks: ["email"], args: ["to[*]", "cc[*]", "bcc[*]", "subject", "body"] },

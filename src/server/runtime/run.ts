@@ -63,7 +63,11 @@ function bridge(mode: string, chunk: unknown, run: string): ThreadEvent[] {
   return [];
 }
 
-export async function executeRun(ctx: RunContext, threadId: string, runId: string): Promise<void> {
+/**
+ * `input` is the resume Command for a run that picks up paused tool calls (approvals.ts); otherwise empty. A run that
+ * stops on an approval ends "interrupted" with the thread "waiting_approval", and its `done` carries the text so far.
+ */
+export async function executeRun(ctx: RunContext, threadId: string, runId: string, input: unknown = { messages: [] }): Promise<void> {
   const { db, worker, events } = ctx;
   const run = db.runs.get(runId);
   if (!run) throw new Error(`No run ${runId}`);
@@ -77,7 +81,7 @@ export async function executeRun(ctx: RunContext, threadId: string, runId: strin
     await withLane(run.lane, async () => {
       // runId (the LangSmith root run) is a RunnableConfig field the agent passes through but doesn't type.
       const config = { streamMode: [...MODES], callbacks: [ledger], runId } as { streamMode: (typeof MODES)[number][]; callbacks: [LedgerCallbacks] };
-      const stream = await worker.stream({ messages: [] }, config);
+      const stream = await worker.stream(input as Parameters<Worker["stream"]>[0], config);
       for await (const [mode, chunk] of stream as AsyncIterable<[string, unknown]>) for (const e of bridge(mode, chunk, runId)) emit(e);
     });
     await ledger.flush();
@@ -86,8 +90,9 @@ export async function executeRun(ctx: RunContext, threadId: string, runId: strin
     const text = last?.getType() === "ai" ? last.text : "";
     // The answer goes to the transcript now, as said: compaction may rewrite the working context later.
     const saved = text ? db.messages.add({ threadId, runId, role: "agent", author: ctx.ledger.agent, text }) : undefined;
-    db.runs.finish(runId, "done");
-    db.threads.setStatus(threadId, "idle");
+    const waiting = (state.tasks ?? []).some((t) => t.interrupts?.length);
+    db.runs.finish(runId, waiting ? "interrupted" : "done");
+    db.threads.setStatus(threadId, waiting ? "waiting_approval" : "idle");
     if (saved) ctx.announce?.(threadId);
     emit({ type: "done", run: runId, text, ...(saved && { message: saved.id }) });
   } catch (e) {

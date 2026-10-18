@@ -16,14 +16,17 @@ import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { BaseCheckpointSaver } from "@langchain/langgraph";
 import { HQ } from "@/lib/data";
 import { MODELS } from "@/lib/models";
+import type { Rule } from "@/lib/policy/types";
 import { readState, renderDigest } from "@/server/project-state";
+import { Approvals, type Decision } from "./approvals";
 import { openCheckpointer } from "./checkpointer";
-import { getRuntimeDb, type AgentRow, type InboxRow, type ProjectRow, type RunTrigger, type RuntimeDb } from "./db";
+import { getRuntimeDb, type AgentRow, type ApprovalRow, type InboxRow, type ProjectRow, type RunTrigger, type RuntimeDb } from "./db";
 import { ThreadEvents } from "./events";
 import { inboxDrain, type DmPayload } from "./inbox";
 import type { Lane, Limiter } from "./limiter";
 import { executeRun } from "./run";
 import { parseThreadId, ThreadQueue } from "./threads";
+import type { ResearchToolDeps } from "./tools/research";
 import { announceMessage } from "./transcript";
 import { agentTools } from "./toolkit";
 import { Workbenches } from "./tools/bash";
@@ -37,6 +40,10 @@ export interface RuntimeOptions {
   limiter?: Limiter;
   /** Extra tools per agent, after its own (tests: a tool that sleeps). */
   tools?: (agent: AgentRow, project: ProjectRow) => StructuredToolInterface[];
+  /** The rules the tool gate decides with; default the policy store (approvals.ts). */
+  rules?: () => Promise<Rule[]>;
+  /** The research tool's You.com key, fetch and ledger; default YDC_API_KEY, the global fetch, the ledger. */
+  research?: ResearchToolDeps;
 }
 
 export interface SendResult {
@@ -56,7 +63,8 @@ export class UnknownThreadError extends Error {
   }
 }
 
-type Job = { runId: string };
+/** `resume`: pick up the thread's paused tool calls whose approvals are decided (approvals.ts). */
+type Job = { runId: string; resume?: boolean };
 
 /** What starts a run, from the oldest item waiting for it: the owner's messages are interactive, the team's work. */
 function runFor(item: InboxRow): { trigger: RunTrigger; lane: Lane } {
@@ -72,8 +80,10 @@ const projectDigest = async (projectId: string) => renderDigest(await readState(
 export class Runtime {
   readonly db: RuntimeDb;
   readonly checkpointer: NonNullable<RuntimeOptions["checkpointer"]>;
-  /** Every run's token, now, plan, tool, done and error events, per thread (events.ts). */
+  /** Every run's token, now, plan, tool, done, error and approval events, per thread (events.ts). */
   readonly events = new ThreadEvents();
+  /** The tool gate and the owner's decisions (R6). */
+  readonly approvals: Approvals;
   private readonly queue: ThreadQueue<Job>;
   private readonly workers = new Map<string, Promise<Worker>>();
   /** The run in progress per thread. */
@@ -89,6 +99,7 @@ export class Runtime {
     this.owns = { db: !opts.db, checkpointer: !opts.checkpointer };
     this.db = opts.db ?? getRuntimeDb();
     this.checkpointer = opts.checkpointer ?? openCheckpointer();
+    this.approvals = new Approvals({ db: this.db, events: this.events, rules: opts.rules, research: opts.research });
     this.queue = new ThreadQueue<Job>(
       (threadId, job) => this.execute(threadId, job),
       (threadId) => this.followUp(threadId),
@@ -115,7 +126,8 @@ export class Runtime {
     const { images, uploads } = message;
     const forModel = [message.text, message.attachments].filter(Boolean).join("\n\n");
     const item = this.db.inbox.add<DmPayload>(threadId, "dm", { text: forModel, from, ...(images?.length && { images }), ...(uploads?.length && { uploads }) });
-    const busy = this.queue.isBusy(threadId);
+    // A thread waiting on an approval stays paused: the resumed run reads the message before its next model call.
+    const busy = this.queue.isBusy(threadId) || this.approvals.waiting(threadId);
     const runId = busy ? this.active.get(threadId) : this.wake(threadId);
     const saved = this.db.messages.add({ threadId, runId: runId ?? null, role: from === "owner" ? "owner" : "agent", author: from, text: message.text, uploads, ref: message.ref });
     announceMessage(threadId);
@@ -133,7 +145,8 @@ export class Runtime {
    * or a follow-up run), so nothing starts. Returns the new run's id.
    */
   wake(threadId: string): string | undefined {
-    if (this.closed || this.queue.isBusy(threadId) || !this.db.threads.get(threadId)) return undefined;
+    // A thread waiting on an approval wakes only through decide().
+    if (this.closed || this.queue.isBusy(threadId) || !this.db.threads.get(threadId) || this.approvals.waiting(threadId)) return undefined;
     this.failed.delete(threadId);
     const job = this.nextJob(threadId);
     // A failure is on the run row (and, with streaming, on the thread's events); nobody awaits it here.
@@ -184,17 +197,32 @@ export class Runtime {
     });
     // The PM sees its project's state with everything it is handed: the kickoff, each report, each message.
     const context = agent.archetype === "lead" && project.kind === "team" ? () => projectDigest(project.id) : undefined;
+    const current = () => this.active.get(threadId);
+    // R6 hook: the tool gate on every worker, and the gated tools its toolset grants (research).
+    const gated = this.approvals.forWorker(agent, project, threadId, current, { sandbox: kit.sandbox });
     return buildWorker(agent, project, {
       checkpointer: this.checkpointer,
       fetch: this.opts.fetch,
       limiter: this.opts.limiter,
-      tools: [...kit.tools, ...(this.opts.tools?.(agent, project) ?? [])],
+      tools: [...kit.tools, ...gated.tools, ...(this.opts.tools?.(agent, project) ?? [])],
       sandbox: kit.sandbox,
-      middleware: [inboxDrain(this.db, threadId, () => this.active.get(threadId), { context })],
+      middleware: [inboxDrain(this.db, threadId, current, { context }), gated.middleware],
     });
   }
 
-  private async execute(threadId: string, { runId }: Job): Promise<void> {
+  /**
+   * The owner's answer to an approval: recorded (row, ledger, events), then a resume run on its thread. Approve runs
+   * the tool; decline tells the model, with the note. Throws UnknownApprovalError, or ApprovalDecidedError when it
+   * was already decided.
+   */
+  async decide(approvalId: string, decision: Decision, note?: string): Promise<{ approval: ApprovalRow; runId: string }> {
+    const approval = await this.approvals.decide(approvalId, decision, note);
+    const run = this.db.runs.create({ threadId: approval.threadId, trigger: "resume", lane: "interactive" });
+    this.queue.enqueue(approval.threadId, { runId: run.id, resume: true }).catch(() => {});
+    return { approval, runId: run.id };
+  }
+
+  private async execute(threadId: string, { runId, resume }: Job): Promise<void> {
     const activate = (id: string) => {
       this.active.set(threadId, id);
       return () => this.active.delete(threadId);
@@ -217,10 +245,17 @@ export class Runtime {
         this.events.emit(threadId, { type: "error", run: runId, message });
         throw e;
       }
+      let input: unknown;
+      if (resume) {
+        input = await this.approvals.resumeCommand(worker, threadId);
+        // An earlier resume run already picked these calls up: nothing is left waiting on this decision.
+        if (!input) return this.db.runs.finish(runId, "cancelled");
+      }
       await executeRun(
         { db: this.db, worker, events: this.events, activate, announce: announceMessage, ledger: { team, agent: agent.id, asked: MODELS[agent.modelTier] } },
         threadId,
         runId,
+        input,
       );
       this.failed.delete(threadId);
     } catch (e) {
@@ -229,9 +264,9 @@ export class Runtime {
     }
   }
 
-  /** What arrived after the last run's final model call gets a run of its own (not after a failed run). */
+  /** What arrived after the last run's final model call gets a run of its own (not after a failed run, nor while it waits on an approval). */
   private followUp(threadId: string): Job | undefined {
-    return this.closed || this.failed.has(threadId) ? undefined : this.nextJob(threadId);
+    return this.closed || this.failed.has(threadId) || this.approvals.waiting(threadId) ? undefined : this.nextJob(threadId);
   }
 
   private nextJob(threadId: string): Job | undefined {

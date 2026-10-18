@@ -29,6 +29,8 @@ import type { ArgConstraint } from "../../../lib/policy/types";
 
 export const SEARCH_URL = "https://ydc-index.io/v1/search";
 export const CONTENTS_URL = "https://ydc-index.io/v1/contents";
+/** The Research API (./research.ts). */
+export const RESEARCH_URL = "https://api.you.com/v1/research";
 
 /** List prices from https://you.com/docs/administration/billing (2026-10-17): Search is $5 per 1k calls with snippets
  * or highlights (up to 100 results); Contents is $1 per 1k pages. */
@@ -144,7 +146,8 @@ function httpError(status: number, text: string): string {
 }
 
 export function createYouClient({ apiKey = process.env.YDC_API_KEY, fetch = globalThis.fetch, timeoutMs = 30_000, clock = () => performance.now() }: YouClientOptions = {}) {
-  async function post<T>(url: string, body: unknown): Promise<YouResult<T>> {
+  /** A POST with `body`, or a GET without one. `timeout` overrides the client's: Research holds the connection for its whole run. */
+  async function post<T>(url: string, body: unknown, timeout = timeoutMs): Promise<YouResult<T>> {
     if (!apiKey) return { ok: false, status: null, error: "YDC_API_KEY is not set on the server.", ms: 0 };
     const started = clock();
     const ms = () => Math.round(clock() - started);
@@ -152,10 +155,10 @@ export function createYouClient({ apiKey = process.env.YDC_API_KEY, fetch = glob
     let text: string;
     try {
       res = await fetch(url, {
-        method: "POST",
-        headers: { "X-API-Key": apiKey, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(timeoutMs),
+        method: body === undefined ? "GET" : "POST",
+        headers: { "X-API-Key": apiKey, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        signal: AbortSignal.timeout(timeout),
       });
       text = await res.text();
     } catch (e) {
@@ -178,16 +181,22 @@ export function createYouClient({ apiKey = process.env.YDC_API_KEY, fetch = glob
         extraction: { extraction_mode: "highlights", highlights: { total_max_tokens: 1024 } },
       }),
     contents: ({ urls }: { urls: string[] }) => post<ContentsResponse>(CONTENTS_URL, { urls, formats: ["markdown", "metadata"] }),
+    /** Research, with the body as You.com documents it (./research.ts); a background request answers with its task. */
+    research: <T>(body: Record<string, unknown>, timeout: number) => post<T>(RESEARCH_URL, body, timeout),
+    /** A background research task: its status, and its result once completed. */
+    researchTask: <T>(id: string) => post<T>(`${RESEARCH_URL}/${encodeURIComponent(id)}`, undefined),
   };
 }
 
 // ---------- shaping what the model sees ----------
 
-const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
-const clip = (s: string, max: number) => (s.length <= max ? s : `${s.slice(0, Math.max(0, max - 1))}…`);
+export const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
+export const clip = (s: string, max: number) => (s.length <= max ? s : `${s.slice(0, Math.max(0, max - 1))}…`);
 /** Web text can't open or close our block: any tag of that name is defused before wrapping. */
 const defuse = (s: string) => s.replace(new RegExp(`<(\\s*/?\\s*${UNTRUSTED_TAG})`, "gi"), "&lt;$1");
 const block = (body: string) => `<${UNTRUSTED_TAG}>\n${defuse(body)}\n</${UNTRUSTED_TAG}>`;
+/** Web text as the model gets it: the notice, then the text in one block it can't close. */
+export const untrusted = (body: string) => `${NOTICE}\n${block(body)}`;
 const dateOf = (pageAge?: string) => (pageAge && /^\d{4}-\d{2}-\d{2}/.test(pageAge) ? pageAge.slice(0, 10) : "");
 
 function searchOutput(data: SearchResponse, max: number): string | null {
