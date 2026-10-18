@@ -113,16 +113,23 @@ export class Runtime {
 
   /**
    * A message to a thread, from the owner unless `from` names an agent, saved to its transcript as it's accepted.
-   * `ref` is the sender's id for it. Throws UnknownThreadError for a thread the runtime db doesn't have.
+   * `ref` is the sender's id for it. Attachments (attachUploads() in src/server/uploads.ts makes them): `attachments`
+   * are <attachment> blocks for the model only, `images` image upload ids sent as image parts, `uploads` every id,
+   * kept on the transcript row. Throws UnknownThreadError for a thread the runtime db doesn't have.
    */
-  send(threadId: string, message: { text: string; from?: string; ref?: string }): SendResult {
+  send(
+    threadId: string,
+    message: { text: string; from?: string; ref?: string; attachments?: string; images?: string[]; uploads?: string[] },
+  ): SendResult {
     if (!this.db.threads.get(threadId)) throw new UnknownThreadError(threadId);
     const from = message.from ?? "owner";
-    const item = this.db.inbox.add<DmPayload>(threadId, "dm", { text: message.text, from });
+    const { images, uploads } = message;
+    const forModel = [message.text, message.attachments].filter(Boolean).join("\n\n");
+    const item = this.db.inbox.add<DmPayload>(threadId, "dm", { text: forModel, from, ...(images?.length && { images }), ...(uploads?.length && { uploads }) });
     // A thread waiting on an approval stays paused: the resumed run reads the message before its next model call.
     const busy = this.queue.isBusy(threadId) || this.approvals.waiting(threadId);
     const runId = busy ? this.active.get(threadId) : this.wake(threadId);
-    const saved = this.db.messages.add({ threadId, runId: runId ?? null, role: from === "owner" ? "owner" : "agent", author: from, text: message.text, ref: message.ref });
+    const saved = this.db.messages.add({ threadId, runId: runId ?? null, role: from === "owner" ? "owner" : "agent", author: from, text: message.text, uploads, ref: message.ref });
     announceMessage(threadId);
     if (busy) return { delivered: "inbox", runId, inboxId: item.id, messageId: saved.id };
     return { delivered: "run", runId, inboxId: item.id, messageId: saved.id };

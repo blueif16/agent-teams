@@ -9,10 +9,11 @@ import { excerpt, type OrderKey } from "@/lib/orders";
 import { systemPrompt, toChatMessages, type ProjectContext, type Turn } from "@/lib/prompt";
 import { endLLMRun, orderFeedback, startLLMRun } from "@/lib/tracing";
 import type { AgentStatus, OrgSnapshot } from "@/lib/types";
+import { isImageUpload } from "@/lib/uploads";
 import { getAgent, getTeam } from "@/server/directory";
 import { getRuntimeDb } from "@/server/runtime/db";
 import { announceMessage, saveTo } from "@/server/runtime/transcript";
-import { imageParts, type ImagePart } from "@/server/uploads";
+import { imageParts, inlineTexts, type ImagePart } from "@/server/uploads";
 
 /** Prompts look agents and teams up in the directory: the constants, then the runtime db. */
 const DIRECTORY = { agent: getAgent, team: getTeam };
@@ -93,7 +94,7 @@ export async function POST(req: Request) {
     history: Turn[];
     /** Image URLs (https or data:) attached to the newest message. */
     images?: string[];
-    /** Ids from POST /api/uploads attached to the newest message (at most 4); sent to the model as data: URLs. */
+    /** Ids from POST /api/uploads attached to the newest message: images (at most 4) as data: URLs, text documents inline. */
     uploads?: string[];
     /** Set when this message is a reaction order on one of the agent's replies. */
     order?: { key: OrderKey; text: string; trace?: string };
@@ -112,10 +113,14 @@ export async function POST(req: Request) {
   const { agentId, mode, history, images = [], order } = body;
   const agent = getAgent(agentId);
   if (!agent) return Response.json({ error: `Unknown agent "${agentId}".` }, { status: 400 });
-  // Uploads reach the model inline: Crusoe can't fetch this machine's /api/uploads.
+  // Uploads reach the model inline: Crusoe can't fetch this machine's /api/uploads. Images as image parts;
+  // text documents as <attachment> blocks on the newest user turn.
   let uploaded: ImagePart[];
+  let attached: string;
   try {
-    uploaded = await imageParts(Array.isArray(body.uploads) ? body.uploads : []);
+    const ids = Array.isArray(body.uploads) ? body.uploads : [];
+    uploaded = await imageParts(ids.filter(isImageUpload));
+    attached = await inlineTexts(ids.filter((id) => !isImageUpload(id)));
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 400 });
   }
@@ -149,6 +154,7 @@ export async function POST(req: Request) {
   // Images ride on the newest user turn as OpenAI-style content parts: ready-made URLs first, then uploads.
   const parts = [...images.map((url) => ({ type: "image_url", image_url: { url } })), ...uploaded];
   const lastUser = messages.findLast((m) => m.role === "user");
+  if (attached && lastUser) lastUser.content = `${lastUser.content}\n\n${attached}`;
   if (parts.length && lastUser) lastUser.content = [{ type: "text", text: lastUser.content }, ...parts];
   const hasImage = parts.length > 0;
 

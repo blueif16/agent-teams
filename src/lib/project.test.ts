@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_EXPERTS, MAX_OPTIONS, parseProject, visibleText } from "./project";
+import { MAX_EXPERTS, MAX_OPTIONS, openingUploads, parseProject, visibleText } from "./project";
 
 /*
  * Mira's ```project fence, v2 (setup-flow spec, step 1, as changed by the owner on 2026-10-17): a shared charter
@@ -180,5 +180,24 @@ describe("parseProject (v2 fence with options)", () => {
 describe("visibleText", () => {
   it("shows only the sentence before the fence while it streams", () => {
     expect(visibleText(reply(proposal))).toBe("Here are three ways to staff it.");
+  });
+});
+
+describe("openingUploads", () => {
+  const you = (id: string, images?: string[]) => ({ id, at: "", kind: "text" as const, from: "you", text: "", images });
+  const card = (id: string, state: "ready" | "launched") => ({ id, at: "", kind: "proposal" as const, from: "mira", state, nonce: "n", picked: 0 });
+
+  it("takes the owner's uploads since the last launched card, up to this card, once each", () => {
+    const msgs = [
+      you("m1", ["old-spec"]),
+      card("c1", "launched"),
+      you("m2", ["spec", "shot"]),
+      { id: "r", at: "", kind: "text" as const, from: "mira", text: "", images: ["not-the-owners"] },
+      you("m3", ["facts", "spec"]),
+      card("c2", "ready"),
+      you("m4", ["after-the-card"]),
+    ];
+
+    expect(openingUploads(msgs, "c2")).toEqual(["spec", "shot", "facts"]);
   });
 });

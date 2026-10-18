@@ -5,7 +5,7 @@ import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { ArrowLeft, ArrowRight, Columns2, Hash, ListChecks, SquarePen } from "lucide-react";
 import { AGENTS, CHIEF, CHIEF_ID, HQ, TEAMS } from "@/lib/data";
 import { excerpt, orderText, ORDERS_BY_KEY, type OrderKey } from "@/lib/orders";
-import { launchPlanOf, parseProject, PROJECT_FENCE, START_PROJECT, visibleText, type LaunchOptions } from "@/lib/project";
+import { launchPlanOf, openingUploads, parseProject, PROJECT_FENCE, START_PROJECT, visibleText, type LaunchOptions } from "@/lib/project";
 import { withChartSummaries } from "@/lib/charts";
 import { cache, prefetch, useCached, type Resource } from "@/lib/client-cache";
 import { sendToThread } from "@/lib/thread-client";
@@ -122,7 +122,7 @@ interface SendOptions {
   replyQuote?: string;
   /** This message is a reaction order; the server records it as a performance signal. */
   order?: { key: OrderKey; text: string; trace?: string };
-  /** Upload ids attached to this message (at most 4). */
+  /** Upload ids attached to this message (at most 8, 4 of them images). */
   images?: string[];
 }
 
@@ -424,11 +424,11 @@ export function AgentTeams() {
     };
     try {
       let acc = "";
-      if (thread && !opts.order && !images) {
+      if (thread && !opts.order) {
         // The agent's persistent thread (src/server/runtime) keeps the conversation, so no history rides along.
         // The reply streams from its run (src/lib/live-runs.ts, which also drives its "now" line), and both
-        // sides land in the transcript. A message with images still goes through /api/chat, which saves it too.
-        const reply = await sendToThread(thread, text, { accepted: (runId) => (replyId = replyIdOf(runId)), text: show }, { ref: userMsg.id });
+        // sides land in the transcript. Attachments ride along.
+        const reply = await sendToThread(thread, text, { accepted: (runId) => (replyId = replyIdOf(runId)), text: show }, { ref: userMsg.id, uploads: images });
         // Delivered into a run already going: that run's answer covers it, wherever it's drawn.
         if (reply.delivered === "inbox") return;
         if (reply.lost) {
@@ -545,7 +545,7 @@ export function AgentTeams() {
     const msg = convosRef.current[key]?.find((m) => m.id === msgId);
     if (msg?.kind !== "proposal" || msg.state !== "ready" || !msg.plan) return;
     updateCard(key, msgId, (m) => ({ ...m, state: "launching", error: undefined }));
-    const plan = launchPlanOf(msg.plan, msg.picked, msg.edits);
+    const plan = { ...launchPlanOf(msg.plan, msg.picked, msg.edits), uploads: openingUploads(convosRef.current[key] ?? [], msgId) };
     const solo = plan.charter.kind === "solo";
     try {
       const res = await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan, nonce: msg.nonce }) });

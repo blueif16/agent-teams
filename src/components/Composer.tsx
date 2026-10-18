@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowUp, AtSign, ImagePlus, ListChecks, Mic, Plus, X } from "lucide-react";
+import { ArrowUp, AtSign, ListChecks, Mic, Paperclip, Plus, X } from "lucide-react";
 import type { Agent } from "@/lib/types";
+import { ACCEPT, IMAGE_TYPES, MAX_TEXT_BYTES, textExt } from "@/lib/uploads";
+import { FileChip, rememberUploadSize } from "./FileChip";
 import { Mascot } from "./Mascot";
 import { POP, SPRING } from "./ui";
 
@@ -29,21 +31,24 @@ function getSpeechCtor(): SpeechCtor | undefined {
 
 const noop = () => () => {};
 
-/** What POST /api/uploads accepts. The server checks the bytes; this only saves a pointless upload. */
-const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+/** What POST /api/uploads accepts (src/lib/uploads.ts). The server checks the bytes; this only saves a pointless upload. */
 const MAX_IMAGES = 4;
+const MAX_ATTACHMENTS = 8;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const isImage = (f: File) => IMAGE_TYPES.includes(f.type);
+const isText = (f: File) => !isImage(f) && textExt(f.name) !== null;
 
-/** An image in the composer: a local preview while it uploads, then its upload id. */
+/** An attachment in the composer: an image's local preview or a text file's name and size, then its upload id. */
 interface Attachment {
   key: string;
-  preview: string;
+  preview?: string;
+  file?: { name: string; bytes: number };
   /** Upload progress, 0 to 1. */
   progress: number;
   id?: string;
 }
 
-/** A ring that fills with upload progress, then spins while the server stores the image. */
+/** A ring that fills with upload progress, then spins while the server stores the file. */
 function UploadRing({ value }: { value: number }) {
   const r = 9;
   const c = 2 * Math.PI * r;
@@ -123,7 +128,7 @@ export function Composer({
   const remove = (key: string) =>
     setAtts((a) => {
       const gone = a.find((x) => x.key === key);
-      if (gone) URL.revokeObjectURL(gone.preview);
+      if (gone?.preview) URL.revokeObjectURL(gone.preview);
       return a.filter((x) => x.key !== key);
     });
 
@@ -140,10 +145,12 @@ export function Composer({
       setNote(why);
     };
     xhr.onload = () => {
-      if (xhr.status === 201 && xhr.response?.id) patch(key, { id: xhr.response.id, progress: 1 });
-      else fail(xhr.response?.error ?? `Couldn't attach that image (${xhr.status}).`);
+      if (xhr.status === 201 && xhr.response?.id) {
+        rememberUploadSize(xhr.response.id, xhr.response.bytes);
+        patch(key, { id: xhr.response.id, progress: 1 });
+      } else fail(xhr.response?.error ?? `Couldn't attach ${file.name} (${xhr.status}).`);
     };
-    xhr.onerror = () => fail("Couldn't attach that image. Check the connection and try again.");
+    xhr.onerror = () => fail(`Couldn't attach ${file.name}. Check the connection and try again.`);
     const form = new FormData();
     form.append("file", file);
     xhr.send(form);
@@ -151,21 +158,29 @@ export function Composer({
 
   const addFiles = (files: File[]) => {
     if (!files.length) return;
-    const images = files.filter((f) => IMAGE_TYPES.includes(f.type));
-    const small = images.filter((f) => f.size <= MAX_IMAGE_BYTES);
-    const take = small.slice(0, Math.max(0, MAX_IMAGES - atts.length));
+    const usable = files.filter((f) => isImage(f) || isText(f));
+    const small = usable.filter((f) => f.size <= (isImage(f) ? MAX_IMAGE_BYTES : MAX_TEXT_BYTES));
+    let total = atts.length;
+    let images = atts.filter((a) => a.preview).length;
+    const take = small.filter((f) => {
+      if (total >= MAX_ATTACHMENTS || (isImage(f) && images >= MAX_IMAGES)) return false;
+      total++;
+      if (isImage(f)) images++;
+      return true;
+    });
     setNote(
-      images.length < files.length
-        ? "Only PNG, JPEG, WebP or GIF images can be attached."
-        : small.length < images.length
-          ? "Images can be at most 10 MB."
+      usable.length < files.length
+        ? "Attach PNG, JPEG, WebP or GIF images, or .md, .txt, .csv, .json or .html files."
+        : small.length < usable.length
+          ? "Images can be at most 10 MB, text files 2 MB."
           : take.length < small.length
-            ? `You can attach up to ${MAX_IMAGES} images.`
+            ? `You can attach up to ${MAX_ATTACHMENTS} files, ${MAX_IMAGES} of them images.`
             : null,
     );
     for (const file of take) {
       const key = Math.random().toString(36).slice(2, 10);
-      setAtts((a) => [...a, { key, preview: URL.createObjectURL(file), progress: 0 }]);
+      const att = isImage(file) ? { preview: URL.createObjectURL(file) } : { file: { name: file.name, bytes: file.size } };
+      setAtts((a) => [...a, { key, progress: 0, ...att }]);
       upload(file, key);
     }
     ref.current?.focus();
@@ -184,7 +199,7 @@ export function Composer({
     return () => clearTimeout(t);
   }, [note]);
 
-  // Images dropped anywhere on the page attach here, so a near miss never opens the file in the tab.
+  // Files dropped anywhere on the page attach here, so a near miss never opens the file in the tab.
   useEffect(() => {
     let depth = 0;
     const hasFiles = (e: DragEvent) => Boolean(e.dataTransfer?.types.includes("Files"));
@@ -219,7 +234,7 @@ export function Composer({
       window.removeEventListener("dragover", over);
       window.removeEventListener("dragleave", leave);
       window.removeEventListener("drop", drop);
-      for (const a of attsRef.current) URL.revokeObjectURL(a.preview);
+      for (const a of attsRef.current) if (a.preview) URL.revokeObjectURL(a.preview);
     };
   }, []);
 
@@ -241,7 +256,7 @@ export function Composer({
   const submit = () => {
     if (!canSend) return;
     onSend(text.trim(), ready.length ? ready : undefined);
-    for (const a of atts) URL.revokeObjectURL(a.preview);
+    for (const a of atts) if (a.preview) URL.revokeObjectURL(a.preview);
     setAtts([]);
     setNote(null);
     setText("");
@@ -303,14 +318,14 @@ export function Composer({
           <motion.div key="menu" {...POPOVER} className="absolute bottom-full left-1 z-20 mb-2 w-56 rounded-2xl border border-line bg-white p-1 text-[14px] shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
             <button
               type="button"
-              disabled={atts.length >= MAX_IMAGES}
+              disabled={atts.length >= MAX_ATTACHMENTS}
               className="tap-soft flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left hover:bg-bubble disabled:opacity-40"
               onClick={() => {
                 setMenu(false);
                 fileRef.current?.click();
               }}
             >
-              <ImagePlus className="size-4 text-muted" /> Add images
+              <Paperclip className="size-4 text-muted" /> Add images or files
             </button>
             {mentionable.length > 0 && (
               <button
@@ -342,7 +357,7 @@ export function Composer({
       <input
         ref={fileRef}
         type="file"
-        accept={IMAGE_TYPES.join(",")}
+        accept={ACCEPT}
         multiple
         hidden
         onChange={(e) => {
@@ -383,7 +398,7 @@ export function Composer({
               transition={SPRING}
               className="overflow-hidden"
             >
-              <div className="flex gap-2.5 px-1.5 pb-2 pt-1.5">
+              <div className="flex flex-wrap gap-2.5 px-1.5 pb-2 pt-1.5">
                 <AnimatePresence initial={false}>
                   {atts.map((a) => (
                     <motion.div
@@ -393,10 +408,16 @@ export function Composer({
                       animate={{ scale: 1, opacity: 1 }}
                       exit={{ scale: 0.6, opacity: 0, transition: { duration: 0.12 } }}
                       transition={POP}
-                      className="relative size-16 shrink-0"
+                      className={`relative h-16 shrink-0 ${a.file ? "w-[210px]" : "w-16"}`}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element -- a local blob: preview */}
-                      <img src={a.preview} alt="" className="size-full rounded-[14px] object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" />
+                      {a.file ? (
+                        <div className="flex size-full items-center rounded-[14px] bg-white pl-2.5 pr-3 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]">
+                          <FileChip name={a.file.name} bytes={a.file.bytes} />
+                        </div>
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element -- a local blob: preview
+                        <img src={a.preview} alt="" className="size-full rounded-[14px] object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" />
+                      )}
                       {!a.id && (
                         <span className="absolute inset-0 grid place-items-center rounded-[14px] bg-white/60">
                           <UploadRing value={a.progress} />
@@ -404,7 +425,7 @@ export function Composer({
                       )}
                       <button
                         type="button"
-                        aria-label="Remove image"
+                        aria-label={a.file ? `Remove ${a.file.name}` : "Remove image"}
                         onClick={() => remove(a.key)}
                         className="tap absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-ink text-white ring-2 ring-white hover:bg-[#3a3a3a]"
                       >
@@ -436,7 +457,7 @@ export function Composer({
             onChange={(e) => setText(e.target.value)}
             onPaste={(e) => {
               const files = Array.from(e.clipboardData.files);
-              if (!files.some((f) => f.type.startsWith("image/"))) return;
+              if (!files.some((f) => isImage(f) || isText(f))) return;
               e.preventDefault();
               addFiles(files);
             }}
@@ -447,7 +468,7 @@ export function Composer({
                 else submit();
               }
             }}
-            placeholder={dragging ? "Drop images to attach" : placeholder}
+            placeholder={dragging ? "Drop files to attach" : placeholder}
             aria-label={placeholder}
             className="scroll-quiet h-[34px] max-h-[168px] min-w-0 flex-1 resize-none bg-transparent px-1.5 py-[7px] text-[15px] leading-[20px] outline-none placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap placeholder:text-[#b4b4b4]"
           />
@@ -463,8 +484,8 @@ export function Composer({
           </button>
           <button
             type="button"
-            aria-label={uploading ? "Send (waiting for images to upload)" : "Send"}
-            title={uploading ? "Waiting for images to upload" : undefined}
+            aria-label={uploading ? "Send (waiting for attachments to upload)" : "Send"}
+            title={uploading ? "Waiting for attachments to upload" : undefined}
             onClick={submit}
             disabled={!canSend}
             className={`tap grid size-[34px] shrink-0 place-items-center overflow-hidden rounded-full text-white ${canSend ? "bg-accent hover:bg-[#3557d6] hover:shadow-[0_4px_14px_rgba(65,102,235,0.4)]" : "bg-accent-soft"}`}
