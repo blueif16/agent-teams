@@ -83,6 +83,9 @@ describe.skipIf(!LIVE)("live eval: Mira proposes instead of quizzing the owner",
     const p = parseProject(r.answer);
     if (!p) console.log("NO CARD. Reply was:\n" + r.answer.slice(0, 1200));
     expect(p?.options.length ?? 0).toBeGreaterThanOrEqual(2);
+    // Mira staffs; the team does the work: no dollar figures of her own before the cards.
+    const { visibleText } = await import("@/lib/project");
+    expect(visibleText(r.answer)).not.toMatch(/\$\s?\d/);
   }, 240_000);
 
   it("starts the team herself when the owner says go: a project with a PM exists afterwards", async () => {
