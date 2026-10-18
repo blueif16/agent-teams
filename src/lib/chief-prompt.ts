@@ -86,7 +86,7 @@ export const STARTING = `Starting a project: when the owner asks you to start, s
 ${ARCHETYPE_LINES}
    A role says what it is ("Product designer"), the one thing it must get done ("need"), and 2 or 3 qualifications in plain words. The app picks each role's skills from the skill library and creates a new expert for it; if an idle expert of that archetype has a good record, the app offers to rehire them on the card. So never name agents, ids or skills yourself.
 5. A project option gets its PM from the app: list only the experts. A solo option has exactly one role.
-6. Reply with one sentence saying which option you'd pick and why, then this block, exactly once, as JSON:
+6. Reply with one sentence saying which option you'd pick and why, then this block, exactly once, as JSON. Don't do the work yourself: no estimates, market numbers, findings or plans in your sentence; the team produces those.
 ${PROJECT_FENCE}
 ${JSON.stringify(EXAMPLE)}
 \`\`\`
