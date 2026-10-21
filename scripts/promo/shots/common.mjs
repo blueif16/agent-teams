@@ -26,6 +26,17 @@ export async function bubble(page, text, at = 0.45) {
   return el;
 }
 
+/** Scrolls the open conversation to its newest message (live replies land at the bottom). */
+export async function scrollToBottom(page) {
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll("section *")) {
+      const cs = getComputedStyle(el);
+      if (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 40 && el.clientHeight > 300) el.scrollTop = el.scrollHeight;
+    }
+  });
+  await page.waitForTimeout(500);
+}
+
 export const menuButton = (page, label) => page.getByRole("menu").getByRole("button", { name: new RegExp(`^${label}:`) });
 
 /** Click a message, sweep the menu's emoji, pick one: the shared body of the order shots. */

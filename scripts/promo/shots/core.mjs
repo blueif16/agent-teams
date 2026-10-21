@@ -1,6 +1,34 @@
 // Reactions, Rive status, live channel, PM coordination, staffing, team choice, artifacts.
 // Helpers and staging live in common.mjs; the entry shape is documented in ../shots.mjs.
-import { CHANNEL, GUILD, GUILD_PID, GUILD_PROPOSAL, MIRA_SENTENCE, openChannel, bubble, menuButton, order, reply, openTeamPanel, tab, rule } from "./common.mjs";
+import { TEXT } from "../org.mjs";
+import { CHANNEL, GUILD, GUILD_PID, GUILD_PROPOSAL, MIRA_SENTENCE, openChannel, bubble, menuButton, order, reply, openTeamPanel, tab, rule, scrollToBottom } from "./common.mjs";
+
+// The plan moving: each step is what the PM and experts change (task id → status), applied cumulatively to the real
+// plan of the Guildhall concept project. Progress and milestone counts are recomputed from the tasks.
+const PLAN_STEPS = [
+  { tasks: [["t1", "done"], ["t4", "in_progress"], ["t7", "in_progress"]], runs: [["sleuth-3snf", "Writing the differentiation thesis"], ["beacon-xpvp", "Drafting the monetization model"]], what: "PM accepts Sleuth's ranking: t1 done, thesis + monetization start" },
+  { tasks: [["t2", "done"], ["t6", "in_progress"]], runs: [["sprocket-dmmy", "Costing the launch scope"]], what: "Sprocket's cost envelope accepted: t2 done, t6 starts" },
+  { tasks: [["t5", "review"]], runs: [], done: ["swatch-be67"], what: "Swatch hands in the core loop for review" },
+  { tasks: [["t5", "done"], ["t4", "review"]], runs: [], done: ["sleuth-3snf"], what: "Core loop accepted; thesis in review" },
+  { tasks: [["t4", "done"], ["t6", "done"], ["t7", "done"], ["t8", "in_progress"]], runs: [["beacon-xpvp", "Assembling the build-decision brief"]], done: ["sprocket-dmmy"], what: "Everything accepted; the PM assembles the brief" },
+];
+
+function planAtStep(state, step) {
+  const s = structuredClone(state);
+  for (const st of PLAN_STEPS.slice(0, step)) for (const [id, status] of st.tasks) {
+    const t = s.plan.tasks.find((x) => x.id === id);
+    if (t) t.status = status;
+  }
+  const ts = s.plan.tasks, n = (st) => ts.filter((t) => t.status === st).length;
+  s.plan.progress = { done: n("done"), total: ts.length, blocked: n("blocked"), review: n("review"), inProgress: n("in_progress") };
+  s.plan.milestones = s.plan.milestones.map((m) => {
+    const mt = ts.filter((t) => t.milestone === m.id), done = mt.filter((t) => t.status === "done").length;
+    return { ...m, done, total: mt.length || m.total, status: mt.length && done === mt.length ? "done" : done ? "in_progress" : m.status };
+  });
+  if (s.pm?.progress) s.pm.progress = { ...s.pm.progress, done: n("done"), total: ts.length, blocked: n("blocked") };
+  s.rev = (s.rev ?? 0) + step;
+  return s;
+}
 
 export const EFFECTS = [
   {
@@ -55,14 +83,16 @@ export const EFFECTS = [
       await page.getByRole("button", { name: "Ravi's profile" }).first().click();
       await page.waitForTimeout(1500);
       // Ravi working on something before the order lands.
-      await page.evaluate(() => window.__stage.run("a:ravi:p:bookbird-run-1", "", { now: "Reading Cliniko's pricing page", done: false, delayMs: 0 }));
+      await page.evaluate(() => window.__stage.run("a:ravi:p:bookbird-run-1", "", { run: "ravi-busy", now: "Reading Cliniko's pricing page", done: false, delayMs: 0 }));
       await page.waitForTimeout(1200);
       await reply(page, "Holding. I'll wait for your go before touching the pricing pages.");
     },
     async act({ page, d }) {
       await order(page, d, { text: "I looked at 7 pages", label: "Hold" });
+      // The busy run ends when he holds, so the status and his Rive mascot settle to idle.
+      await page.evaluate(() => window.__stage.emit("/api/runs", "done", { type: "done", thread: "a:ravi:p:bookbird-run-1", run: "ravi-busy", text: "" }));
       await d.wait(500);
-      d.mark("Ravi goes idle: status chip + Rive mascot", await d.box(page.locator("main, body").getByText("Ravi", { exact: true }).last()));
+      d.mark("Ravi goes idle: status chip + Rive mascot", { x: 950, y: 110, w: 470, h: 330 });
       await d.wait(2400);
     },
     focus: async () => ({ x: 900, y: 40, w: 540, h: 420 }),
@@ -162,27 +192,38 @@ export const EFFECTS = [
     id: "reactive.live-channel",
     feature: "reactive",
     title: "Live channel: three agents report at once, the PM answers",
-    demonstrates: "An AI Slack that's alive: in #guildhall-concept the researcher, designer and engineer stream their reports at the same time, each with typing and a live status, then the PM accepts and redirects. Nobody refreshes anything.",
-    suggestedUse: "The 'it's alive' beat; works full-frame or as the focus crop.",
+    demonstrates: "An AI Slack that's alive: in #guildhall-concept the researcher, designer and engineer stream their reports at the same time, each with a live status, then the PM accepts and redirects. Nobody refreshes anything.",
+    suggestedUse: "The 'it's alive' beat; smart.mp4 follows each report as it lands.",
     staged: "Four scripted runs on /api/runs.",
     async setup({ page }) {
       await openChannel(page, GUILD);
+      await scrollToBottom(page);
     },
     async act({ page, d }) {
       const T = (who) => `a:${who}:p:${GUILD_PID}`;
-      d.mark("three reports start streaming");
-      await Promise.all([
-        page.evaluate(([t]) => window.__stage.run(t, "Three of the five creator communities I checked moved paid tiers off Discord this year. Ranked table with dated sources in segments.md.", { now: "Writing segments.md", cps: 55, delayMs: 200 }), [T("sleuth-3snf")]),
-        page.evaluate(([t]) => window.__stage.run(t, "Onboarding is three states now: invite, pick your circles, first post. Empty and error states drawn for each.", { now: "Drawing onboarding states", cps: 50, delayMs: 700 }), [T("swatch-be67")]),
-        page.evaluate(([t]) => window.__stage.run(t, "Hardest constraint is presence fan-out: ~2.4M updates a minute at 100k online. Batching into 5 s windows cuts it 12×.", { now: "Costing presence fan-out", cps: 52, delayMs: 1200 }), [T("sprocket-dmmy")]),
-      ]);
-      d.mark("PM accepts and redirects");
-      await page.evaluate(([t]) => window.__stage.run(t, "Accepted Sleuth's ranking. Swatch, build the loop around creators first; Sprocket, cost the 5 s batching.", { cps: 60, delayMs: 300 }), [T("beacon-xpvp")]);
+      const run = (who, text, o) => page.evaluate(([t, x, o]) => window.__stage.run(t, x, o), [T(who), text, o]);
+      const reports = [
+        ["sleuth-3snf", "Three of the five creator communities I checked moved paid tiers off Discord this year. Ranked table with dated sources in segments.md.", { now: "Writing segments.md", cps: 55, delayMs: 200 }, "Three of the five creator"],
+        ["swatch-be67", "Onboarding is three states now: invite, pick your circles, first post. Empty and error states drawn for each.", { now: "Drawing onboarding states", cps: 50, delayMs: 900 }, "Onboarding is three states"],
+        ["sprocket-dmmy", "Hardest constraint is presence fan-out: ~2.4M updates a minute at 100k online. Batching into 5 s windows cuts it 12×.", { now: "Costing presence fan-out", cps: 52, delayMs: 1700 }, "Hardest constraint is presence"],
+      ];
+      const done = reports.map(([who, text, o]) => run(who, text, o));
+      for (const [, , o, start] of reports) {
+        await d.wait(o.delayMs === 200 ? 700 : 800);
+        await scrollToBottom(page);
+        const el = page.getByText(start, { exact: false }).last();
+        d.mark(`report streaming: ${start}…`, await d.box(el));
+      }
+      await Promise.all(done);
+      await scrollToBottom(page);
+      await run("beacon-xpvp", "Accepted Sleuth's ranking. Swatch, build the loop around creators first; Sprocket, cost the 5 s batching.", { cps: 60, delayMs: 300 });
+      await scrollToBottom(page);
+      d.mark("PM accepts and redirects", await d.box(page.getByText("Accepted Sleuth's ranking", { exact: false }).last()));
       await d.wait(600);
     },
-    focus: async () => ({ x: 430, y: 300, w: 1010, h: 600 }),
     tail: 800,
   },
+
   {
     id: "pm.plan-graph",
     feature: "pm-coordination",
@@ -321,20 +362,35 @@ export const EFFECTS = [
       const box = page.getByPlaceholder("Send a message");
       await d.click(box, { ms: 600, what: "click the composer" });
       await box.pressSequentially("Build us a Discord competitor for paid creator communities. Real product, web first.", { delay: 22 / d.rate, timeout: 0 });
+      d.mark("the ask, typed", await d.box(box));
       await d.wait(250);
-      d.mark("send the ask");
       await page.keyboard.press("Enter");
-      await d.wait(500);
-      const text = `${MIRA_SENTENCE}\n\n\`\`\`project\n${JSON.stringify(GUILD_PROPOSAL)}\n\`\`\``;
-      await page.evaluate(([t]) => window.__stage.run("a:mira:p:dm", t, { run: "mira-guild", cps: 260, delayMs: 300 }), [text]);
-      await d.wait(2600);
-      d.mark("option cards staffed", await d.box(page.getByText("Balanced", { exact: true }).first()).catch(() => undefined));
-      await d.hover(page.getByText("Lean", { exact: true }).first(), { ms: 500 });
-      await d.wait(300);
-      await d.hover(page.getByText("Full", { exact: true }).first(), { ms: 500 });
-      await d.wait(300);
-      await d.click(page.getByText("Balanced", { exact: true }).first(), { ms: 500, what: "pick Balanced" });
+      await d.wait(450);
+      d.mark("the ask lands in Mira's DM", await d.box(page.getByText("Build us a Discord competitor", { exact: false }).last()));
+      await d.move(980, 420, 500); // off the composer, so the camera can follow the reply up
+      // Mira's sentence streams at reading speed; the proposal JSON (hidden while streaming) lands in one burst.
+      await page.evaluate((t) => window.__stage.run("a:mira:p:dm", t, { run: "mira-guild", cps: 70, delayMs: 200, done: false }), MIRA_SENTENCE);
+      await d.wait((MIRA_SENTENCE.length / 70) * 1000 + 500);
+      d.mark("Mira's one-line pick", await d.box(page.getByText("This is a build, not a concept", { exact: false }).last()));
+      const fence = `\n\n\`\`\`project\n${JSON.stringify(GUILD_PROPOSAL)}\n\`\`\``;
+      await page.evaluate((f) => {
+        window.__stage.emit("/api/runs", "token", { type: "token", thread: "a:mira:p:dm", run: "mira-guild", text: f });
+        window.__stage.emit("/api/runs", "done", { type: "done", thread: "a:mira:p:dm", run: "mira-guild" });
+      }, fence);
+      // Cards appear once the app's real /api/projects/plan staffs them; wait for them, then let the entrance settle.
+      await page.getByRole("button", { name: /^Pick/ }).first().waitFor();
       await d.wait(900);
+      // A card is ~296×540 px from its label's top-left.
+      const label = (t) => page.getByText(t, { exact: true }).first();
+      const cardOf = (b) => ({ x: b.x - 24, y: b.y - 22, w: 296, h: 540 });
+      const lean = cardOf(await d.box(label("Lean"))), balanced = cardOf(await d.box(label("Balanced")));
+      d.mark("three staffed options with cost + time", { x: lean.x, y: lean.y, w: balanced.x + balanced.w * 1.5 - lean.x, h: lean.h });
+      await d.hover(label("Lean"), { ms: 500 });
+      await d.wait(350);
+      await d.click(label("Balanced"), { ms: 600, what: "pick Balanced" });
+      await d.wait(700);
+      d.mark("Balanced picked, Launch ready", balanced);
+      await d.wait(500);
     },
     focus: async () => ({ x: 430, y: 200, w: 1010, h: 700 }),
     tail: 600,
@@ -442,5 +498,60 @@ export const EFFECTS = [
       await d.wait(800);
     },
     focus: async () => ({ x: 600, y: 44, w: 830, h: 846 }),
+  },
+
+  {
+    id: "pm.plan-live",
+    feature: "pm-coordination",
+    title: "The PM's plan, expanded, moving live as each agent reports",
+    demonstrates: "Open the Plan tab and expand it: the PM's task graph (a DAG of who does what, in what order) fills the screen. Then the project moves on its own: the PM accepts Sleuth's ranking and the thesis unblocks, Sprocket's cost work is accepted, Swatch's core loop goes to review and is accepted, and the PM starts assembling the final brief. Each task's status ring changes as it happens, progress and milestones count up, and the owners' mascots in the channel header switch to working. Ends on the Board view with the work in its columns.",
+    suggestedUse: "The PM-coordination hero. smart.mp4 hops to each task as it changes; slowmo works for the status flips.",
+    staged: "The plan is the real Guildhall concept plan (rev 27); its status changes are staged step by step (served state + the app's own state:<pid> refresh event), and the agents' work is scripted runs.",
+    stage: { fakeES: ["/api/runs", "/api/events"] },
+    async routes(page) {
+      page.__planStep = 0;
+      let real = null;
+      await page.route((u) => u.pathname === `/api/projects/${GUILD_PID}/state`, async (route) => {
+        if (!real) {
+          const res = await route.fetch();
+          real = JSON.parse(TEXT.reduce((acc, [a, b]) => acc.split(a).join(b), await res.text()));
+        }
+        await route.fulfill({ json: planAtStep(real, page.__planStep) });
+      });
+    },
+    async setup({ page }) {
+      await openChannel(page, GUILD);
+      await openTeamPanel(page);
+    },
+    async act({ page, d }) {
+      await d.click(tab(page, "Plan"), { ms: 550, what: "open the Plan tab" });
+      await d.wait(700);
+      await d.click(page.getByRole("button", { name: /open .*full|full size|Open full/i }).first(), { ms: 550, what: "expand the plan" });
+      await d.wait(1100);
+      const graph = await d.box(page.locator(".react-flow").last());
+      d.mark("the expanded DAG: who does what, in what order", graph);
+      await d.wait(700);
+      for (const [i, st] of PLAN_STEPS.entries()) {
+        page.__planStep = i + 1;
+        for (const [who, now] of st.runs) await page.evaluate(([t, n]) => window.__stage.run(t, "", { run: `plan-${t}`, now: n, done: false, delayMs: 0 }), [`a:${who}:p:${GUILD_PID}`, now]);
+        for (const who of st.done ?? []) await page.evaluate((t) => window.__stage.emit("/api/runs", "done", { type: "done", thread: t, run: `plan-${t}`, text: "" }), `a:${who}:p:${GUILD_PID}`);
+        await page.evaluate((pid) => window.__stage.emit("/api/events", "message", { topic: `state:${pid}` }), GUILD_PID);
+        await d.wait(350);
+        const boxes = [];
+        for (const [id] of st.tasks) {
+          const b = await page.locator(`[aria-label^="${id} "]`).first().boundingBox();
+          if (b) boxes.push({ x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) });
+        }
+        const u = boxes.length ? { x: Math.min(...boxes.map((b) => b.x)), y: Math.min(...boxes.map((b) => b.y)) } : null;
+        d.mark(st.what, u ? { ...u, w: Math.max(...boxes.map((b) => b.x + b.w)) - u.x, h: Math.max(...boxes.map((b) => b.y + b.h)) - u.y } : graph);
+        await d.wait(1250);
+      }
+      d.mark("7 of 8 done, the PM on the brief", graph);
+      await d.wait(600);
+      await d.click(page.getByRole("tab", { name: "Board", exact: true }).first(), { ms: 600, what: "flip to the Board" });
+      await d.wait(1200);
+      d.mark("the same work, by column", await d.box(page.locator("main, body").locator("text=Done").first()).catch(() => graph));
+    },
+    tail: 600,
   },
 ];
