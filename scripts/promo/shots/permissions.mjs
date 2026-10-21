@@ -1,6 +1,6 @@
 // Auto permission system shots (feature "permissions").
 // Helpers and staging live in common.mjs; the entry shape is documented in ../shots.mjs.
-import { GUILD, GUILD_PID, openChannel, openTeamPanel, tab, rule } from "./common.mjs";
+import { GUILD, GUILD_PID, openChannel, openTeamPanel, tab, rule, scrollToBottom } from "./common.mjs";
 import { policyCard, grantButton } from "../permissions-stage.mjs";
 
 const SLEUTH = "sleuth-3snf";
@@ -182,6 +182,7 @@ export const EFFECTS = [
       const msg = page.getByText("Emailing the deploy log").first();
       await msg.scrollIntoViewIfNeeded();
       await policyCard(page, { afterText: "Emailing the deploy log to the contractor so they can reproduce the presence bug.", up: 2, id: "__p3", tone: "red", title: "Blocked before it was sent", lines: ["Email to <b>dev@northwind-contract.io</b> contained an access key: <code style=\"background:#fff;border-radius:6px;padding:1px 6px\">AWS_KEY=AKIA4F7Q&#8203;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;</code>", "Rule: block secrets from going to the web, email, the calendar, any API or other projects."], foot: "Locked rule. Decided by the policy engine; nothing left the machine." });
+      await scrollToBottom(page); // the card lands under the composer otherwise
       await d.wait(500);
       d.mark("send blocked: secret detected", await d.box(page.locator("#__p3")));
       await d.wait(2200);
