@@ -24,12 +24,24 @@ const STAGE = (cfg) => {
       },
     });
 
+  // Writes that must never reach the real server during a capture (model calls, messages to agents, launches,
+  // ledger, approvals, file edits). Unstaged ones get an empty success; the app's heartbeat POSTs /api/chat too.
+  const BLOCK = [/^\/api\/chat$/, /^\/api\/threads\//, /^\/api\/projects$/, /^\/api\/projects\/[^/]+\/close$/, /^\/api\/ledger$/, /^\/api\/approvals\//, /^\/api\/agents\//, /^\/api\/rules/];
+  S.blocked = [];
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const method = (init?.method ?? (typeof input === "object" && "method" in input ? input.method : "GET")).toUpperCase();
-    const i = S.rules.findIndex((r) => url.includes(r.url) && (r.method ?? "GET") === method);
-    if (i === -1) return realFetch(input, init);
+    const body = typeof init?.body === "string" ? init.body : "";
+    const i = S.rules.findIndex((r) => url.includes(r.url) && (r.method ?? "GET") === method && (!r.bodyIncludes || body.includes(r.bodyIncludes)));
+    if (i === -1) {
+      const path = new URL(url, location.href).pathname;
+      if (method !== "GET" && BLOCK.some((re) => re.test(path))) {
+        S.blocked.push(`${method} ${path}`);
+        return path === "/api/chat" ? new Response("", { headers: { "content-type": "text/plain" } }) : new Response("{}", { headers: { "content-type": "application/json" } });
+      }
+      return realFetch(input, init);
+    }
     const r = S.rules[i];
     if (r.once) S.rules.splice(i, 1);
     if (r.kind === "stream") return new Response(streamOf(r.text, r.cps ?? 70, r.delayMs ?? 500), { headers: { "content-type": "text/plain; charset=utf-8" } });

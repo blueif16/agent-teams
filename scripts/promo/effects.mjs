@@ -18,7 +18,8 @@ import { EFFECTS } from "./shots.mjs";
 
 // PROMO_DEBUG=1: full speed, no recording or encoding, a screenshot in promo-assets/.debug/ when a shot fails or ends.
 const DEBUG = !!process.env.PROMO_DEBUG;
-const RATE = DEBUG ? 1 : 0.2;
+// 0.1: even when the machine is busy (~10 fps of retina screenshots), that's 100 fps of page time.
+const RATE = Number(process.env.PROMO_RATE ?? (DEBUG ? 1 : 0.1));
 const SLOW = 3;
 const W = 1440, H = 900, DPR = 2;
 
@@ -59,7 +60,7 @@ async function captureIn(fx, { page, cdp, browser }) {
   await installStage(page, fx.stage ?? {});
   if (fx.polish !== false) await polish(page);
   if (fx.routes) await fx.routes(page);
-  await page.goto(APP, { waitUntil: "load" });
+  await page.goto(APP, { waitUntil: "load", timeout: 90000 }); // the dev server may be compiling
   await page.addStyleTag({ content: CLEAN_CSS });
   await page.waitForTimeout(1500);
   const d = new Director(page, RATE);
