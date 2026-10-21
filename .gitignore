@@ -44,3 +44,6 @@ next-env.d.ts
 # performance ledger (local records of model calls and orders)
 /.data/
 .tasks/HANDOFF-*.md
+
+# promo capture output (large binaries)
+/promo-assets/
