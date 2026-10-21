@@ -10,7 +10,7 @@
 //   poster.png  the payoff frame, focus crop
 //   timeline.json  cursor path, clicks and marked moments in ms + boxes in CSS px (×2 for device px)
 // and an entry in promo-assets/manifest.json saying what it shows and why (feature, demonstrates, moments).
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { launch, setRate, recorder, encodeMp4, poster, addToManifest, rel, OUT, APP, CLEAN_CSS } from "./lib.mjs";
 import { installStage, Director } from "./stage.mjs";
@@ -41,14 +41,54 @@ function union(boxes) {
   return { x, y, w: Math.max(...boxes.map((b) => b.x + b.w)) - x, h: Math.max(...boxes.map((b) => b.y + b.h)) - y };
 }
 
+// One real recording at a time across every process (parallel captures pushed this Mac into swap: 3 fps of page
+// time). Debug runs skip the lock. The lock is a directory holding the owner's pid; a dead owner's lock is taken over.
+const LOCK = join(OUT, ".record.lock");
+async function withRecordLock(fn) {
+  if (DEBUG) return fn();
+  mkdirSync(OUT, { recursive: true });
+  for (let waited = 0; ; waited += 2) {
+    try {
+      mkdirSync(LOCK);
+      writeFileSync(join(LOCK, "pid"), String(process.pid));
+      break;
+    } catch {
+      const owner = Number(existsSync(join(LOCK, "pid")) ? readFileSync(join(LOCK, "pid"), "utf8") : 0);
+      let alive = false;
+      try { if (owner) { process.kill(owner, 0); alive = true; } } catch {}
+      if (!alive && waited > 4) rmSync(LOCK, { recursive: true, force: true });
+      if (waited % 30 === 0) console.log(`  waiting for another recording to finish (${waited}s)`);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    rmSync(LOCK, { recursive: true, force: true });
+  }
+}
+
+/** Records; if the clip has < 60 fps of page time (machine under memory pressure), retries once at a slower page speed. */
 async function capture(fx) {
+  return withRecordLock(async () => {
+    let rate = RATE;
+    for (let attempt = 0; ; attempt++) {
+      const fps = await captureOnce(fx, rate);
+      if (DEBUG || fps >= 60 || attempt >= 1) return;
+      rate = Math.max(0.05, (rate * fps) / 100);
+      console.log(`  only ${fps} fps of page time; re-recording at ${rate.toFixed(3)}× page speed`);
+    }
+  });
+}
+
+async function captureOnce(fx, RATE) {
   console.log(`● ${fx.id}`);
   const s = await launch({ width: W, height: H, dpr: DPR });
   const { page, cdp, browser } = s;
   if (DEBUG) page.on("console", (m) => m.text().startsWith("[viewer]") && console.log("  " + m.text()));
   page.setDefaultTimeout(8000 / RATE); // Playwright waits are wall-clock; the page runs RATE× slower
   try {
-    return await captureIn(fx, s);
+    return await captureIn(fx, s, RATE);
   } catch (e) {
     if (DEBUG) {
       mkdirSync(join(OUT, ".debug"), { recursive: true });
@@ -60,7 +100,7 @@ async function capture(fx) {
   }
 }
 
-async function captureIn(fx, { page, cdp, browser }) {
+async function captureIn(fx, { page, cdp, browser }, RATE) {
   await installStage(page, fx.stage ?? {});
   if (fx.polish !== false) await polish(page);
   if (fx.viewer) await installViewer(page, fx.viewer);
@@ -133,6 +173,7 @@ async function captureIn(fx, { page, cdp, browser }) {
     alpha: false,
   });
   console.log(`  ${frames.length} frames, ${capturedFps} fps of page time, ${(durationMs / 1000).toFixed(1)} s, focus ${focus.w}x${focus.h}`);
+  return capturedFps;
 }
 
 const args = process.argv.slice(2);
