@@ -3,6 +3,7 @@
 //   node scripts/promo/effects.mjs reactions stats  effects whose id starts with any of these
 //   node scripts/promo/effects.mjs --list
 // Per effect, in promo-assets/effects/<id>/:
+//   smart.mp4   1920x1080 60 fps, auto-zoom camera: pushes in on each marked element, follows the cursor (camera.mjs)
 //   full.mp4    2880x1800 60 fps, real speed, whole window (for any reframing)
 //   focus.mp4   16:9 crop around where the action happens, real speed
 //   slowmo.mp4  the focus crop at 1/3 speed (captured at 150+ fps of page time, so it's true slow motion)
@@ -14,6 +15,8 @@ import { join } from "node:path";
 import { launch, setRate, recorder, encodeMp4, poster, addToManifest, rel, OUT, APP, CLEAN_CSS } from "./lib.mjs";
 import { installStage, Director } from "./stage.mjs";
 import { polish } from "./org.mjs";
+import { installViewer } from "./viewer.mjs";
+import { render as renderSmart } from "./camera.mjs";
 import { EFFECTS } from "./shots.mjs";
 
 // PROMO_DEBUG=1: full speed, no recording or encoding, a screenshot in promo-assets/.debug/ when a shot fails or ends.
@@ -42,6 +45,7 @@ async function capture(fx) {
   console.log(`● ${fx.id}`);
   const s = await launch({ width: W, height: H, dpr: DPR });
   const { page, cdp, browser } = s;
+  if (DEBUG) page.on("console", (m) => m.text().startsWith("[viewer]") && console.log("  " + m.text()));
   page.setDefaultTimeout(8000 / RATE); // Playwright waits are wall-clock; the page runs RATE× slower
   try {
     return await captureIn(fx, s);
@@ -59,6 +63,7 @@ async function capture(fx) {
 async function captureIn(fx, { page, cdp, browser }) {
   await installStage(page, fx.stage ?? {});
   if (fx.polish !== false) await polish(page);
+  if (fx.viewer) await installViewer(page, fx.viewer);
   if (fx.routes) await fx.routes(page);
   await page.goto(APP, { waitUntil: "load", timeout: 90000 }); // the dev server may be compiling
   await page.addStyleTag({ content: CLEAN_CSS });
@@ -105,6 +110,7 @@ async function captureIn(fx, { page, cdp, browser }) {
   poster(pf.file, join(out, "poster.png"), crop);
   writeFileSync(join(out, "timeline.json"), JSON.stringify({ viewport: { w: W, h: H, dpr: DPR }, durationMs, focus, marks: d.marks, cursor: d.cursor }, null, 1));
   rmSync(dir, { recursive: true, force: true });
+  renderSmart(fx.id); // smart.mp4: auto-zoom camera from the timeline's boxes and cursor
 
   const capturedFps = Math.round(frames.length / (durationMs / 1000));
   addToManifest({
@@ -115,7 +121,7 @@ async function captureIn(fx, { page, cdp, browser }) {
     demonstrates: fx.demonstrates,
     suggestedUse: fx.suggestedUse,
     moments: d.marks.map(({ atMs, what }) => ({ atMs, what })),
-    files: { full: rel(join(out, "full.mp4")), focus: rel(join(out, "focus.mp4")), slowmo: rel(join(out, "slowmo.mp4")), poster: rel(join(out, "poster.png")), timeline: rel(join(out, "timeline.json")) },
+    files: { smart: rel(join(out, "smart.mp4")), full: rel(join(out, "full.mp4")), focus: rel(join(out, "focus.mp4")), slowmo: rel(join(out, "slowmo.mp4")), poster: rel(join(out, "poster.png")), timeline: rel(join(out, "timeline.json")) },
     size: { full: [W * DPR, H * DPR], focus: [crop.w, crop.h] },
     focusBoxCss: focus,
     fps: 60,

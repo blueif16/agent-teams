@@ -47,3 +47,4 @@ next-env.d.ts
 
 # promo capture output (large binaries)
 /promo-assets/
+/scripts/promo/.venv/

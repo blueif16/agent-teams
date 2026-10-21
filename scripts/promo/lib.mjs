@@ -2,7 +2,7 @@
 // Measured on this Mac (2026-10-20): full 2880x1800 JPEG ≈ 35 fps, a small clip PNG ≈ 80–120 fps. Running the
 // page at RATE 0.2 turns that into 175–600 fps of page time, so every spring and pop is captured smoothly.
 import { chromium } from "playwright-core";
-import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, readdirSync, renameSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
@@ -132,20 +132,46 @@ export function poster(frameFile, out, crop) {
 }
 
 /**
- * Merges one asset entry into promo-assets/manifest.json (keyed by id). Every entry carries notes for the
- * editing agent: `feature` (a key of FEATURES), `title`, `demonstrates` (what a viewer sees and why it matters),
- * `moments` ([{atMs, what}] in the real-speed clip) and `suggestedUse`.
+ * Records one asset for the editing agent. Every entry carries: `feature` (a key of FEATURES), `title`,
+ * `demonstrates` (what a viewer sees and why it matters), `moments` ([{atMs, what}] in the real-speed clip) and
+ * `suggestedUse`. Each entry is its own file under promo-assets/.manifest/ (so parallel recorders never overwrite
+ * each other), merged into promo-assets/manifest.json after every write.
  */
 export function addToManifest(entry) {
   for (const k of ["feature", "title", "demonstrates", "files"]) if (!entry[k]) throw new Error(`manifest entry ${entry.id} is missing ${k}`);
   if (!FEATURES[entry.feature]) throw new Error(`manifest entry ${entry.id}: unknown feature ${entry.feature}`);
-  mkdirSync(OUT, { recursive: true });
+  const dir = join(OUT, ".manifest");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${entry.id}.json`), JSON.stringify(entry, null, 2));
+  rebuildManifest();
+}
+
+/** Merges `patch.files` into an existing entry (e.g. a re-rendered smart.mp4). */
+export function patchManifest(id, patch) {
+  const f = join(OUT, ".manifest", `${id}.json`);
+  if (!existsSync(f)) return;
+  const e = JSON.parse(readFileSync(f, "utf8"));
+  writeFileSync(f, JSON.stringify({ ...e, ...patch, files: { ...e.files, ...(patch.files ?? {}) } }, null, 2));
+  rebuildManifest();
+}
+
+export function rebuildManifest() {
+  const dir = join(OUT, ".manifest");
+  mkdirSync(dir, { recursive: true });
   const path = join(OUT, "manifest.json");
-  const m = existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : { generated: null, assets: {} };
-  m.features = FEATURES;
-  m.assets[entry.id] = entry;
-  m.generated = new Date().toISOString();
-  writeFileSync(path, JSON.stringify(m, null, 2));
+  // One-time migration: entries written before the per-file layout.
+  if (existsSync(path)) {
+    const old = JSON.parse(readFileSync(path, "utf8"));
+    for (const [id, e] of Object.entries(old.assets ?? {})) if (!existsSync(join(dir, `${id}.json`))) writeFileSync(join(dir, `${id}.json`), JSON.stringify(e, null, 2));
+  }
+  const assets = {};
+  for (const f of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
+    const e = JSON.parse(readFileSync(join(dir, f), "utf8"));
+    assets[e.id] = e;
+  }
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify({ generated: new Date().toISOString(), features: FEATURES, assets }, null, 2));
+  renameSync(tmp, path);
 }
 
 export const rel = (p) => p.replace(OUT + "/", "");
@@ -161,4 +187,5 @@ export const FEATURES = {
   artifacts: "Teams hand back the artifacts they built (tables, docs, HTML mockups, charts) right in the chat.",
   "pm-coordination": "The PM plans, assigns work to each expert, gets reports back and accepts or sends work back.",
   staffing: "The PM/CEO staff a team from archetypes plus workers with proven skills and past project experience.",
+  permissions: "Auto permissions: say a rule in plain words and it becomes specific, enforced permissions; the policy engine (not the model) decides every tool call — allow, ask or deny — and approvals teach it what you're fine with.",
 };
