@@ -81,9 +81,9 @@ export function path(tl) {
   for (let i = 0; i < n; i++) {
     const t = (i / FPS) * 1000;
     let c = { ...camAt(keys, t) };
-    // Keep the cursor inside the frame with a margin.
+    // Keep a moving cursor inside the frame; once it has rested 600 ms the marked moment owns the shot.
     const p = cursorAt(tl.cursor, t);
-    if (p) {
+    if (p && t - p.atMs < 600) {
       const h = (c.w * 9) / 16, m = c.w * 0.08;
       if (p.x < c.cx - c.w / 2 + m) c.cx = p.x - m + c.w / 2;
       if (p.x > c.cx + c.w / 2 - m) c.cx = p.x + m - c.w / 2;
