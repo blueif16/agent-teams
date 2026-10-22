@@ -1,0 +1,5 @@
+promo-assets/**/*.mp4 filter=lfs diff=lfs merge=lfs -text
+promo-assets/**/*.mov filter=lfs diff=lfs merge=lfs -text
+promo-assets/**/*.webm filter=lfs diff=lfs merge=lfs -text
+promo-assets/**/*.png filter=lfs diff=lfs merge=lfs -text
+promo-assets/**/*.riv filter=lfs diff=lfs merge=lfs -text

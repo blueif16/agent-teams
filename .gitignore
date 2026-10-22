@@ -46,5 +46,7 @@ next-env.d.ts
 .tasks/HANDOFF-*.md
 
 # promo capture output (large binaries)
-/promo-assets/
+/promo-assets/.frames/
+/promo-assets/.record.lock/
+/promo-assets/**/.DS_Store
 /scripts/promo/.venv/
