@@ -1,0 +1,81 @@
+{
+  "id": "effect.permissions.plain-words",
+  "kind": "effect",
+  "feature": "permissions",
+  "title": "One sentence becomes enforced permissions",
+  "demonstrates": "The owner types a single plain-English sentence into Sleuth's Permissions tab. It turns into three specific rules, each read back in a fixed plain sentence (never written by a model), with one multiple-choice question, a note that it tightens the existing email rule, and a dry run over the last 214 calls. One click on Save and the rules sit in 'Your rules'. What you said is exactly what is enforced.",
+  "suggestedUse": "The hero of the permissions story: open on the sentence, cut on the proposal card, end on the saved rows.",
+  "moments": [
+    {
+      "atMs": 1079,
+      "what": "click the permission box"
+    },
+    {
+      "atMs": 5032,
+      "what": "the owner's sentence"
+    },
+    {
+      "atMs": 5699,
+      "what": "turn it into rules"
+    },
+    {
+      "atMs": 7809,
+      "what": "proposal card: three rules, plain-English read-backs"
+    },
+    {
+      "atMs": 9211,
+      "what": "one question to settle"
+    },
+    {
+      "atMs": 10591,
+      "what": "answer: every day"
+    },
+    {
+      "atMs": 12491,
+      "what": "conflict note and dry run"
+    },
+    {
+      "atMs": 13897,
+      "what": "dry run: 214 calls replayed"
+    },
+    {
+      "atMs": 15867,
+      "what": "Save"
+    },
+    {
+      "atMs": 18211,
+      "what": "saved: three rules in Your rules"
+    }
+  ],
+  "files": {
+    "smart": "effects/permissions.plain-words/smart.mp4",
+    "full": "effects/permissions.plain-words/full.mp4",
+    "focus": "effects/permissions.plain-words/focus.mp4",
+    "slowmo": "effects/permissions.plain-words/slowmo.mp4",
+    "poster": "effects/permissions.plain-words/poster.png",
+    "timeline": "effects/permissions.plain-words/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2538,
+      1428
+    ]
+  },
+  "focusBoxCss": {
+    "x": 171,
+    "y": 186,
+    "w": 1269,
+    "h": 714
+  },
+  "fps": 60,
+  "capturedFps": 207,
+  "durationMs": 20005,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "The compile and save responses (POST /api/rules/compile and /api/rules) are scripted JSON in the real CompileResult shape, including the 214-call dry run; nothing is written. The agent panel, capability list and the existing email rule are the live app.",
+  "alpha": false
+}

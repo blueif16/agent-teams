@@ -1,0 +1,29 @@
+{
+  "id": "rive.pixel.working",
+  "kind": "rive-action",
+  "feature": "rive-status",
+  "title": "pixel (Engineer (orange pixel, headphones)): working",
+  "demonstrates": "Busy on a task: a keyboard and two mittens come out and it types. This is what a live agent looks like while it works.",
+  "suggestedUse": "Any beat about agents doing real work in parallel; tile several rigs side by side.",
+  "moments": [],
+  "rive": {
+    "stateMachine": "Agent",
+    "viewModel": "Agent",
+    "enumProperty": "action",
+    "value": "working"
+  },
+  "files": {
+    "hevcAlpha": "rive/pixel/working.mov",
+    "webmAlpha": "rive/pixel/working.webm",
+    "poster": "rive/pixel/working.png",
+    "source": "rive/pixel/pixel.riv"
+  },
+  "size": [
+    1024,
+    1024
+  ],
+  "fps": 60,
+  "capturedFps": 371,
+  "durationMs": 3999,
+  "alpha": true
+}

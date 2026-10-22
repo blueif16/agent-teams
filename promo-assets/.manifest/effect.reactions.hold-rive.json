@@ -1,0 +1,57 @@
+{
+  "id": "effect.reactions.hold-rive",
+  "kind": "effect",
+  "feature": "reactions",
+  "title": "✋ Hold: the agent's Rive mascot stops working",
+  "demonstrates": "With Ravi's profile open, ✋ on his message pauses him: the status chip pops to Idle and his live Rive mascot puts the keyboard away. An order changes what the agent is doing, visibly.",
+  "suggestedUse": "Pairs reactions with rive-status: frame the right-hand panel after the click.",
+  "moments": [
+    {
+      "atMs": 1135,
+      "what": "left-click the agent's message"
+    },
+    {
+      "atMs": 1613,
+      "what": "quick-actions menu open"
+    },
+    {
+      "atMs": 2150,
+      "what": "pick Hold"
+    },
+    {
+      "atMs": 2754,
+      "what": "Ravi goes idle: status chip + Rive mascot"
+    }
+  ],
+  "files": {
+    "smart": "effects/reactions.hold-rive/smart.mp4",
+    "full": "effects/reactions.hold-rive/full.mp4",
+    "focus": "effects/reactions.hold-rive/focus.mp4",
+    "slowmo": "effects/reactions.hold-rive/slowmo.mp4",
+    "poster": "effects/reactions.hold-rive/poster.png",
+    "timeline": "effects/reactions.hold-rive/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2276,
+      1280
+    ]
+  },
+  "focusBoxCss": {
+    "x": 302,
+    "y": 0,
+    "w": 1138,
+    "h": 640
+  },
+  "fps": 60,
+  "capturedFps": 248,
+  "durationMs": 5748,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "Ravi is set working by a scripted run on /api/runs; his reply text is scripted.",
+  "alpha": false
+}

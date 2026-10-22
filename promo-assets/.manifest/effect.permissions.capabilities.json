@@ -1,0 +1,57 @@
+{
+  "id": "effect.permissions.capabilities",
+  "kind": "effect",
+  "feature": "permissions",
+  "title": "What an agent can do: free, asks you, or never",
+  "demonstrates": "Sleuth's Permissions tab lists every capability with one of three plain states: Allowed, Asks you, or Never (blocked). Reading and searching are free, email, posts and spending ask first, and running code is blocked outright. The owner sees the whole boundary at a glance, not a config file.",
+  "suggestedUse": "Establishing shot before plain-words, or the closing 'here is the result' beat.",
+  "moments": [
+    {
+      "atMs": 1078,
+      "what": "open the Permissions tab"
+    },
+    {
+      "atMs": 2083,
+      "what": "what Sleuth can do freely"
+    },
+    {
+      "atMs": 4856,
+      "what": "open the rest"
+    },
+    {
+      "atMs": 6355,
+      "what": "what asks you, what is never allowed"
+    }
+  ],
+  "files": {
+    "smart": "effects/permissions.capabilities/smart.mp4",
+    "full": "effects/permissions.capabilities/full.mp4",
+    "focus": "effects/permissions.capabilities/focus.mp4",
+    "slowmo": "effects/permissions.capabilities/slowmo.mp4",
+    "poster": "effects/permissions.capabilities/poster.png",
+    "timeline": "effects/permissions.capabilities/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2880,
+      1800
+    ]
+  },
+  "focusBoxCss": {
+    "x": 0,
+    "y": 0,
+    "w": 1440,
+    "h": 900
+  },
+  "fps": 60,
+  "capturedFps": 230,
+  "durationMs": 8550,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "Nothing: this is the live Permissions tab for Sleuth with the app's real default rules.",
+  "alpha": false
+}

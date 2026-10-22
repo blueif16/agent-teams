@@ -1,0 +1,49 @@
+{
+  "id": "effect.pm.plan-graph",
+  "kind": "effect",
+  "feature": "pm-coordination",
+  "title": "The PM's plan as a live graph: tasks pop in by dependency",
+  "demonstrates": "Open the Plan tab and the PM's task graph builds itself: each task (owner, status, dependencies) pops in in order, blocked edges dashed. This is the plan Beacon wrote and keeps updating as experts report.",
+  "suggestedUse": "PM-coordination beat; follow with pm.task-drawer.",
+  "moments": [
+    {
+      "atMs": 1059,
+      "what": "open the Plan tab"
+    },
+    {
+      "atMs": 2360,
+      "what": "graph built"
+    }
+  ],
+  "files": {
+    "smart": "effects/pm.plan-graph/smart.mp4",
+    "full": "effects/pm.plan-graph/full.mp4",
+    "focus": "effects/pm.plan-graph/focus.mp4",
+    "slowmo": "effects/pm.plan-graph/slowmo.mp4",
+    "poster": "effects/pm.plan-graph/poster.png",
+    "timeline": "effects/pm.plan-graph/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2774,
+      1560
+    ]
+  },
+  "focusBoxCss": {
+    "x": 53,
+    "y": 120,
+    "w": 1387,
+    "h": 780
+  },
+  "fps": 60,
+  "capturedFps": 117,
+  "durationMs": 3957,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "None: the real plan of the Guildhall concept project.",
+  "alpha": false
+}

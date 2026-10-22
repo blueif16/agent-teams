@@ -1,0 +1,49 @@
+{
+  "id": "effect.soul-memory.designer-evolution",
+  "kind": "effect",
+  "feature": "soul-memory",
+  "title": "The same designer, three runs: the mockup gets better every time",
+  "demonstrates": "Pia's mockup from runs 1, 2 and 3 side by side on her canvas: a bare page, then cards, then a polished hero with a live booking widget. What she learned (saved to her memory) shows up in the work.",
+  "suggestedUse": "Learning beat, right after soul-memory.history.",
+  "moments": [
+    {
+      "atMs": 1242,
+      "what": "click mockup.html"
+    },
+    {
+      "atMs": 3736,
+      "what": "runs 1 → 3 on the canvas"
+    }
+  ],
+  "files": {
+    "smart": "effects/soul-memory.designer-evolution/smart.mp4",
+    "full": "effects/soul-memory.designer-evolution/full.mp4",
+    "focus": "effects/soul-memory.designer-evolution/focus.mp4",
+    "slowmo": "effects/soul-memory.designer-evolution/slowmo.mp4",
+    "poster": "effects/soul-memory.designer-evolution/poster.png",
+    "timeline": "effects/soul-memory.designer-evolution/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2880,
+      1800
+    ]
+  },
+  "focusBoxCss": {
+    "x": 0,
+    "y": 0,
+    "w": 1440,
+    "h": 900
+  },
+  "fps": 60,
+  "capturedFps": 90,
+  "durationMs": 6010,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "The canvas viewer is staged; all three mockups are the team's real outputs.",
+  "alpha": false
+}

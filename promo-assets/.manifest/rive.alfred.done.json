@@ -1,0 +1,29 @@
+{
+  "id": "rive.alfred.done",
+  "kind": "rive-action",
+  "feature": "rive-status",
+  "title": "alfred (Writer (yellow pear, glasses + bowtie)): done",
+  "demonstrates": "Task finished: a green check badge appears. Work is accepted and handed back.",
+  "suggestedUse": "Payoff beats: artifacts delivered, project closed.",
+  "moments": [],
+  "rive": {
+    "stateMachine": "Agent",
+    "viewModel": "Agent",
+    "enumProperty": "action",
+    "value": "done"
+  },
+  "files": {
+    "hevcAlpha": "rive/alfred/done.mov",
+    "webmAlpha": "rive/alfred/done.webm",
+    "poster": "rive/alfred/done.png",
+    "source": "rive/alfred/alfred.riv"
+  },
+  "size": [
+    1024,
+    1024
+  ],
+  "fps": 60,
+  "capturedFps": 109,
+  "durationMs": 3994,
+  "alpha": true
+}

@@ -1,0 +1,57 @@
+{
+  "id": "effect.reactive.live-channel",
+  "kind": "effect",
+  "feature": "reactive",
+  "title": "Live channel: three agents report at once, the PM answers",
+  "demonstrates": "An AI Slack that's alive: in #guildhall-concept the researcher, designer and engineer stream their reports at the same time, each with a live status, then the PM accepts and redirects. Nobody refreshes anything.",
+  "suggestedUse": "The 'it's alive' beat; smart.mp4 follows each report as it lands.",
+  "moments": [
+    {
+      "atMs": 1027,
+      "what": "report streaming: Three of the five creator…"
+    },
+    {
+      "atMs": 1854,
+      "what": "report streaming: Onboarding is three states…"
+    },
+    {
+      "atMs": 2682,
+      "what": "report streaming: Hardest constraint is presence…"
+    },
+    {
+      "atMs": 6359,
+      "what": "PM accepts and redirects"
+    }
+  ],
+  "files": {
+    "smart": "effects/reactive.live-channel/smart.mp4",
+    "full": "effects/reactive.live-channel/full.mp4",
+    "focus": "effects/reactive.live-channel/focus.mp4",
+    "slowmo": "effects/reactive.live-channel/slowmo.mp4",
+    "poster": "effects/reactive.live-channel/poster.png",
+    "timeline": "effects/reactive.live-channel/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      1616,
+      910
+    ]
+  },
+  "focusBoxCss": {
+    "x": 475,
+    "y": 370,
+    "w": 808,
+    "h": 455
+  },
+  "fps": 60,
+  "capturedFps": 480,
+  "durationMs": 7756,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "Four scripted runs on /api/runs.",
+  "alpha": false
+}

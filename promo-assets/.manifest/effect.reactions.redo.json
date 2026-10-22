@@ -1,0 +1,56 @@
+{
+  "id": "effect.reactions.redo",
+  "kind": "effect",
+  "feature": "reactions",
+  "title": "🔁 Redo: send the writer's hype draft back",
+  "demonstrates": "One click sends work back: 🔁 on Wren's draft ('Revolutionary booking for modern clinics') and Wren answers with the fix. Quality control is a reaction away.",
+  "suggestedUse": "Quick cut in a montage of orders.",
+  "moments": [
+    {
+      "atMs": 1116,
+      "what": "left-click the agent's message"
+    },
+    {
+      "atMs": 1595,
+      "what": "quick-actions menu open"
+    },
+    {
+      "atMs": 2152,
+      "what": "pick Redo"
+    },
+    {
+      "atMs": 4861,
+      "what": "Wren's reply streamed"
+    }
+  ],
+  "files": {
+    "full": "effects/reactions.redo/full.mp4",
+    "focus": "effects/reactions.redo/focus.mp4",
+    "slowmo": "effects/reactions.redo/slowmo.mp4",
+    "poster": "effects/reactions.redo/poster.png",
+    "timeline": "effects/reactions.redo/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2880,
+      1800
+    ]
+  },
+  "focusBoxCss": {
+    "x": 0,
+    "y": 0,
+    "w": 1440,
+    "h": 900
+  },
+  "fps": 60,
+  "capturedFps": 191,
+  "durationMs": 5756,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "Wren's reply text is scripted.",
+  "alpha": false
+}

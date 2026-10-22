@@ -1,0 +1,2336 @@
+{
+  "generated": "2026-10-21T16:33:42.382Z",
+  "features": {
+    "reactive": "An AI Slack that is alive: replies stream in, statuses and channels update the moment agents act.",
+    "reactions": "Emoji reactions are orders (👍 go ahead, 👀 dig in, 🔁 redo, ✋ hold, 📌 remember): click one and the agent acts and answers.",
+    "rive-status": "Every agent is a plush Rive mascot whose animation shows its live status: idle, working (keyboard + mittens), needs you (! bubble), done (check).",
+    "stats": "Clear, live stats: spend, tokens, cache hit, acceptance, latency, per-agent and per-hour charts.",
+    "team-choice": "Mira (the CEO agent) proposes 2–3 team options with realistic cost and time, and you pick one.",
+    "soul-memory": "Each agent's SOUL.md and memory are versioned and improve over time; you can browse every git edit, diff and restore.",
+    "artifacts": "Teams hand back the artifacts they built (tables, docs, HTML mockups, charts) right in the chat.",
+    "pm-coordination": "The PM plans, assigns work to each expert, gets reports back and accepts or sends work back.",
+    "staffing": "The PM/CEO staff a team from archetypes plus workers with proven skills and past project experience.",
+    "permissions": "Auto permissions: say a rule in plain words and it becomes specific, enforced permissions; the policy engine (not the model) decides every tool call — allow, ask or deny — and approvals teach it what you're fine with."
+  },
+  "assets": {
+    "effect.permissions.auto-approve": {
+      "id": "effect.permissions.auto-approve",
+      "kind": "effect",
+      "feature": "permissions",
+      "title": "Approve once, never be asked again: the second request goes through on its own",
+      "demonstrates": "Sleuth asks to run a paid research query and an approval card lands. The owner picks 'Approve & allow for this project'. When Sleuth needs a similar query minutes later, no card appears and nobody is pinged: a green line says it was allowed by the owner's rule, decided by the policy engine and not the chat model. Agents keep working, within what the owner said yes to.",
+      "suggestedUse": "The 'agents don't interrupt you' beat. Cut on the green receipt line.",
+      "moments": [
+        {
+          "atMs": 3416,
+          "what": "approval card lands"
+        },
+        {
+          "atMs": 5200,
+          "what": "Approve & allow for this project"
+        },
+        {
+          "atMs": 6695,
+          "what": "rule saved from the approval"
+        },
+        {
+          "atMs": 9501,
+          "what": "second request allowed by the rule, no card, no ping"
+        }
+      ],
+      "files": {
+        "smart": "effects/permissions.auto-approve/smart.mp4",
+        "full": "effects/permissions.auto-approve/full.mp4",
+        "focus": "effects/permissions.auto-approve/focus.mp4",
+        "slowmo": "effects/permissions.auto-approve/slowmo.mp4",
+        "poster": "effects/permissions.auto-approve/poster.png",
+        "timeline": "effects/permissions.auto-approve/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          1760,
+          990
+        ]
+      },
+      "focusBoxCss": {
+        "x": 399,
+        "y": 386,
+        "w": 880,
+        "h": 495
+      },
+      "fps": 60,
+      "capturedFps": 254,
+      "durationMs": 12298,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "The approval card is fed through scripted /api/approvals and event stubs and Sleuth's messages are scripted runs. The 'Approve & allow for this project' button and both green policy lines are STAGED overlays in the app's visual language (the app has no such UI yet; grants from approvals are not minted yet). Nothing is written.",
+      "alpha": false
+    },
+    "effect.permissions.blocked-secret": {
+      "id": "effect.permissions.blocked-secret",
+      "kind": "effect",
+      "feature": "permissions",
+      "title": "A leaked key never leaves: the rule blocks it before it is sent",
+      "demonstrates": "Sprocket tries to email a contractor a deploy log with a live access key in it. The policy engine stops the call before it goes out, citing the locked rule 'secrets never leave the machine'. The owner did nothing; the guardrail held.",
+      "suggestedUse": "The 'can't do what you forbade' beat, after auto-approve.",
+      "moments": [
+        {
+          "atMs": 3309,
+          "what": "send blocked: secret detected"
+        }
+      ],
+      "files": {
+        "smart": "effects/permissions.blocked-secret/smart.mp4",
+        "full": "effects/permissions.blocked-secret/full.mp4",
+        "focus": "effects/permissions.blocked-secret/focus.mp4",
+        "slowmo": "effects/permissions.blocked-secret/slowmo.mp4",
+        "poster": "effects/permissions.blocked-secret/poster.png",
+        "timeline": "effects/permissions.blocked-secret/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          1520,
+          856
+        ]
+      },
+      "focusBoxCss": {
+        "x": 459,
+        "y": 361,
+        "w": 760,
+        "h": 428
+      },
+      "fps": 60,
+      "capturedFps": 263,
+      "durationMs": 6101,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "Sprocket's messages are scripted runs and the red policy card is a STAGED overlay (the app has no in-chat block notice yet). The rule text is the real default rule r_secr03; the key is fake. Nothing is sent.",
+      "alpha": false
+    },
+    "effect.permissions.capabilities": {
+      "id": "effect.permissions.capabilities",
+      "kind": "effect",
+      "feature": "permissions",
+      "title": "What an agent can do: free, asks you, or never",
+      "demonstrates": "Sleuth's Permissions tab lists every capability with one of three plain states: Allowed, Asks you, or Never (blocked). Reading and searching are free, email, posts and spending ask first, and running code is blocked outright. The owner sees the whole boundary at a glance, not a config file.",
+      "suggestedUse": "Establishing shot before plain-words, or the closing 'here is the result' beat.",
+      "moments": [
+        {
+          "atMs": 1078,
+          "what": "open the Permissions tab"
+        },
+        {
+          "atMs": 2083,
+          "what": "what Sleuth can do freely"
+        },
+        {
+          "atMs": 4856,
+          "what": "open the rest"
+        },
+        {
+          "atMs": 6355,
+          "what": "what asks you, what is never allowed"
+        }
+      ],
+      "files": {
+        "smart": "effects/permissions.capabilities/smart.mp4",
+        "full": "effects/permissions.capabilities/full.mp4",
+        "focus": "effects/permissions.capabilities/focus.mp4",
+        "slowmo": "effects/permissions.capabilities/slowmo.mp4",
+        "poster": "effects/permissions.capabilities/poster.png",
+        "timeline": "effects/permissions.capabilities/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2880,
+          1800
+        ]
+      },
+      "focusBoxCss": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 900
+      },
+      "fps": 60,
+      "capturedFps": 230,
+      "durationMs": 8550,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "Nothing: this is the live Permissions tab for Sleuth with the app's real default rules.",
+      "alpha": false
+    },
+    "effect.permissions.plain-words": {
+      "id": "effect.permissions.plain-words",
+      "kind": "effect",
+      "feature": "permissions",
+      "title": "One sentence becomes enforced permissions",
+      "demonstrates": "The owner types a single plain-English sentence into Sleuth's Permissions tab. It turns into three specific rules, each read back in a fixed plain sentence (never written by a model), with one multiple-choice question, a note that it tightens the existing email rule, and a dry run over the last 214 calls. One click on Save and the rules sit in 'Your rules'. What you said is exactly what is enforced.",
+      "suggestedUse": "The hero of the permissions story: open on the sentence, cut on the proposal card, end on the saved rows.",
+      "moments": [
+        {
+          "atMs": 1079,
+          "what": "click the permission box"
+        },
+        {
+          "atMs": 5032,
+          "what": "the owner's sentence"
+        },
+        {
+          "atMs": 5699,
+          "what": "turn it into rules"
+        },
+        {
+          "atMs": 7809,
+          "what": "proposal card: three rules, plain-English read-backs"
+        },
+        {
+          "atMs": 9211,
+          "what": "one question to settle"
+        },
+        {
+          "atMs": 10591,
+          "what": "answer: every day"
+        },
+        {
+          "atMs": 12491,
+          "what": "conflict note and dry run"
+        },
+        {
+          "atMs": 13897,
+          "what": "dry run: 214 calls replayed"
+        },
+        {
+          "atMs": 15867,
+          "what": "Save"
+        },
+        {
+          "atMs": 18211,
+          "what": "saved: three rules in Your rules"
+        }
+      ],
+      "files": {
+        "smart": "effects/permissions.plain-words/smart.mp4",
+        "full": "effects/permissions.plain-words/full.mp4",
+        "focus": "effects/permissions.plain-words/focus.mp4",
+        "slowmo": "effects/permissions.plain-words/slowmo.mp4",
+        "poster": "effects/permissions.plain-words/poster.png",
+        "timeline": "effects/permissions.plain-words/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2538,
+          1428
+        ]
+      },
+      "focusBoxCss": {
+        "x": 171,
+        "y": 186,
+        "w": 1269,
+        "h": 714
+      },
+      "fps": 60,
+      "capturedFps": 207,
+      "durationMs": 20005,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "The compile and save responses (POST /api/rules/compile and /api/rules) are scripted JSON in the real CompileResult shape, including the 214-call dry run; nothing is written. The agent panel, capability list and the existing email rule are the live app.",
+      "alpha": false
+    },
+    "effect.pm.decisions": {
+      "id": "effect.pm.decisions",
+      "kind": "effect",
+      "feature": "pm-coordination",
+      "title": "Decisions log: every call the PM made, with its reason",
+      "demonstrates": "The Decisions tab lists what the PM decided and why, newest first, entries sliding in. A team that explains itself.",
+      "suggestedUse": "Quick insert.",
+      "moments": [
+        {
+          "atMs": 1081,
+          "what": "open Decisions"
+        },
+        {
+          "atMs": 2574,
+          "what": "decisions listed"
+        }
+      ],
+      "files": {
+        "full": "effects/pm.decisions/full.mp4",
+        "focus": "effects/pm.decisions/focus.mp4",
+        "slowmo": "effects/pm.decisions/slowmo.mp4",
+        "poster": "effects/pm.decisions/poster.png",
+        "timeline": "effects/pm.decisions/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2880,
+          1620
+        ]
+      },
+      "focusBoxCss": {
+        "x": 0,
+        "y": 90,
+        "w": 1440,
+        "h": 810
+      },
+      "fps": 60,
+      "capturedFps": 159,
+      "durationMs": 3470,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "None: real decisions.",
+      "alpha": false
+    },
+    "effect.pm.open-full-board": {
+      "id": "effect.pm.open-full-board",
+      "kind": "effect",
+      "feature": "pm-coordination",
+      "title": "Open full: the plan widens, then flips from graph to board",
+      "demonstrates": "The plan opens full size (the pane widens with a spring), then the Graph/Board toggle glides and the same tasks regroup as a kanban board by status. The PM's coordination, two ways.",
+      "suggestedUse": "Motion-heavy transition shot.",
+      "moments": [
+        {
+          "atMs": 1464,
+          "what": "open the plan full size"
+        },
+        {
+          "atMs": 4819,
+          "what": "flip to the board"
+        },
+        {
+          "atMs": 6217,
+          "what": "board view"
+        }
+      ],
+      "files": {
+        "full": "effects/pm.open-full-board/full.mp4",
+        "focus": "effects/pm.open-full-board/focus.mp4",
+        "slowmo": "effects/pm.open-full-board/slowmo.mp4",
+        "poster": "effects/pm.open-full-board/poster.png",
+        "timeline": "effects/pm.open-full-board/timeline.json",
+        "smart": "effects/pm.open-full-board/smart.mp4"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2880,
+          1800
+        ]
+      },
+      "focusBoxCss": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 900
+      },
+      "fps": 60,
+      "capturedFps": 83,
+      "durationMs": 7105,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "None: real plan.",
+      "alpha": false
+    },
+    "effect.pm.overview": {
+      "id": "effect.pm.overview",
+      "kind": "effect",
+      "feature": "pm-coordination",
+      "title": "Team overview: the PM strip fills with progress",
+      "demonstrates": "The team panel opens on the PM strip: the progress segments fill one by one, the waiting-on-you pill pops, and the context bar shows how much of the PM's memory window is in use.",
+      "suggestedUse": "Opening shot of the team panel.",
+      "moments": [
+        {
+          "atMs": 1508,
+          "what": "open the team panel"
+        },
+        {
+          "atMs": 3204,
+          "what": "PM strip filled"
+        }
+      ],
+      "files": {
+        "full": "effects/pm.overview/full.mp4",
+        "focus": "effects/pm.overview/focus.mp4",
+        "slowmo": "effects/pm.overview/slowmo.mp4",
+        "poster": "effects/pm.overview/poster.png",
+        "timeline": "effects/pm.overview/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2880,
+          1640
+        ]
+      },
+      "focusBoxCss": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 820
+      },
+      "fps": 60,
+      "capturedFps": 113,
+      "durationMs": 4084,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "None: real state.",
+      "alpha": false
+    },
+    "effect.pm.plan-graph": {
+      "id": "effect.pm.plan-graph",
+      "kind": "effect",
+      "feature": "pm-coordination",
+      "title": "The PM's plan as a live graph: tasks pop in by dependency",
+      "demonstrates": "Open the Plan tab and the PM's task graph builds itself: each task (owner, status, dependencies) pops in in order, blocked edges dashed. This is the plan Beacon wrote and keeps updating as experts report.",
+      "suggestedUse": "PM-coordination beat; follow with pm.task-drawer.",
+      "moments": [
+        {
+          "atMs": 1059,
+          "what": "open the Plan tab"
+        },
+        {
+          "atMs": 2360,
+          "what": "graph built"
+        }
+      ],
+      "files": {
+        "smart": "effects/pm.plan-graph/smart.mp4",
+        "full": "effects/pm.plan-graph/full.mp4",
+        "focus": "effects/pm.plan-graph/focus.mp4",
+        "slowmo": "effects/pm.plan-graph/slowmo.mp4",
+        "poster": "effects/pm.plan-graph/poster.png",
+        "timeline": "effects/pm.plan-graph/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2774,
+          1560
+        ]
+      },
+      "focusBoxCss": {
+        "x": 53,
+        "y": 120,
+        "w": 1387,
+        "h": 780
+      },
+      "fps": 60,
+      "capturedFps": 117,
+      "durationMs": 3957,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "None: the real plan of the Guildhall concept project.",
+      "alpha": false
+    },
+    "effect.pm.plan-live": {
+      "id": "effect.pm.plan-live",
+      "kind": "effect",
+      "feature": "pm-coordination",
+      "title": "The PM's plan, expanded, moving live as each agent reports",
+      "demonstrates": "Open the Plan tab and expand it: the PM's task graph (a DAG of who does what, in what order) fills the screen. Then the project moves on its own: the PM accepts Sleuth's ranking and the thesis unblocks, Sprocket's cost work is accepted, Swatch's core loop goes to review and is accepted, and the PM starts assembling the final brief. Each task's status ring changes as it happens, progress and milestones count up, and the owners' mascots in the channel header switch to working. Ends on the Board view with the work in its columns.",
+      "suggestedUse": "The PM-coordination hero. smart.mp4 hops to each task as it changes; slowmo works for the status flips.",
+      "moments": [
+        {
+          "atMs": 1019,
+          "what": "open the Plan tab"
+        },
+        {
+          "atMs": 2543,
+          "what": "expand the plan"
+        },
+        {
+          "atMs": 3743,
+          "what": "the expanded DAG: who does what, in what order"
+        },
+        {
+          "atMs": 4811,
+          "what": "PM accepts Sleuth's ranking: t1 done, thesis + monetization start"
+        },
+        {
+          "atMs": 6424,
+          "what": "Sprocket's cost envelope accepted: t2 done, t6 starts"
+        },
+        {
+          "atMs": 8031,
+          "what": "Swatch hands in the core loop for review"
+        },
+        {
+          "atMs": 9640,
+          "what": "Core loop accepted; thesis in review"
+        },
+        {
+          "atMs": 11254,
+          "what": "Everything accepted; the PM assembles the brief"
+        },
+        {
+          "atMs": 12504,
+          "what": "7 of 8 done, the PM on the brief"
+        },
+        {
+          "atMs": 13897,
+          "what": "flip to the Board"
+        },
+        {
+          "atMs": 15193,
+          "what": "the same work, by column"
+        }
+      ],
+      "files": {
+        "smart": "effects/pm.plan-live/smart.mp4",
+        "full": "effects/pm.plan-live/full.mp4",
+        "focus": "effects/pm.plan-live/focus.mp4",
+        "slowmo": "effects/pm.plan-live/slowmo.mp4",
+        "poster": "effects/pm.plan-live/poster.png",
+        "timeline": "effects/pm.plan-live/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2880,
+          1800
+        ]
+      },
+      "focusBoxCss": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 900
+      },
+      "fps": 60,
+      "capturedFps": 219,
+      "durationMs": 15790,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "The plan is the real Guildhall concept plan (rev 27); its status changes are staged step by step (served state + the app's own state:<pid> refresh event), and the agents' work is scripted runs.",
+      "alpha": false
+    },
+    "effect.pm.task-drawer": {
+      "id": "effect.pm.task-drawer",
+      "kind": "effect",
+      "feature": "pm-coordination",
+      "title": "A task's drawer: owner, acceptance criteria, the expert's report and evidence",
+      "demonstrates": "Click a task in the plan and its drawer slides up: who owns it, the acceptance bar the PM set, the expert's last report and the evidence file. The PM accepts work on evidence, not vibes.",
+      "suggestedUse": "Detail insert after pm.plan-graph.",
+      "moments": [
+        {
+          "atMs": 3554,
+          "what": "open task t1"
+        },
+        {
+          "atMs": 5059,
+          "what": "drawer open: acceptance + report + evidence"
+        }
+      ],
+      "files": {
+        "full": "effects/pm.task-drawer/full.mp4",
+        "focus": "effects/pm.task-drawer/focus.mp4",
+        "slowmo": "effects/pm.task-drawer/slowmo.mp4",
+        "poster": "effects/pm.task-drawer/poster.png",
+        "timeline": "effects/pm.task-drawer/timeline.json",
+        "smart": "effects/pm.task-drawer/smart.mp4"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2880,
+          1800
+        ]
+      },
+      "focusBoxCss": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 900
+      },
+      "fps": 60,
+      "capturedFps": 61,
+      "durationMs": 6609,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "None: real task t1 (Sleuth's ranking, in review).",
+      "alpha": false
+    },
+    "effect.reactions.go-ahead": {
+      "id": "effect.reactions.go-ahead",
+      "kind": "effect",
+      "feature": "reactions",
+      "title": "👍 Go ahead: click a message, pick the order, the agent acts and answers",
+      "demonstrates": "The full reaction loop on the designer's latest message: left-click opens the quick-actions menu, the cursor sweeps the five orders (each grows, the hint line names it), 👍 lands as a chip under the message, the bubble bumps, Pia flips to working (header count + mascot), typing dots, then a reply quoting the order streams in right below. Reactions are instructions, not decoration.",
+      "suggestedUse": "The hero sequence. Cut on 'pick Go ahead' for the punch; the slow-mo covers the chip pop.",
+      "moments": [
+        {
+          "atMs": 1114,
+          "what": "left-click the agent's message"
+        },
+        {
+          "atMs": 1589,
+          "what": "quick-actions menu open"
+        },
+        {
+          "atMs": 4716,
+          "what": "pick Go ahead"
+        },
+        {
+          "atMs": 5515,
+          "what": "chip + status working + typing dots"
+        },
+        {
+          "atMs": 7616,
+          "what": "quoted reply finished streaming"
+        }
+      ],
+      "files": {
+        "full": "effects/reactions.go-ahead/full.mp4",
+        "focus": "effects/reactions.go-ahead/focus.mp4",
+        "slowmo": "effects/reactions.go-ahead/slowmo.mp4",
+        "poster": "effects/reactions.go-ahead/poster.png",
+        "timeline": "effects/reactions.go-ahead/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          1974,
+          1110
+        ]
+      },
+      "focusBoxCss": {
+        "x": 380,
+        "y": 256,
+        "w": 987,
+        "h": 555
+      },
+      "fps": 60,
+      "capturedFps": 183,
+      "durationMs": 8311,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "Pia's reply text is scripted (fetch stub for POST /api/chat); channel name and transcript polished (org.mjs).",
+      "alpha": false
+    },
+    "effect.reactions.hold-rive": {
+      "id": "effect.reactions.hold-rive",
+      "kind": "effect",
+      "feature": "reactions",
+      "title": "✋ Hold: the agent's Rive mascot stops working",
+      "demonstrates": "With Ravi's profile open, ✋ on his message pauses him: the status chip pops to Idle and his live Rive mascot puts the keyboard away. An order changes what the agent is doing, visibly.",
+      "suggestedUse": "Pairs reactions with rive-status: frame the right-hand panel after the click.",
+      "moments": [
+        {
+          "atMs": 1135,
+          "what": "left-click the agent's message"
+        },
+        {
+          "atMs": 1613,
+          "what": "quick-actions menu open"
+        },
+        {
+          "atMs": 2150,
+          "what": "pick Hold"
+        },
+        {
+          "atMs": 2754,
+          "what": "Ravi goes idle: status chip + Rive mascot"
+        }
+      ],
+      "files": {
+        "smart": "effects/reactions.hold-rive/smart.mp4",
+        "full": "effects/reactions.hold-rive/full.mp4",
+        "focus": "effects/reactions.hold-rive/focus.mp4",
+        "slowmo": "effects/reactions.hold-rive/slowmo.mp4",
+        "poster": "effects/reactions.hold-rive/poster.png",
+        "timeline": "effects/reactions.hold-rive/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2276,
+          1280
+        ]
+      },
+      "focusBoxCss": {
+        "x": 302,
+        "y": 0,
+        "w": 1138,
+        "h": 640
+      },
+      "fps": 60,
+      "capturedFps": 248,
+      "durationMs": 5748,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "Ravi is set working by a scripted run on /api/runs; his reply text is scripted.",
+      "alpha": false
+    },
+    "effect.reactions.hover-bar": {
+      "id": "effect.reactions.hover-bar",
+      "kind": "effect",
+      "feature": "reactions",
+      "title": "Hover bar: Slack-style quick orders on every agent message",
+      "demonstrates": "Hovering an agent message reveals the quick bar; sweeping across it, each emoji grows. Fast, familiar, Slack-like.",
+      "suggestedUse": "Very short insert before the menu shots.",
+      "moments": [
+        {
+          "atMs": 929,
+          "what": "hover bar appears"
+        },
+        {
+          "atMs": 3221,
+          "what": "swept all five orders"
+        }
+      ],
+      "files": {
+        "full": "effects/reactions.hover-bar/full.mp4",
+        "focus": "effects/reactions.hover-bar/focus.mp4",
+        "slowmo": "effects/reactions.hover-bar/slowmo.mp4",
+        "poster": "effects/reactions.hover-bar/poster.png",
+        "timeline": "effects/reactions.hover-bar/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          1440,
+          810
+        ]
+      },
+      "focusBoxCss": {
+        "x": 452,
+        "y": 245,
+        "w": 720,
+        "h": 405
+      },
+      "fps": 60,
+      "capturedFps": 162,
+      "durationMs": 3718,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": null,
+      "alpha": false
+    },
+    "effect.reactions.redo": {
+      "id": "effect.reactions.redo",
+      "kind": "effect",
+      "feature": "reactions",
+      "title": "🔁 Redo: send the writer's hype draft back",
+      "demonstrates": "One click sends work back: 🔁 on Wren's draft ('Revolutionary booking for modern clinics') and Wren answers with the fix. Quality control is a reaction away.",
+      "suggestedUse": "Quick cut in a montage of orders.",
+      "moments": [
+        {
+          "atMs": 1116,
+          "what": "left-click the agent's message"
+        },
+        {
+          "atMs": 1595,
+          "what": "quick-actions menu open"
+        },
+        {
+          "atMs": 2152,
+          "what": "pick Redo"
+        },
+        {
+          "atMs": 4861,
+          "what": "Wren's reply streamed"
+        }
+      ],
+      "files": {
+        "full": "effects/reactions.redo/full.mp4",
+        "focus": "effects/reactions.redo/focus.mp4",
+        "slowmo": "effects/reactions.redo/slowmo.mp4",
+        "poster": "effects/reactions.redo/poster.png",
+        "timeline": "effects/reactions.redo/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2880,
+          1800
+        ]
+      },
+      "focusBoxCss": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 900
+      },
+      "fps": 60,
+      "capturedFps": 191,
+      "durationMs": 5756,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "Wren's reply text is scripted.",
+      "alpha": false
+    },
+    "effect.reactions.remember": {
+      "id": "effect.reactions.remember",
+      "kind": "effect",
+      "feature": "reactions",
+      "title": "📌 Remember: an order becomes a standing instruction",
+      "demonstrates": "📌 on Pia's message saves it as a standing instruction: a new line lands under Remembers in her profile, and she confirms. Agents keep what you teach them.",
+      "suggestedUse": "Bridge into soul-memory beats.",
+      "moments": [
+        {
+          "atMs": 1121,
+          "what": "left-click the agent's message"
+        },
+        {
+          "atMs": 1601,
+          "what": "quick-actions menu open"
+        },
+        {
+          "atMs": 2144,
+          "what": "pick Remember"
+        },
+        {
+          "atMs": 2940,
+          "what": "Remembers row lands in Pia's profile"
+        }
+      ],
+      "files": {
+        "full": "effects/reactions.remember/full.mp4",
+        "focus": "effects/reactions.remember/focus.mp4",
+        "slowmo": "effects/reactions.remember/slowmo.mp4",
+        "poster": "effects/reactions.remember/poster.png",
+        "timeline": "effects/reactions.remember/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          1974,
+          1110
+        ]
+      },
+      "focusBoxCss": {
+        "x": 146,
+        "y": 278,
+        "w": 987,
+        "h": 555
+      },
+      "fps": 60,
+      "capturedFps": 196,
+      "durationMs": 5735,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "Pia's reply text is scripted.",
+      "alpha": false
+    },
+    "effect.reactive.live-channel": {
+      "id": "effect.reactive.live-channel",
+      "kind": "effect",
+      "feature": "reactive",
+      "title": "Live channel: three agents report at once, the PM answers",
+      "demonstrates": "An AI Slack that's alive: in #guildhall-concept the researcher, designer and engineer stream their reports at the same time, each with a live status, then the PM accepts and redirects. Nobody refreshes anything.",
+      "suggestedUse": "The 'it's alive' beat; smart.mp4 follows each report as it lands.",
+      "moments": [
+        {
+          "atMs": 1027,
+          "what": "report streaming: Three of the five creator…"
+        },
+        {
+          "atMs": 1854,
+          "what": "report streaming: Onboarding is three states…"
+        },
+        {
+          "atMs": 2682,
+          "what": "report streaming: Hardest constraint is presence…"
+        },
+        {
+          "atMs": 6359,
+          "what": "PM accepts and redirects"
+        }
+      ],
+      "files": {
+        "smart": "effects/reactive.live-channel/smart.mp4",
+        "full": "effects/reactive.live-channel/full.mp4",
+        "focus": "effects/reactive.live-channel/focus.mp4",
+        "slowmo": "effects/reactive.live-channel/slowmo.mp4",
+        "poster": "effects/reactive.live-channel/poster.png",
+        "timeline": "effects/reactive.live-channel/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          1616,
+          910
+        ]
+      },
+      "focusBoxCss": {
+        "x": 475,
+        "y": 370,
+        "w": 808,
+        "h": 455
+      },
+      "fps": 60,
+      "capturedFps": 480,
+      "durationMs": 7756,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "Four scripted runs on /api/runs.",
+      "alpha": false
+    },
+    "effect.rive-status.channel-header": {
+      "id": "effect.rive-status.channel-header",
+      "kind": "effect",
+      "feature": "rive-status",
+      "title": "Channel header: three agents start working at once, their Rive mascots pull out keyboards",
+      "demonstrates": "The team's mascots sit on top of the channel. As the researcher, designer and engineer each start a task, their live Rive mascots switch to working (keyboard + mittens) one after another and the header count climbs to '3 working'. You see who is busy at a glance.",
+      "suggestedUse": "Tight on the header; the stagger reads well at real speed.",
+      "moments": [
+        {
+          "atMs": 301,
+          "what": "all idle"
+        },
+        {
+          "atMs": 2262,
+          "what": "3 working: keyboards out"
+        }
+      ],
+      "files": {
+        "full": "effects/rive-status.channel-header/full.mp4",
+        "focus": "effects/rive-status.channel-header/focus.mp4",
+        "slowmo": "effects/rive-status.channel-header/slowmo.mp4",
+        "poster": "effects/rive-status.channel-header/poster.png",
+        "timeline": "effects/rive-status.channel-header/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          1440,
+          810
+        ]
+      },
+      "focusBoxCss": {
+        "x": 509,
+        "y": 0,
+        "w": 720,
+        "h": 405
+      },
+      "fps": 60,
+      "capturedFps": 195,
+      "durationMs": 4457,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "Three scripted runs on /api/runs (start + now line).",
+      "alpha": false
+    },
+    "effect.rive-status.profile": {
+      "id": "effect.rive-status.profile",
+      "kind": "effect",
+      "feature": "rive-status",
+      "title": "Agent profile: the big Rive mascot goes from idle to working, with its 'now' line",
+      "demonstrates": "Sleuth's profile header carries a large live mascot. When a task starts, the mascot animates into working, the status chip pops and the Now line says exactly what it's doing ('Reading Discord's Creator Revenue FAQ'). When the run ends it settles back.",
+      "suggestedUse": "Hero close-up for rive-status; crop to the mascot for a tight insert.",
+      "moments": [
+        {
+          "atMs": 300,
+          "what": "idle"
+        },
+        {
+          "atMs": 12709,
+          "what": "working: mascot + status chip + now line"
+        }
+      ],
+      "files": {
+        "full": "effects/rive-status.profile/full.mp4",
+        "focus": "effects/rive-status.profile/focus.mp4",
+        "slowmo": "effects/rive-status.profile/slowmo.mp4",
+        "poster": "effects/rive-status.profile/poster.png",
+        "timeline": "effects/rive-status.profile/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          1956,
+          1100
+        ]
+      },
+      "focusBoxCss": {
+        "x": 462,
+        "y": 0,
+        "w": 978,
+        "h": 550
+      },
+      "fps": 60,
+      "capturedFps": 133,
+      "durationMs": 15920,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "A scripted run on /api/runs.",
+      "alpha": false
+    },
+    "effect.soul-memory.designer-evolution": {
+      "id": "effect.soul-memory.designer-evolution",
+      "kind": "effect",
+      "feature": "soul-memory",
+      "title": "The same designer, three runs: the mockup gets better every time",
+      "demonstrates": "Pia's mockup from runs 1, 2 and 3 side by side on her canvas: a bare page, then cards, then a polished hero with a live booking widget. What she learned (saved to her memory) shows up in the work.",
+      "suggestedUse": "Learning beat, right after soul-memory.history.",
+      "moments": [
+        {
+          "atMs": 1242,
+          "what": "click mockup.html"
+        },
+        {
+          "atMs": 3736,
+          "what": "runs 1 → 3 on the canvas"
+        }
+      ],
+      "files": {
+        "smart": "effects/soul-memory.designer-evolution/smart.mp4",
+        "full": "effects/soul-memory.designer-evolution/full.mp4",
+        "focus": "effects/soul-memory.designer-evolution/focus.mp4",
+        "slowmo": "effects/soul-memory.designer-evolution/slowmo.mp4",
+        "poster": "effects/soul-memory.designer-evolution/poster.png",
+        "timeline": "effects/soul-memory.designer-evolution/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2880,
+          1800
+        ]
+      },
+      "focusBoxCss": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 900
+      },
+      "fps": 60,
+      "capturedFps": 90,
+      "durationMs": 6010,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "The canvas viewer is staged; all three mockups are the team's real outputs.",
+      "alpha": false
+    },
+    "effect.soul-memory.history": {
+      "id": "effect.soul-memory.history",
+      "kind": "effect",
+      "feature": "soul-memory",
+      "title": "Versioned memory: open Wren's MEMORY.md history and read what she learned",
+      "demonstrates": "Wren's Soul and memory tab shows her SOUL.md and MEMORY.md as cards. Opening MEMORY.md's history slides in a git-backed timeline: one commit per project run. Expanding one shows the diff of what she learned (e.g. no hype words, tag every number). Agents get better, and every change is reviewable and restorable.",
+      "suggestedUse": "The soul-memory beat; cut on 'diff expanded'.",
+      "moments": [
+        {
+          "atMs": 1078,
+          "what": "open Soul and memory"
+        },
+        {
+          "atMs": 2077,
+          "what": "SOUL.md + MEMORY.md cards"
+        },
+        {
+          "atMs": 2851,
+          "what": "open MEMORY.md history"
+        },
+        {
+          "atMs": 3943,
+          "what": "history timeline: one commit per run"
+        },
+        {
+          "atMs": 4718,
+          "what": "expand a commit"
+        },
+        {
+          "atMs": 6320,
+          "what": "diff expanded: what she learned"
+        }
+      ],
+      "files": {
+        "full": "effects/soul-memory.history/full.mp4",
+        "focus": "effects/soul-memory.history/focus.mp4",
+        "slowmo": "effects/soul-memory.history/slowmo.mp4",
+        "poster": "effects/soul-memory.history/poster.png",
+        "timeline": "effects/soul-memory.history/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2880,
+          1800
+        ]
+      },
+      "focusBoxCss": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 900
+      },
+      "fps": 60,
+      "capturedFps": 126,
+      "durationMs": 7214,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "None: real vault commits from three Bookbird runs.",
+      "alpha": false
+    },
+    "effect.soul-memory.project-retro": {
+      "id": "effect.soul-memory.project-retro",
+      "kind": "effect",
+      "feature": "soul-memory",
+      "title": "Project ends, lessons are written, and the PM's skill changes",
+      "demonstrates": "Juno's pane opens on the retro she wrote when the Bookbird run closed: four gaps, each with evidence and a rule. One click on Skill change shows the lead-pm SKILL.md with four new steps highlighted in green, waiting for the owner's approval. The loop is visible: project ends, lessons, the skill itself changes.",
+      "suggestedUse": "Self-optimization beat, after soul-memory.history. Cut on 'skill change: four rules added'.",
+      "moments": [
+        {
+          "atMs": 1169,
+          "what": "open Juno's pane"
+        },
+        {
+          "atMs": 3389,
+          "what": "the retro written at project close"
+        },
+        {
+          "atMs": 5589,
+          "what": "each gap ends in a rule"
+        },
+        {
+          "atMs": 6380,
+          "what": "open Skill change"
+        },
+        {
+          "atMs": 8674,
+          "what": "skill change: four rules added"
+        }
+      ],
+      "files": {
+        "smart": "effects/soul-memory.project-retro/smart.mp4",
+        "full": "effects/soul-memory.project-retro/full.mp4",
+        "focus": "effects/soul-memory.project-retro/focus.mp4",
+        "slowmo": "effects/soul-memory.project-retro/slowmo.mp4",
+        "poster": "effects/soul-memory.project-retro/poster.png",
+        "timeline": "effects/soul-memory.project-retro/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2880,
+          1800
+        ]
+      },
+      "focusBoxCss": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 900
+      },
+      "fps": 60,
+      "capturedFps": 227,
+      "durationMs": 10469,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "The retro/diff panel is a staged overlay (capture only). Its content is the team's real retro-run3.md and the real revised skills/lead-pm/SKILL.md from bookbird-run-1; the diff rendering (steps 5-8 as added lines) is derived from that file.",
+      "alpha": false
+    },
+    "effect.staffing.skills-library": {
+      "id": "effect.staffing.skills-library",
+      "kind": "effect",
+      "feature": "staffing",
+      "title": "Skills library: filter by archetype, the skills each kind of agent can be staffed with",
+      "demonstrates": "The Skills library groups every installed skill by archetype. Clicking Researcher, Designer, Engineer glides the highlight and re-sorts the results. This is the pool the PM and Mira staff teams from.",
+      "suggestedUse": "Staffing beat, before the option cards.",
+      "moments": [
+        {
+          "atMs": 936,
+          "what": "filter: Researcher"
+        },
+        {
+          "atMs": 2371,
+          "what": "filter: Designer"
+        },
+        {
+          "atMs": 3803,
+          "what": "filter: Engineer"
+        },
+        {
+          "atMs": 4599,
+          "what": "engineer skills listed"
+        }
+      ],
+      "files": {
+        "full": "effects/staffing.skills-library/full.mp4",
+        "focus": "effects/staffing.skills-library/focus.mp4",
+        "slowmo": "effects/staffing.skills-library/slowmo.mp4",
+        "poster": "effects/staffing.skills-library/poster.png",
+        "timeline": "effects/staffing.skills-library/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          1440,
+          810
+        ]
+      },
+      "focusBoxCss": {
+        "x": 720,
+        "y": 55,
+        "w": 720,
+        "h": 405
+      },
+      "fps": 60,
+      "capturedFps": 244,
+      "durationMs": 5491,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": null,
+      "alpha": false
+    },
+    "effect.stats.mira-chart": {
+      "id": "effect.stats.mira-chart",
+      "kind": "effect",
+      "feature": "stats",
+      "title": "Ask Mira which team is performing best: one sentence, then a chart card grows in",
+      "demonstrates": "In her DM you ask 'Which team is performing best?'. Mira answers in one sentence and a bar chart card of real per-team ledger spend grows in below it, with the cheapest, best-accepted team highlighted. Cross-team answers are numbers you can see, not paragraphs.",
+      "suggestedUse": "Stats beat, the Mira answer. Cut on 'chart card grows in'.",
+      "moments": [
+        {
+          "atMs": 1069,
+          "what": "click the composer"
+        },
+        {
+          "atMs": 2335,
+          "what": "send the question"
+        },
+        {
+          "atMs": 6695,
+          "what": "chart card grows in"
+        },
+        {
+          "atMs": 9564,
+          "what": "toggle chart to table"
+        }
+      ],
+      "files": {
+        "smart": "effects/stats.mira-chart/smart.mp4",
+        "full": "effects/stats.mira-chart/full.mp4",
+        "focus": "effects/stats.mira-chart/focus.mp4",
+        "slowmo": "effects/stats.mira-chart/slowmo.mp4",
+        "poster": "effects/stats.mira-chart/poster.png",
+        "timeline": "effects/stats.mira-chart/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2880,
+          1800
+        ]
+      },
+      "focusBoxCss": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 900
+      },
+      "fps": 60,
+      "capturedFps": 302,
+      "durationMs": 11457,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "Mira's reply (sentence + chart JSON) is scripted; the figures are the real ledger totals per project (Guildhall $0.26, Chronoshield hardware $0.26, Checkout $0.12). The chart card itself is the app's real renderer.",
+      "alpha": false
+    },
+    "effect.stats.team-performance": {
+      "id": "effect.stats.team-performance",
+      "kind": "effect",
+      "feature": "stats",
+      "title": "Team Performance: spend, tokens, cache hit, per-agent bars grow in, chart or table",
+      "demonstrates": "Open a team's Performance tab and the real numbers animate in: KPI tiles pop (a whole project cost about 26 cents, 83% cache hit, 100% accepted), then the panel scrolls to tokens-by-agent bars growing, and a click flips the chart to a table. Live, clear stats from the real ledger.",
+      "suggestedUse": "Stats beat; the poster is a clean still of the tiles. Cut on 'KPI tiles pop' then 'charts grow'.",
+      "moments": [
+        {
+          "atMs": 1122,
+          "what": "open the Performance tab"
+        },
+        {
+          "atMs": 1719,
+          "what": "KPI tiles pop: $0.26, 83% cache, 100% accepted"
+        },
+        {
+          "atMs": 3959,
+          "what": "tokens by agent bars"
+        },
+        {
+          "atMs": 5532,
+          "what": "show the chart as a table"
+        },
+        {
+          "atMs": 7029,
+          "what": "same numbers as a table"
+        }
+      ],
+      "files": {
+        "smart": "effects/stats.team-performance/smart.mp4",
+        "full": "effects/stats.team-performance/full.mp4",
+        "focus": "effects/stats.team-performance/focus.mp4",
+        "slowmo": "effects/stats.team-performance/slowmo.mp4",
+        "poster": "effects/stats.team-performance/poster.png",
+        "timeline": "effects/stats.team-performance/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2880,
+          1800
+        ]
+      },
+      "focusBoxCss": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 900
+      },
+      "fps": 60,
+      "capturedFps": 174,
+      "durationMs": 8525,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "None: real ledger data for the Guildhall concept project (shown as #guildhall-concept).",
+      "alpha": false
+    },
+    "effect.team-choice.proposal": {
+      "id": "effect.team-choice.proposal",
+      "kind": "effect",
+      "feature": "team-choice",
+      "title": "Ask Mira for a build, get three staffed team options with realistic cost and time",
+      "demonstrates": "You ask Mira (the CEO agent) to build a Discord competitor for creators. She answers in one sentence and the option cards land: Lean (one engineer, $180, 14 days), Balanced (PM + 3 experts, $640, 30 days), Full (PM + 3 experts incl. iOS, $980, 42 days). Each card is staffed with real agents, their skills and rehire badges. You pick Balanced (the ring glides) and launch.",
+      "suggestedUse": "The team-choice beat; the poster is the three cards.",
+      "moments": [
+        {
+          "atMs": 1083,
+          "what": "click the composer"
+        },
+        {
+          "atMs": 3109,
+          "what": "the ask, typed"
+        },
+        {
+          "atMs": 3814,
+          "what": "the ask lands in Mira's DM"
+        },
+        {
+          "atMs": 8221,
+          "what": "Mira's one-line pick"
+        },
+        {
+          "atMs": 9160,
+          "what": "three staffed options with cost + time"
+        },
+        {
+          "atMs": 10801,
+          "what": "pick Balanced"
+        },
+        {
+          "atMs": 11595,
+          "what": "Balanced picked, Launch ready"
+        }
+      ],
+      "files": {
+        "smart": "effects/team-choice.proposal/smart.mp4",
+        "full": "effects/team-choice.proposal/full.mp4",
+        "focus": "effects/team-choice.proposal/focus.mp4",
+        "slowmo": "effects/team-choice.proposal/slowmo.mp4",
+        "poster": "effects/team-choice.proposal/poster.png",
+        "timeline": "effects/team-choice.proposal/timeline.json"
+      },
+      "size": {
+        "full": [
+          2880,
+          1800
+        ],
+        "focus": [
+          2880,
+          1800
+        ]
+      },
+      "focusBoxCss": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 900
+      },
+      "fps": 60,
+      "capturedFps": 273,
+      "durationMs": 12692,
+      "slowmoFactor": 3,
+      "cursor": true,
+      "staged": "Mira's reply (sentence + proposal JSON) is scripted with realistic budgets; staffing on the cards is the app's real /api/projects/plan; launch is stubbed (no project is created).",
+      "alpha": false
+    },
+    "rive.alfred.done": {
+      "id": "rive.alfred.done",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "alfred (Writer (yellow pear, glasses + bowtie)): done",
+      "demonstrates": "Task finished: a green check badge appears. Work is accepted and handed back.",
+      "suggestedUse": "Payoff beats: artifacts delivered, project closed.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "done"
+      },
+      "files": {
+        "hevcAlpha": "rive/alfred/done.mov",
+        "webmAlpha": "rive/alfred/done.webm",
+        "poster": "rive/alfred/done.png",
+        "source": "rive/alfred/alfred.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 109,
+      "durationMs": 3994,
+      "alpha": true
+    },
+    "rive.alfred.idle-to-working": {
+      "id": "rive.alfred.idle-to-working",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "alfred (Writer (yellow pear, glasses + bowtie)): idle → working",
+      "demonstrates": "The moment an agent picks up a task: the keyboard and mittens animate in. Status changes are animated, not swapped.",
+      "suggestedUse": "Cut on the switch (400 ms) as the PM assigns work.",
+      "moments": [
+        {
+          "atMs": 400,
+          "what": "action switches to working; keyboard + mittens animate in"
+        }
+      ],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "working"
+      },
+      "files": {
+        "hevcAlpha": "rive/alfred/idle-to-working.mov",
+        "webmAlpha": "rive/alfred/idle-to-working.webm",
+        "poster": "rive/alfred/idle-to-working.png",
+        "source": "rive/alfred/alfred.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 254,
+      "durationMs": 2898,
+      "alpha": true
+    },
+    "rive.alfred.idle": {
+      "id": "rive.alfred.idle",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "alfred (Writer (yellow pear, glasses + bowtie)): idle",
+      "demonstrates": "At rest: the plush mascot breathes and blinks. The baseline before an agent gets work.",
+      "suggestedUse": "Roster / team lineup shots, or the 'before' of a status change.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "idle"
+      },
+      "files": {
+        "hevcAlpha": "rive/alfred/idle.mov",
+        "webmAlpha": "rive/alfred/idle.webm",
+        "poster": "rive/alfred/idle.png",
+        "source": "rive/alfred/alfred.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 198,
+      "durationMs": 3990,
+      "alpha": true
+    },
+    "rive.alfred.needs-you": {
+      "id": "rive.alfred.needs-you",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "alfred (Writer (yellow pear, glasses + bowtie)): needs you",
+      "demonstrates": "Waiting on the owner: an orange ! bubble pops and it waves. Agents ask for approval or answers instead of guessing.",
+      "suggestedUse": "Approval / question beats; pairs with the approval card effect.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "needs-you"
+      },
+      "files": {
+        "hevcAlpha": "rive/alfred/needs-you.mov",
+        "webmAlpha": "rive/alfred/needs-you.webm",
+        "poster": "rive/alfred/needs-you.png",
+        "source": "rive/alfred/alfred.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 202,
+      "durationMs": 3996,
+      "alpha": true
+    },
+    "rive.alfred.working": {
+      "id": "rive.alfred.working",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "alfred (Writer (yellow pear, glasses + bowtie)): working",
+      "demonstrates": "Busy on a task: a keyboard and two mittens come out and it types. This is what a live agent looks like while it works.",
+      "suggestedUse": "Any beat about agents doing real work in parallel; tile several rigs side by side.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "working"
+      },
+      "files": {
+        "hevcAlpha": "rive/alfred/working.mov",
+        "webmAlpha": "rive/alfred/working.webm",
+        "poster": "rive/alfred/working.png",
+        "source": "rive/alfred/alfred.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 165,
+      "durationMs": 3995,
+      "alpha": true
+    },
+    "rive.dottie.done": {
+      "id": "rive.dottie.done",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "dottie (Researcher (green bean)): done",
+      "demonstrates": "Task finished: a green check badge appears. Work is accepted and handed back.",
+      "suggestedUse": "Payoff beats: artifacts delivered, project closed.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "done"
+      },
+      "files": {
+        "hevcAlpha": "rive/dottie/done.mov",
+        "webmAlpha": "rive/dottie/done.webm",
+        "poster": "rive/dottie/done.png",
+        "source": "rive/dottie/dottie.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 215,
+      "durationMs": 3999,
+      "alpha": true
+    },
+    "rive.dottie.idle-to-working": {
+      "id": "rive.dottie.idle-to-working",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "dottie (Researcher (green bean)): idle → working",
+      "demonstrates": "The moment an agent picks up a task: the keyboard and mittens animate in. Status changes are animated, not swapped.",
+      "suggestedUse": "Cut on the switch (400 ms) as the PM assigns work.",
+      "moments": [
+        {
+          "atMs": 400,
+          "what": "action switches to working; keyboard + mittens animate in"
+        }
+      ],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "working"
+      },
+      "files": {
+        "hevcAlpha": "rive/dottie/idle-to-working.mov",
+        "webmAlpha": "rive/dottie/idle-to-working.webm",
+        "poster": "rive/dottie/idle-to-working.png",
+        "source": "rive/dottie/dottie.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 243,
+      "durationMs": 2902,
+      "alpha": true
+    },
+    "rive.dottie.idle": {
+      "id": "rive.dottie.idle",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "dottie (Researcher (green bean)): idle",
+      "demonstrates": "At rest: the plush mascot breathes and blinks. The baseline before an agent gets work.",
+      "suggestedUse": "Roster / team lineup shots, or the 'before' of a status change.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "idle"
+      },
+      "files": {
+        "hevcAlpha": "rive/dottie/idle.mov",
+        "webmAlpha": "rive/dottie/idle.webm",
+        "poster": "rive/dottie/idle.png",
+        "source": "rive/dottie/dottie.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 193,
+      "durationMs": 3999,
+      "alpha": true
+    },
+    "rive.dottie.needs-you": {
+      "id": "rive.dottie.needs-you",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "dottie (Researcher (green bean)): needs you",
+      "demonstrates": "Waiting on the owner: an orange ! bubble pops and it waves. Agents ask for approval or answers instead of guessing.",
+      "suggestedUse": "Approval / question beats; pairs with the approval card effect.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "needs-you"
+      },
+      "files": {
+        "hevcAlpha": "rive/dottie/needs-you.mov",
+        "webmAlpha": "rive/dottie/needs-you.webm",
+        "poster": "rive/dottie/needs-you.png",
+        "source": "rive/dottie/dottie.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 125,
+      "durationMs": 3993,
+      "alpha": true
+    },
+    "rive.dottie.working": {
+      "id": "rive.dottie.working",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "dottie (Researcher (green bean)): working",
+      "demonstrates": "Busy on a task: a keyboard and two mittens come out and it types. This is what a live agent looks like while it works.",
+      "suggestedUse": "Any beat about agents doing real work in parallel; tile several rigs side by side.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "working"
+      },
+      "files": {
+        "hevcAlpha": "rive/dottie/working.mov",
+        "webmAlpha": "rive/dottie/working.webm",
+        "poster": "rive/dottie/working.png",
+        "source": "rive/dottie/dottie.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 144,
+      "durationMs": 3990,
+      "alpha": true
+    },
+    "rive.felipe.done": {
+      "id": "rive.felipe.done",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "felipe (PM (blue cloud, beret)): done",
+      "demonstrates": "Task finished: a green check badge appears. Work is accepted and handed back.",
+      "suggestedUse": "Payoff beats: artifacts delivered, project closed.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "done"
+      },
+      "files": {
+        "hevcAlpha": "rive/felipe/done.mov",
+        "webmAlpha": "rive/felipe/done.webm",
+        "poster": "rive/felipe/done.png",
+        "source": "rive/felipe/felipe.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 180,
+      "durationMs": 3998,
+      "alpha": true
+    },
+    "rive.felipe.idle-to-working": {
+      "id": "rive.felipe.idle-to-working",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "felipe (PM (blue cloud, beret)): idle → working",
+      "demonstrates": "The moment an agent picks up a task: the keyboard and mittens animate in. Status changes are animated, not swapped.",
+      "suggestedUse": "Cut on the switch (400 ms) as the PM assigns work.",
+      "moments": [
+        {
+          "atMs": 400,
+          "what": "action switches to working; keyboard + mittens animate in"
+        }
+      ],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "working"
+      },
+      "files": {
+        "hevcAlpha": "rive/felipe/idle-to-working.mov",
+        "webmAlpha": "rive/felipe/idle-to-working.webm",
+        "poster": "rive/felipe/idle-to-working.png",
+        "source": "rive/felipe/felipe.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 193,
+      "durationMs": 2900,
+      "alpha": true
+    },
+    "rive.felipe.idle": {
+      "id": "rive.felipe.idle",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "felipe (PM (blue cloud, beret)): idle",
+      "demonstrates": "At rest: the plush mascot breathes and blinks. The baseline before an agent gets work.",
+      "suggestedUse": "Roster / team lineup shots, or the 'before' of a status change.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "idle"
+      },
+      "files": {
+        "hevcAlpha": "rive/felipe/idle.mov",
+        "webmAlpha": "rive/felipe/idle.webm",
+        "poster": "rive/felipe/idle.png",
+        "source": "rive/felipe/felipe.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 186,
+      "durationMs": 3993,
+      "alpha": true
+    },
+    "rive.felipe.needs-you": {
+      "id": "rive.felipe.needs-you",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "felipe (PM (blue cloud, beret)): needs you",
+      "demonstrates": "Waiting on the owner: an orange ! bubble pops and it waves. Agents ask for approval or answers instead of guessing.",
+      "suggestedUse": "Approval / question beats; pairs with the approval card effect.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "needs-you"
+      },
+      "files": {
+        "hevcAlpha": "rive/felipe/needs-you.mov",
+        "webmAlpha": "rive/felipe/needs-you.webm",
+        "poster": "rive/felipe/needs-you.png",
+        "source": "rive/felipe/felipe.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 163,
+      "durationMs": 3997,
+      "alpha": true
+    },
+    "rive.felipe.working": {
+      "id": "rive.felipe.working",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "felipe (PM (blue cloud, beret)): working",
+      "demonstrates": "Busy on a task: a keyboard and two mittens come out and it types. This is what a live agent looks like while it works.",
+      "suggestedUse": "Any beat about agents doing real work in parallel; tile several rigs side by side.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "working"
+      },
+      "files": {
+        "hevcAlpha": "rive/felipe/working.mov",
+        "webmAlpha": "rive/felipe/working.webm",
+        "poster": "rive/felipe/working.png",
+        "source": "rive/felipe/felipe.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 132,
+      "durationMs": 3995,
+      "alpha": true
+    },
+    "rive.ledger.done": {
+      "id": "rive.ledger.done",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "ledger (Analyst (purple blob, glasses)): done",
+      "demonstrates": "Task finished: a green check badge appears. Work is accepted and handed back.",
+      "suggestedUse": "Payoff beats: artifacts delivered, project closed.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "done"
+      },
+      "files": {
+        "hevcAlpha": "rive/ledger/done.mov",
+        "webmAlpha": "rive/ledger/done.webm",
+        "poster": "rive/ledger/done.png",
+        "source": "rive/ledger/ledger.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 70,
+      "durationMs": 3987,
+      "alpha": true
+    },
+    "rive.ledger.idle-to-working": {
+      "id": "rive.ledger.idle-to-working",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "ledger (Analyst (purple blob, glasses)): idle → working",
+      "demonstrates": "The moment an agent picks up a task: the keyboard and mittens animate in. Status changes are animated, not swapped.",
+      "suggestedUse": "Cut on the switch (400 ms) as the PM assigns work.",
+      "moments": [
+        {
+          "atMs": 400,
+          "what": "action switches to working; keyboard + mittens animate in"
+        }
+      ],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "working"
+      },
+      "files": {
+        "hevcAlpha": "rive/ledger/idle-to-working.mov",
+        "webmAlpha": "rive/ledger/idle-to-working.webm",
+        "poster": "rive/ledger/idle-to-working.png",
+        "source": "rive/ledger/ledger.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 236,
+      "durationMs": 2901,
+      "alpha": true
+    },
+    "rive.ledger.idle": {
+      "id": "rive.ledger.idle",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "ledger (Analyst (purple blob, glasses)): idle",
+      "demonstrates": "At rest: the plush mascot breathes and blinks. The baseline before an agent gets work.",
+      "suggestedUse": "Roster / team lineup shots, or the 'before' of a status change.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "idle"
+      },
+      "files": {
+        "hevcAlpha": "rive/ledger/idle.mov",
+        "webmAlpha": "rive/ledger/idle.webm",
+        "poster": "rive/ledger/idle.png",
+        "source": "rive/ledger/ledger.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 196,
+      "durationMs": 3998,
+      "alpha": true
+    },
+    "rive.ledger.needs-you": {
+      "id": "rive.ledger.needs-you",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "ledger (Analyst (purple blob, glasses)): needs you",
+      "demonstrates": "Waiting on the owner: an orange ! bubble pops and it waves. Agents ask for approval or answers instead of guessing.",
+      "suggestedUse": "Approval / question beats; pairs with the approval card effect.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "needs-you"
+      },
+      "files": {
+        "hevcAlpha": "rive/ledger/needs-you.mov",
+        "webmAlpha": "rive/ledger/needs-you.webm",
+        "poster": "rive/ledger/needs-you.png",
+        "source": "rive/ledger/ledger.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 90,
+      "durationMs": 3996,
+      "alpha": true
+    },
+    "rive.ledger.working": {
+      "id": "rive.ledger.working",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "ledger (Analyst (purple blob, glasses)): working",
+      "demonstrates": "Busy on a task: a keyboard and two mittens come out and it types. This is what a live agent looks like while it works.",
+      "suggestedUse": "Any beat about agents doing real work in parallel; tile several rigs side by side.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "working"
+      },
+      "files": {
+        "hevcAlpha": "rive/ledger/working.mov",
+        "webmAlpha": "rive/ledger/working.webm",
+        "poster": "rive/ledger/working.png",
+        "source": "rive/ledger/ledger.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 152,
+      "durationMs": 3994,
+      "alpha": true
+    },
+    "rive.pip.done": {
+      "id": "rive.pip.done",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "pip (Designer (teal heart, sprout)): done",
+      "demonstrates": "Task finished: a green check badge appears. Work is accepted and handed back.",
+      "suggestedUse": "Payoff beats: artifacts delivered, project closed.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "done"
+      },
+      "files": {
+        "hevcAlpha": "rive/pip/done.mov",
+        "webmAlpha": "rive/pip/done.webm",
+        "poster": "rive/pip/done.png",
+        "source": "rive/pip/pip.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 196,
+      "durationMs": 3996,
+      "alpha": true
+    },
+    "rive.pip.idle-to-working": {
+      "id": "rive.pip.idle-to-working",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "pip (Designer (teal heart, sprout)): idle → working",
+      "demonstrates": "The moment an agent picks up a task: the keyboard and mittens animate in. Status changes are animated, not swapped.",
+      "suggestedUse": "Cut on the switch (400 ms) as the PM assigns work.",
+      "moments": [
+        {
+          "atMs": 400,
+          "what": "action switches to working; keyboard + mittens animate in"
+        }
+      ],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "working"
+      },
+      "files": {
+        "hevcAlpha": "rive/pip/idle-to-working.mov",
+        "webmAlpha": "rive/pip/idle-to-working.webm",
+        "poster": "rive/pip/idle-to-working.png",
+        "source": "rive/pip/pip.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 150,
+      "durationMs": 2904,
+      "alpha": true
+    },
+    "rive.pip.idle": {
+      "id": "rive.pip.idle",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "pip (Designer (teal heart, sprout)): idle",
+      "demonstrates": "At rest: the plush mascot breathes and blinks. The baseline before an agent gets work.",
+      "suggestedUse": "Roster / team lineup shots, or the 'before' of a status change.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "idle"
+      },
+      "files": {
+        "hevcAlpha": "rive/pip/idle.mov",
+        "webmAlpha": "rive/pip/idle.webm",
+        "poster": "rive/pip/idle.png",
+        "source": "rive/pip/pip.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 223,
+      "durationMs": 3996,
+      "alpha": true
+    },
+    "rive.pip.needs-you": {
+      "id": "rive.pip.needs-you",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "pip (Designer (teal heart, sprout)): needs you",
+      "demonstrates": "Waiting on the owner: an orange ! bubble pops and it waves. Agents ask for approval or answers instead of guessing.",
+      "suggestedUse": "Approval / question beats; pairs with the approval card effect.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "needs-you"
+      },
+      "files": {
+        "hevcAlpha": "rive/pip/needs-you.mov",
+        "webmAlpha": "rive/pip/needs-you.webm",
+        "poster": "rive/pip/needs-you.png",
+        "source": "rive/pip/pip.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 183,
+      "durationMs": 3999,
+      "alpha": true
+    },
+    "rive.pip.working": {
+      "id": "rive.pip.working",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "pip (Designer (teal heart, sprout)): working",
+      "demonstrates": "Busy on a task: a keyboard and two mittens come out and it types. This is what a live agent looks like while it works.",
+      "suggestedUse": "Any beat about agents doing real work in parallel; tile several rigs side by side.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "working"
+      },
+      "files": {
+        "hevcAlpha": "rive/pip/working.mov",
+        "webmAlpha": "rive/pip/working.webm",
+        "poster": "rive/pip/working.png",
+        "source": "rive/pip/pip.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 223,
+      "durationMs": 3996,
+      "alpha": true
+    },
+    "rive.pixel.done": {
+      "id": "rive.pixel.done",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "pixel (Engineer (orange pixel, headphones)): done",
+      "demonstrates": "Task finished: a green check badge appears. Work is accepted and handed back.",
+      "suggestedUse": "Payoff beats: artifacts delivered, project closed.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "done"
+      },
+      "files": {
+        "hevcAlpha": "rive/pixel/done.mov",
+        "webmAlpha": "rive/pixel/done.webm",
+        "poster": "rive/pixel/done.png",
+        "source": "rive/pixel/pixel.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 150,
+      "durationMs": 3994,
+      "alpha": true
+    },
+    "rive.pixel.idle-to-working": {
+      "id": "rive.pixel.idle-to-working",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "pixel (Engineer (orange pixel, headphones)): idle → working",
+      "demonstrates": "The moment an agent picks up a task: the keyboard and mittens animate in. Status changes are animated, not swapped.",
+      "suggestedUse": "Cut on the switch (400 ms) as the PM assigns work.",
+      "moments": [
+        {
+          "atMs": 400,
+          "what": "action switches to working; keyboard + mittens animate in"
+        }
+      ],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "working"
+      },
+      "files": {
+        "hevcAlpha": "rive/pixel/idle-to-working.mov",
+        "webmAlpha": "rive/pixel/idle-to-working.webm",
+        "poster": "rive/pixel/idle-to-working.png",
+        "source": "rive/pixel/pixel.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 281,
+      "durationMs": 2901,
+      "alpha": true
+    },
+    "rive.pixel.idle": {
+      "id": "rive.pixel.idle",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "pixel (Engineer (orange pixel, headphones)): idle",
+      "demonstrates": "At rest: the plush mascot breathes and blinks. The baseline before an agent gets work.",
+      "suggestedUse": "Roster / team lineup shots, or the 'before' of a status change.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "idle"
+      },
+      "files": {
+        "hevcAlpha": "rive/pixel/idle.mov",
+        "webmAlpha": "rive/pixel/idle.webm",
+        "poster": "rive/pixel/idle.png",
+        "source": "rive/pixel/pixel.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 223,
+      "durationMs": 3998,
+      "alpha": true
+    },
+    "rive.pixel.needs-you": {
+      "id": "rive.pixel.needs-you",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "pixel (Engineer (orange pixel, headphones)): needs you",
+      "demonstrates": "Waiting on the owner: an orange ! bubble pops and it waves. Agents ask for approval or answers instead of guessing.",
+      "suggestedUse": "Approval / question beats; pairs with the approval card effect.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "needs-you"
+      },
+      "files": {
+        "hevcAlpha": "rive/pixel/needs-you.mov",
+        "webmAlpha": "rive/pixel/needs-you.webm",
+        "poster": "rive/pixel/needs-you.png",
+        "source": "rive/pixel/pixel.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 176,
+      "durationMs": 3991,
+      "alpha": true
+    },
+    "rive.pixel.working": {
+      "id": "rive.pixel.working",
+      "kind": "rive-action",
+      "feature": "rive-status",
+      "title": "pixel (Engineer (orange pixel, headphones)): working",
+      "demonstrates": "Busy on a task: a keyboard and two mittens come out and it types. This is what a live agent looks like while it works.",
+      "suggestedUse": "Any beat about agents doing real work in parallel; tile several rigs side by side.",
+      "moments": [],
+      "rive": {
+        "stateMachine": "Agent",
+        "viewModel": "Agent",
+        "enumProperty": "action",
+        "value": "working"
+      },
+      "files": {
+        "hevcAlpha": "rive/pixel/working.mov",
+        "webmAlpha": "rive/pixel/working.webm",
+        "poster": "rive/pixel/working.png",
+        "source": "rive/pixel/pixel.riv"
+      },
+      "size": [
+        1024,
+        1024
+      ],
+      "fps": 60,
+      "capturedFps": 371,
+      "durationMs": 3999,
+      "alpha": true
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "id": "rive.felipe.needs-you",
+  "kind": "rive-action",
+  "feature": "rive-status",
+  "title": "felipe (PM (blue cloud, beret)): needs you",
+  "demonstrates": "Waiting on the owner: an orange ! bubble pops and it waves. Agents ask for approval or answers instead of guessing.",
+  "suggestedUse": "Approval / question beats; pairs with the approval card effect.",
+  "moments": [],
+  "rive": {
+    "stateMachine": "Agent",
+    "viewModel": "Agent",
+    "enumProperty": "action",
+    "value": "needs-you"
+  },
+  "files": {
+    "hevcAlpha": "rive/felipe/needs-you.mov",
+    "webmAlpha": "rive/felipe/needs-you.webm",
+    "poster": "rive/felipe/needs-you.png",
+    "source": "rive/felipe/felipe.riv"
+  },
+  "size": [
+    1024,
+    1024
+  ],
+  "fps": 60,
+  "capturedFps": 163,
+  "durationMs": 3997,
+  "alpha": true
+}

@@ -1,0 +1,29 @@
+{
+  "id": "rive.felipe.working",
+  "kind": "rive-action",
+  "feature": "rive-status",
+  "title": "felipe (PM (blue cloud, beret)): working",
+  "demonstrates": "Busy on a task: a keyboard and two mittens come out and it types. This is what a live agent looks like while it works.",
+  "suggestedUse": "Any beat about agents doing real work in parallel; tile several rigs side by side.",
+  "moments": [],
+  "rive": {
+    "stateMachine": "Agent",
+    "viewModel": "Agent",
+    "enumProperty": "action",
+    "value": "working"
+  },
+  "files": {
+    "hevcAlpha": "rive/felipe/working.mov",
+    "webmAlpha": "rive/felipe/working.webm",
+    "poster": "rive/felipe/working.png",
+    "source": "rive/felipe/felipe.riv"
+  },
+  "size": [
+    1024,
+    1024
+  ],
+  "fps": 60,
+  "capturedFps": 132,
+  "durationMs": 3995,
+  "alpha": true
+}

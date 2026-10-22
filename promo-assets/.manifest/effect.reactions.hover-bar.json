@@ -1,0 +1,48 @@
+{
+  "id": "effect.reactions.hover-bar",
+  "kind": "effect",
+  "feature": "reactions",
+  "title": "Hover bar: Slack-style quick orders on every agent message",
+  "demonstrates": "Hovering an agent message reveals the quick bar; sweeping across it, each emoji grows. Fast, familiar, Slack-like.",
+  "suggestedUse": "Very short insert before the menu shots.",
+  "moments": [
+    {
+      "atMs": 929,
+      "what": "hover bar appears"
+    },
+    {
+      "atMs": 3221,
+      "what": "swept all five orders"
+    }
+  ],
+  "files": {
+    "full": "effects/reactions.hover-bar/full.mp4",
+    "focus": "effects/reactions.hover-bar/focus.mp4",
+    "slowmo": "effects/reactions.hover-bar/slowmo.mp4",
+    "poster": "effects/reactions.hover-bar/poster.png",
+    "timeline": "effects/reactions.hover-bar/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      1440,
+      810
+    ]
+  },
+  "focusBoxCss": {
+    "x": 452,
+    "y": 245,
+    "w": 720,
+    "h": 405
+  },
+  "fps": 60,
+  "capturedFps": 162,
+  "durationMs": 3718,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": null,
+  "alpha": false
+}

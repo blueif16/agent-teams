@@ -1,0 +1,48 @@
+{
+  "id": "effect.rive-status.channel-header",
+  "kind": "effect",
+  "feature": "rive-status",
+  "title": "Channel header: three agents start working at once, their Rive mascots pull out keyboards",
+  "demonstrates": "The team's mascots sit on top of the channel. As the researcher, designer and engineer each start a task, their live Rive mascots switch to working (keyboard + mittens) one after another and the header count climbs to '3 working'. You see who is busy at a glance.",
+  "suggestedUse": "Tight on the header; the stagger reads well at real speed.",
+  "moments": [
+    {
+      "atMs": 301,
+      "what": "all idle"
+    },
+    {
+      "atMs": 2262,
+      "what": "3 working: keyboards out"
+    }
+  ],
+  "files": {
+    "full": "effects/rive-status.channel-header/full.mp4",
+    "focus": "effects/rive-status.channel-header/focus.mp4",
+    "slowmo": "effects/rive-status.channel-header/slowmo.mp4",
+    "poster": "effects/rive-status.channel-header/poster.png",
+    "timeline": "effects/rive-status.channel-header/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      1440,
+      810
+    ]
+  },
+  "focusBoxCss": {
+    "x": 509,
+    "y": 0,
+    "w": 720,
+    "h": 405
+  },
+  "fps": 60,
+  "capturedFps": 195,
+  "durationMs": 4457,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "Three scripted runs on /api/runs (start + now line).",
+  "alpha": false
+}

@@ -1,0 +1,61 @@
+{
+  "id": "effect.soul-memory.project-retro",
+  "kind": "effect",
+  "feature": "soul-memory",
+  "title": "Project ends, lessons are written, and the PM's skill changes",
+  "demonstrates": "Juno's pane opens on the retro she wrote when the Bookbird run closed: four gaps, each with evidence and a rule. One click on Skill change shows the lead-pm SKILL.md with four new steps highlighted in green, waiting for the owner's approval. The loop is visible: project ends, lessons, the skill itself changes.",
+  "suggestedUse": "Self-optimization beat, after soul-memory.history. Cut on 'skill change: four rules added'.",
+  "moments": [
+    {
+      "atMs": 1169,
+      "what": "open Juno's pane"
+    },
+    {
+      "atMs": 3389,
+      "what": "the retro written at project close"
+    },
+    {
+      "atMs": 5589,
+      "what": "each gap ends in a rule"
+    },
+    {
+      "atMs": 6380,
+      "what": "open Skill change"
+    },
+    {
+      "atMs": 8674,
+      "what": "skill change: four rules added"
+    }
+  ],
+  "files": {
+    "smart": "effects/soul-memory.project-retro/smart.mp4",
+    "full": "effects/soul-memory.project-retro/full.mp4",
+    "focus": "effects/soul-memory.project-retro/focus.mp4",
+    "slowmo": "effects/soul-memory.project-retro/slowmo.mp4",
+    "poster": "effects/soul-memory.project-retro/poster.png",
+    "timeline": "effects/soul-memory.project-retro/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2880,
+      1800
+    ]
+  },
+  "focusBoxCss": {
+    "x": 0,
+    "y": 0,
+    "w": 1440,
+    "h": 900
+  },
+  "fps": 60,
+  "capturedFps": 227,
+  "durationMs": 10469,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "The retro/diff panel is a staged overlay (capture only). Its content is the team's real retro-run3.md and the real revised skills/lead-pm/SKILL.md from bookbird-run-1; the diff rendering (steps 5-8 as added lines) is derived from that file.",
+  "alpha": false
+}

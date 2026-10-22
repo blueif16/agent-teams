@@ -1,0 +1,29 @@
+{
+  "id": "rive.pixel.done",
+  "kind": "rive-action",
+  "feature": "rive-status",
+  "title": "pixel (Engineer (orange pixel, headphones)): done",
+  "demonstrates": "Task finished: a green check badge appears. Work is accepted and handed back.",
+  "suggestedUse": "Payoff beats: artifacts delivered, project closed.",
+  "moments": [],
+  "rive": {
+    "stateMachine": "Agent",
+    "viewModel": "Agent",
+    "enumProperty": "action",
+    "value": "done"
+  },
+  "files": {
+    "hevcAlpha": "rive/pixel/done.mov",
+    "webmAlpha": "rive/pixel/done.webm",
+    "poster": "rive/pixel/done.png",
+    "source": "rive/pixel/pixel.riv"
+  },
+  "size": [
+    1024,
+    1024
+  ],
+  "fps": 60,
+  "capturedFps": 150,
+  "durationMs": 3994,
+  "alpha": true
+}

@@ -1,0 +1,64 @@
+{
+  "id": "effect.soul-memory.history",
+  "kind": "effect",
+  "feature": "soul-memory",
+  "title": "Versioned memory: open Wren's MEMORY.md history and read what she learned",
+  "demonstrates": "Wren's Soul and memory tab shows her SOUL.md and MEMORY.md as cards. Opening MEMORY.md's history slides in a git-backed timeline: one commit per project run. Expanding one shows the diff of what she learned (e.g. no hype words, tag every number). Agents get better, and every change is reviewable and restorable.",
+  "suggestedUse": "The soul-memory beat; cut on 'diff expanded'.",
+  "moments": [
+    {
+      "atMs": 1078,
+      "what": "open Soul and memory"
+    },
+    {
+      "atMs": 2077,
+      "what": "SOUL.md + MEMORY.md cards"
+    },
+    {
+      "atMs": 2851,
+      "what": "open MEMORY.md history"
+    },
+    {
+      "atMs": 3943,
+      "what": "history timeline: one commit per run"
+    },
+    {
+      "atMs": 4718,
+      "what": "expand a commit"
+    },
+    {
+      "atMs": 6320,
+      "what": "diff expanded: what she learned"
+    }
+  ],
+  "files": {
+    "full": "effects/soul-memory.history/full.mp4",
+    "focus": "effects/soul-memory.history/focus.mp4",
+    "slowmo": "effects/soul-memory.history/slowmo.mp4",
+    "poster": "effects/soul-memory.history/poster.png",
+    "timeline": "effects/soul-memory.history/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2880,
+      1800
+    ]
+  },
+  "focusBoxCss": {
+    "x": 0,
+    "y": 0,
+    "w": 1440,
+    "h": 900
+  },
+  "fps": 60,
+  "capturedFps": 126,
+  "durationMs": 7214,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "None: real vault commits from three Bookbird runs.",
+  "alpha": false
+}

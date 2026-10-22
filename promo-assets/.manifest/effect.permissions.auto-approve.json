@@ -1,0 +1,57 @@
+{
+  "id": "effect.permissions.auto-approve",
+  "kind": "effect",
+  "feature": "permissions",
+  "title": "Approve once, never be asked again: the second request goes through on its own",
+  "demonstrates": "Sleuth asks to run a paid research query and an approval card lands. The owner picks 'Approve & allow for this project'. When Sleuth needs a similar query minutes later, no card appears and nobody is pinged: a green line says it was allowed by the owner's rule, decided by the policy engine and not the chat model. Agents keep working, within what the owner said yes to.",
+  "suggestedUse": "The 'agents don't interrupt you' beat. Cut on the green receipt line.",
+  "moments": [
+    {
+      "atMs": 3416,
+      "what": "approval card lands"
+    },
+    {
+      "atMs": 5200,
+      "what": "Approve & allow for this project"
+    },
+    {
+      "atMs": 6695,
+      "what": "rule saved from the approval"
+    },
+    {
+      "atMs": 9501,
+      "what": "second request allowed by the rule, no card, no ping"
+    }
+  ],
+  "files": {
+    "smart": "effects/permissions.auto-approve/smart.mp4",
+    "full": "effects/permissions.auto-approve/full.mp4",
+    "focus": "effects/permissions.auto-approve/focus.mp4",
+    "slowmo": "effects/permissions.auto-approve/slowmo.mp4",
+    "poster": "effects/permissions.auto-approve/poster.png",
+    "timeline": "effects/permissions.auto-approve/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      1760,
+      990
+    ]
+  },
+  "focusBoxCss": {
+    "x": 399,
+    "y": 386,
+    "w": 880,
+    "h": 495
+  },
+  "fps": 60,
+  "capturedFps": 254,
+  "durationMs": 12298,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "The approval card is fed through scripted /api/approvals and event stubs and Sleuth's messages are scripted runs. The 'Approve & allow for this project' button and both green policy lines are STAGED overlays in the app's visual language (the app has no such UI yet; grants from approvals are not minted yet). Nothing is written.",
+  "alpha": false
+}

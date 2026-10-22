@@ -1,0 +1,53 @@
+{
+  "id": "effect.pm.open-full-board",
+  "kind": "effect",
+  "feature": "pm-coordination",
+  "title": "Open full: the plan widens, then flips from graph to board",
+  "demonstrates": "The plan opens full size (the pane widens with a spring), then the Graph/Board toggle glides and the same tasks regroup as a kanban board by status. The PM's coordination, two ways.",
+  "suggestedUse": "Motion-heavy transition shot.",
+  "moments": [
+    {
+      "atMs": 1464,
+      "what": "open the plan full size"
+    },
+    {
+      "atMs": 4819,
+      "what": "flip to the board"
+    },
+    {
+      "atMs": 6217,
+      "what": "board view"
+    }
+  ],
+  "files": {
+    "full": "effects/pm.open-full-board/full.mp4",
+    "focus": "effects/pm.open-full-board/focus.mp4",
+    "slowmo": "effects/pm.open-full-board/slowmo.mp4",
+    "poster": "effects/pm.open-full-board/poster.png",
+    "timeline": "effects/pm.open-full-board/timeline.json",
+    "smart": "effects/pm.open-full-board/smart.mp4"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2880,
+      1800
+    ]
+  },
+  "focusBoxCss": {
+    "x": 0,
+    "y": 0,
+    "w": 1440,
+    "h": 900
+  },
+  "fps": 60,
+  "capturedFps": 83,
+  "durationMs": 7105,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "None: real plan.",
+  "alpha": false
+}

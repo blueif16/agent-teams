@@ -1,0 +1,49 @@
+{
+  "id": "effect.pm.task-drawer",
+  "kind": "effect",
+  "feature": "pm-coordination",
+  "title": "A task's drawer: owner, acceptance criteria, the expert's report and evidence",
+  "demonstrates": "Click a task in the plan and its drawer slides up: who owns it, the acceptance bar the PM set, the expert's last report and the evidence file. The PM accepts work on evidence, not vibes.",
+  "suggestedUse": "Detail insert after pm.plan-graph.",
+  "moments": [
+    {
+      "atMs": 3554,
+      "what": "open task t1"
+    },
+    {
+      "atMs": 5059,
+      "what": "drawer open: acceptance + report + evidence"
+    }
+  ],
+  "files": {
+    "full": "effects/pm.task-drawer/full.mp4",
+    "focus": "effects/pm.task-drawer/focus.mp4",
+    "slowmo": "effects/pm.task-drawer/slowmo.mp4",
+    "poster": "effects/pm.task-drawer/poster.png",
+    "timeline": "effects/pm.task-drawer/timeline.json",
+    "smart": "effects/pm.task-drawer/smart.mp4"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2880,
+      1800
+    ]
+  },
+  "focusBoxCss": {
+    "x": 0,
+    "y": 0,
+    "w": 1440,
+    "h": 900
+  },
+  "fps": 60,
+  "capturedFps": 61,
+  "durationMs": 6609,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "None: real task t1 (Sleuth's ranking, in review).",
+  "alpha": false
+}

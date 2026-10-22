@@ -1,0 +1,56 @@
+{
+  "id": "effect.reactions.remember",
+  "kind": "effect",
+  "feature": "reactions",
+  "title": "📌 Remember: an order becomes a standing instruction",
+  "demonstrates": "📌 on Pia's message saves it as a standing instruction: a new line lands under Remembers in her profile, and she confirms. Agents keep what you teach them.",
+  "suggestedUse": "Bridge into soul-memory beats.",
+  "moments": [
+    {
+      "atMs": 1121,
+      "what": "left-click the agent's message"
+    },
+    {
+      "atMs": 1601,
+      "what": "quick-actions menu open"
+    },
+    {
+      "atMs": 2144,
+      "what": "pick Remember"
+    },
+    {
+      "atMs": 2940,
+      "what": "Remembers row lands in Pia's profile"
+    }
+  ],
+  "files": {
+    "full": "effects/reactions.remember/full.mp4",
+    "focus": "effects/reactions.remember/focus.mp4",
+    "slowmo": "effects/reactions.remember/slowmo.mp4",
+    "poster": "effects/reactions.remember/poster.png",
+    "timeline": "effects/reactions.remember/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      1974,
+      1110
+    ]
+  },
+  "focusBoxCss": {
+    "x": 146,
+    "y": 278,
+    "w": 987,
+    "h": 555
+  },
+  "fps": 60,
+  "capturedFps": 196,
+  "durationMs": 5735,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "Pia's reply text is scripted.",
+  "alpha": false
+}

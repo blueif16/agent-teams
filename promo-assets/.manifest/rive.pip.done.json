@@ -1,0 +1,29 @@
+{
+  "id": "rive.pip.done",
+  "kind": "rive-action",
+  "feature": "rive-status",
+  "title": "pip (Designer (teal heart, sprout)): done",
+  "demonstrates": "Task finished: a green check badge appears. Work is accepted and handed back.",
+  "suggestedUse": "Payoff beats: artifacts delivered, project closed.",
+  "moments": [],
+  "rive": {
+    "stateMachine": "Agent",
+    "viewModel": "Agent",
+    "enumProperty": "action",
+    "value": "done"
+  },
+  "files": {
+    "hevcAlpha": "rive/pip/done.mov",
+    "webmAlpha": "rive/pip/done.webm",
+    "poster": "rive/pip/done.png",
+    "source": "rive/pip/pip.riv"
+  },
+  "size": [
+    1024,
+    1024
+  ],
+  "fps": 60,
+  "capturedFps": 196,
+  "durationMs": 3996,
+  "alpha": true
+}

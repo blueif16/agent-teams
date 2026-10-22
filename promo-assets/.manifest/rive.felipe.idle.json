@@ -1,0 +1,29 @@
+{
+  "id": "rive.felipe.idle",
+  "kind": "rive-action",
+  "feature": "rive-status",
+  "title": "felipe (PM (blue cloud, beret)): idle",
+  "demonstrates": "At rest: the plush mascot breathes and blinks. The baseline before an agent gets work.",
+  "suggestedUse": "Roster / team lineup shots, or the 'before' of a status change.",
+  "moments": [],
+  "rive": {
+    "stateMachine": "Agent",
+    "viewModel": "Agent",
+    "enumProperty": "action",
+    "value": "idle"
+  },
+  "files": {
+    "hevcAlpha": "rive/felipe/idle.mov",
+    "webmAlpha": "rive/felipe/idle.webm",
+    "poster": "rive/felipe/idle.png",
+    "source": "rive/felipe/felipe.riv"
+  },
+  "size": [
+    1024,
+    1024
+  ],
+  "fps": 60,
+  "capturedFps": 186,
+  "durationMs": 3993,
+  "alpha": true
+}

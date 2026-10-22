@@ -1,0 +1,48 @@
+{
+  "id": "effect.pm.decisions",
+  "kind": "effect",
+  "feature": "pm-coordination",
+  "title": "Decisions log: every call the PM made, with its reason",
+  "demonstrates": "The Decisions tab lists what the PM decided and why, newest first, entries sliding in. A team that explains itself.",
+  "suggestedUse": "Quick insert.",
+  "moments": [
+    {
+      "atMs": 1081,
+      "what": "open Decisions"
+    },
+    {
+      "atMs": 2574,
+      "what": "decisions listed"
+    }
+  ],
+  "files": {
+    "full": "effects/pm.decisions/full.mp4",
+    "focus": "effects/pm.decisions/focus.mp4",
+    "slowmo": "effects/pm.decisions/slowmo.mp4",
+    "poster": "effects/pm.decisions/poster.png",
+    "timeline": "effects/pm.decisions/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2880,
+      1620
+    ]
+  },
+  "focusBoxCss": {
+    "x": 0,
+    "y": 90,
+    "w": 1440,
+    "h": 810
+  },
+  "fps": 60,
+  "capturedFps": 159,
+  "durationMs": 3470,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "None: real decisions.",
+  "alpha": false
+}

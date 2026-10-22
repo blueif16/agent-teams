@@ -1,0 +1,61 @@
+{
+  "id": "effect.stats.team-performance",
+  "kind": "effect",
+  "feature": "stats",
+  "title": "Team Performance: spend, tokens, cache hit, per-agent bars grow in, chart or table",
+  "demonstrates": "Open a team's Performance tab and the real numbers animate in: KPI tiles pop (a whole project cost about 26 cents, 83% cache hit, 100% accepted), then the panel scrolls to tokens-by-agent bars growing, and a click flips the chart to a table. Live, clear stats from the real ledger.",
+  "suggestedUse": "Stats beat; the poster is a clean still of the tiles. Cut on 'KPI tiles pop' then 'charts grow'.",
+  "moments": [
+    {
+      "atMs": 1122,
+      "what": "open the Performance tab"
+    },
+    {
+      "atMs": 1719,
+      "what": "KPI tiles pop: $0.26, 83% cache, 100% accepted"
+    },
+    {
+      "atMs": 3959,
+      "what": "tokens by agent bars"
+    },
+    {
+      "atMs": 5532,
+      "what": "show the chart as a table"
+    },
+    {
+      "atMs": 7029,
+      "what": "same numbers as a table"
+    }
+  ],
+  "files": {
+    "smart": "effects/stats.team-performance/smart.mp4",
+    "full": "effects/stats.team-performance/full.mp4",
+    "focus": "effects/stats.team-performance/focus.mp4",
+    "slowmo": "effects/stats.team-performance/slowmo.mp4",
+    "poster": "effects/stats.team-performance/poster.png",
+    "timeline": "effects/stats.team-performance/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2880,
+      1800
+    ]
+  },
+  "focusBoxCss": {
+    "x": 0,
+    "y": 0,
+    "w": 1440,
+    "h": 900
+  },
+  "fps": 60,
+  "capturedFps": 174,
+  "durationMs": 8525,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "None: real ledger data for the Guildhall concept project (shown as #guildhall-concept).",
+  "alpha": false
+}
