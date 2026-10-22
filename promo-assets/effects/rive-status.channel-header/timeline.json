@@ -1,0 +1,37 @@
+{
+ "viewport": {
+  "w": 1440,
+  "h": 900,
+  "dpr": 2
+ },
+ "durationMs": 4457,
+ "focus": {
+  "x": 509,
+  "y": 0,
+  "w": 720,
+  "h": 405
+ },
+ "marks": [
+  {
+   "atMs": 301,
+   "what": "all idle",
+   "box": {
+    "x": 670,
+    "y": 30,
+    "w": 397,
+    "h": 154
+   }
+  },
+  {
+   "atMs": 2262,
+   "what": "3 working: keyboards out",
+   "box": {
+    "x": 670,
+    "y": 30,
+    "w": 397,
+    "h": 154
+   }
+  }
+ ],
+ "cursor": []
+}

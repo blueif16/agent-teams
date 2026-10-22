@@ -1,0 +1,29 @@
+{
+  "id": "rive.dottie.done",
+  "kind": "rive-action",
+  "feature": "rive-status",
+  "title": "dottie (Researcher (green bean)): done",
+  "demonstrates": "Task finished: a green check badge appears. Work is accepted and handed back.",
+  "suggestedUse": "Payoff beats: artifacts delivered, project closed.",
+  "moments": [],
+  "rive": {
+    "stateMachine": "Agent",
+    "viewModel": "Agent",
+    "enumProperty": "action",
+    "value": "done"
+  },
+  "files": {
+    "hevcAlpha": "rive/dottie/done.mov",
+    "webmAlpha": "rive/dottie/done.webm",
+    "poster": "rive/dottie/done.png",
+    "source": "rive/dottie/dottie.riv"
+  },
+  "size": [
+    1024,
+    1024
+  ],
+  "fps": 60,
+  "capturedFps": 215,
+  "durationMs": 3999,
+  "alpha": true
+}

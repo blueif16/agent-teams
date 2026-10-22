@@ -1,0 +1,69 @@
+{
+  "id": "effect.team-choice.proposal",
+  "kind": "effect",
+  "feature": "team-choice",
+  "title": "Ask Mira for a build, get three staffed team options with realistic cost and time",
+  "demonstrates": "You ask Mira (the CEO agent) to build a Discord competitor for creators. She answers in one sentence and the option cards land: Lean (one engineer, $180, 14 days), Balanced (PM + 3 experts, $640, 30 days), Full (PM + 3 experts incl. iOS, $980, 42 days). Each card is staffed with real agents, their skills and rehire badges. You pick Balanced (the ring glides) and launch.",
+  "suggestedUse": "The team-choice beat; the poster is the three cards.",
+  "moments": [
+    {
+      "atMs": 1083,
+      "what": "click the composer"
+    },
+    {
+      "atMs": 3109,
+      "what": "the ask, typed"
+    },
+    {
+      "atMs": 3814,
+      "what": "the ask lands in Mira's DM"
+    },
+    {
+      "atMs": 8221,
+      "what": "Mira's one-line pick"
+    },
+    {
+      "atMs": 9160,
+      "what": "three staffed options with cost + time"
+    },
+    {
+      "atMs": 10801,
+      "what": "pick Balanced"
+    },
+    {
+      "atMs": 11595,
+      "what": "Balanced picked, Launch ready"
+    }
+  ],
+  "files": {
+    "smart": "effects/team-choice.proposal/smart.mp4",
+    "full": "effects/team-choice.proposal/full.mp4",
+    "focus": "effects/team-choice.proposal/focus.mp4",
+    "slowmo": "effects/team-choice.proposal/slowmo.mp4",
+    "poster": "effects/team-choice.proposal/poster.png",
+    "timeline": "effects/team-choice.proposal/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2880,
+      1800
+    ]
+  },
+  "focusBoxCss": {
+    "x": 0,
+    "y": 0,
+    "w": 1440,
+    "h": 900
+  },
+  "fps": 60,
+  "capturedFps": 273,
+  "durationMs": 12692,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "Mira's reply (sentence + proposal JSON) is scripted with realistic budgets; staffing on the cards is the app's real /api/projects/plan; launch is stubbed (no project is created).",
+  "alpha": false
+}

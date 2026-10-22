@@ -1,0 +1,57 @@
+{
+  "id": "effect.stats.mira-chart",
+  "kind": "effect",
+  "feature": "stats",
+  "title": "Ask Mira which team is performing best: one sentence, then a chart card grows in",
+  "demonstrates": "In her DM you ask 'Which team is performing best?'. Mira answers in one sentence and a bar chart card of real per-team ledger spend grows in below it, with the cheapest, best-accepted team highlighted. Cross-team answers are numbers you can see, not paragraphs.",
+  "suggestedUse": "Stats beat, the Mira answer. Cut on 'chart card grows in'.",
+  "moments": [
+    {
+      "atMs": 1069,
+      "what": "click the composer"
+    },
+    {
+      "atMs": 2335,
+      "what": "send the question"
+    },
+    {
+      "atMs": 6695,
+      "what": "chart card grows in"
+    },
+    {
+      "atMs": 9564,
+      "what": "toggle chart to table"
+    }
+  ],
+  "files": {
+    "smart": "effects/stats.mira-chart/smart.mp4",
+    "full": "effects/stats.mira-chart/full.mp4",
+    "focus": "effects/stats.mira-chart/focus.mp4",
+    "slowmo": "effects/stats.mira-chart/slowmo.mp4",
+    "poster": "effects/stats.mira-chart/poster.png",
+    "timeline": "effects/stats.mira-chart/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2880,
+      1800
+    ]
+  },
+  "focusBoxCss": {
+    "x": 0,
+    "y": 0,
+    "w": 1440,
+    "h": 900
+  },
+  "fps": 60,
+  "capturedFps": 302,
+  "durationMs": 11457,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "Mira's reply (sentence + chart JSON) is scripted; the figures are the real ledger totals per project (Guildhall $0.26, Chronoshield hardware $0.26, Checkout $0.12). The chart card itself is the app's real renderer.",
+  "alpha": false
+}

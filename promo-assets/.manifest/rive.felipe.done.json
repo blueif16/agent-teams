@@ -1,0 +1,29 @@
+{
+  "id": "rive.felipe.done",
+  "kind": "rive-action",
+  "feature": "rive-status",
+  "title": "felipe (PM (blue cloud, beret)): done",
+  "demonstrates": "Task finished: a green check badge appears. Work is accepted and handed back.",
+  "suggestedUse": "Payoff beats: artifacts delivered, project closed.",
+  "moments": [],
+  "rive": {
+    "stateMachine": "Agent",
+    "viewModel": "Agent",
+    "enumProperty": "action",
+    "value": "done"
+  },
+  "files": {
+    "hevcAlpha": "rive/felipe/done.mov",
+    "webmAlpha": "rive/felipe/done.webm",
+    "poster": "rive/felipe/done.png",
+    "source": "rive/felipe/felipe.riv"
+  },
+  "size": [
+    1024,
+    1024
+  ],
+  "fps": 60,
+  "capturedFps": 180,
+  "durationMs": 3998,
+  "alpha": true
+}

@@ -1,0 +1,29 @@
+{
+  "id": "rive.pip.working",
+  "kind": "rive-action",
+  "feature": "rive-status",
+  "title": "pip (Designer (teal heart, sprout)): working",
+  "demonstrates": "Busy on a task: a keyboard and two mittens come out and it types. This is what a live agent looks like while it works.",
+  "suggestedUse": "Any beat about agents doing real work in parallel; tile several rigs side by side.",
+  "moments": [],
+  "rive": {
+    "stateMachine": "Agent",
+    "viewModel": "Agent",
+    "enumProperty": "action",
+    "value": "working"
+  },
+  "files": {
+    "hevcAlpha": "rive/pip/working.mov",
+    "webmAlpha": "rive/pip/working.webm",
+    "poster": "rive/pip/working.png",
+    "source": "rive/pip/pip.riv"
+  },
+  "size": [
+    1024,
+    1024
+  ],
+  "fps": 60,
+  "capturedFps": 223,
+  "durationMs": 3996,
+  "alpha": true
+}

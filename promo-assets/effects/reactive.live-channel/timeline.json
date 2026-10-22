@@ -1,0 +1,57 @@
+{
+ "viewport": {
+  "w": 1440,
+  "h": 900,
+  "dpr": 2
+ },
+ "durationMs": 7756,
+ "focus": {
+  "x": 475,
+  "y": 370,
+  "w": 808,
+  "h": 455
+ },
+ "marks": [
+  {
+   "atMs": 1027,
+   "what": "report streaming: Three of the five creator…",
+   "box": {
+    "x": 585,
+    "y": 546,
+    "w": 267,
+    "h": 22
+   }
+  },
+  {
+   "atMs": 1854,
+   "what": "report streaming: Onboarding is three states…",
+   "box": {
+    "x": 585,
+    "y": 547,
+    "w": 272,
+    "h": 22
+   }
+  },
+  {
+   "atMs": 2682,
+   "what": "report streaming: Hardest constraint is presence…",
+   "box": {
+    "x": 585,
+    "y": 626,
+    "w": 278,
+    "h": 22
+   }
+  },
+  {
+   "atMs": 6359,
+   "what": "PM accepts and redirects",
+   "box": {
+    "x": 585,
+    "y": 604,
+    "w": 588,
+    "h": 44
+   }
+  }
+ ],
+ "cursor": []
+}

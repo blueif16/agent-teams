@@ -1,0 +1,85 @@
+{
+  "id": "effect.pm.plan-live",
+  "kind": "effect",
+  "feature": "pm-coordination",
+  "title": "The PM's plan, expanded, moving live as each agent reports",
+  "demonstrates": "Open the Plan tab and expand it: the PM's task graph (a DAG of who does what, in what order) fills the screen. Then the project moves on its own: the PM accepts Sleuth's ranking and the thesis unblocks, Sprocket's cost work is accepted, Swatch's core loop goes to review and is accepted, and the PM starts assembling the final brief. Each task's status ring changes as it happens, progress and milestones count up, and the owners' mascots in the channel header switch to working. Ends on the Board view with the work in its columns.",
+  "suggestedUse": "The PM-coordination hero. smart.mp4 hops to each task as it changes; slowmo works for the status flips.",
+  "moments": [
+    {
+      "atMs": 1019,
+      "what": "open the Plan tab"
+    },
+    {
+      "atMs": 2543,
+      "what": "expand the plan"
+    },
+    {
+      "atMs": 3743,
+      "what": "the expanded DAG: who does what, in what order"
+    },
+    {
+      "atMs": 4811,
+      "what": "PM accepts Sleuth's ranking: t1 done, thesis + monetization start"
+    },
+    {
+      "atMs": 6424,
+      "what": "Sprocket's cost envelope accepted: t2 done, t6 starts"
+    },
+    {
+      "atMs": 8031,
+      "what": "Swatch hands in the core loop for review"
+    },
+    {
+      "atMs": 9640,
+      "what": "Core loop accepted; thesis in review"
+    },
+    {
+      "atMs": 11254,
+      "what": "Everything accepted; the PM assembles the brief"
+    },
+    {
+      "atMs": 12504,
+      "what": "7 of 8 done, the PM on the brief"
+    },
+    {
+      "atMs": 13897,
+      "what": "flip to the Board"
+    },
+    {
+      "atMs": 15193,
+      "what": "the same work, by column"
+    }
+  ],
+  "files": {
+    "smart": "effects/pm.plan-live/smart.mp4",
+    "full": "effects/pm.plan-live/full.mp4",
+    "focus": "effects/pm.plan-live/focus.mp4",
+    "slowmo": "effects/pm.plan-live/slowmo.mp4",
+    "poster": "effects/pm.plan-live/poster.png",
+    "timeline": "effects/pm.plan-live/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2880,
+      1800
+    ]
+  },
+  "focusBoxCss": {
+    "x": 0,
+    "y": 0,
+    "w": 1440,
+    "h": 900
+  },
+  "fps": 60,
+  "capturedFps": 219,
+  "durationMs": 15790,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "The plan is the real Guildhall concept plan (rev 27); its status changes are staged step by step (served state + the app's own state:<pid> refresh event), and the agents' work is scripted runs.",
+  "alpha": false
+}

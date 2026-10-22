@@ -1,0 +1,27 @@
+{
+ "viewport": {
+  "w": 1440,
+  "h": 900,
+  "dpr": 2
+ },
+ "durationMs": 6101,
+ "focus": {
+  "x": 459,
+  "y": 361,
+  "w": 760,
+  "h": 428
+ },
+ "marks": [
+  {
+   "atMs": 3309,
+   "what": "send blocked: secret detected",
+   "box": {
+    "x": 569,
+    "y": 491,
+    "w": 540,
+    "h": 168
+   }
+  }
+ ],
+ "cursor": []
+}

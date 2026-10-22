@@ -1,0 +1,29 @@
+{
+  "id": "rive.dottie.needs-you",
+  "kind": "rive-action",
+  "feature": "rive-status",
+  "title": "dottie (Researcher (green bean)): needs you",
+  "demonstrates": "Waiting on the owner: an orange ! bubble pops and it waves. Agents ask for approval or answers instead of guessing.",
+  "suggestedUse": "Approval / question beats; pairs with the approval card effect.",
+  "moments": [],
+  "rive": {
+    "stateMachine": "Agent",
+    "viewModel": "Agent",
+    "enumProperty": "action",
+    "value": "needs-you"
+  },
+  "files": {
+    "hevcAlpha": "rive/dottie/needs-you.mov",
+    "webmAlpha": "rive/dottie/needs-you.webm",
+    "poster": "rive/dottie/needs-you.png",
+    "source": "rive/dottie/dottie.riv"
+  },
+  "size": [
+    1024,
+    1024
+  ],
+  "fps": 60,
+  "capturedFps": 125,
+  "durationMs": 3993,
+  "alpha": true
+}

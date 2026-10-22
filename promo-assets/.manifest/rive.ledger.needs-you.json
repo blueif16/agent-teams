@@ -1,0 +1,29 @@
+{
+  "id": "rive.ledger.needs-you",
+  "kind": "rive-action",
+  "feature": "rive-status",
+  "title": "ledger (Analyst (purple blob, glasses)): needs you",
+  "demonstrates": "Waiting on the owner: an orange ! bubble pops and it waves. Agents ask for approval or answers instead of guessing.",
+  "suggestedUse": "Approval / question beats; pairs with the approval card effect.",
+  "moments": [],
+  "rive": {
+    "stateMachine": "Agent",
+    "viewModel": "Agent",
+    "enumProperty": "action",
+    "value": "needs-you"
+  },
+  "files": {
+    "hevcAlpha": "rive/ledger/needs-you.mov",
+    "webmAlpha": "rive/ledger/needs-you.webm",
+    "poster": "rive/ledger/needs-you.png",
+    "source": "rive/ledger/ledger.riv"
+  },
+  "size": [
+    1024,
+    1024
+  ],
+  "fps": 60,
+  "capturedFps": 90,
+  "durationMs": 3996,
+  "alpha": true
+}

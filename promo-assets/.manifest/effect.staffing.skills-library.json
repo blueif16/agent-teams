@@ -1,0 +1,56 @@
+{
+  "id": "effect.staffing.skills-library",
+  "kind": "effect",
+  "feature": "staffing",
+  "title": "Skills library: filter by archetype, the skills each kind of agent can be staffed with",
+  "demonstrates": "The Skills library groups every installed skill by archetype. Clicking Researcher, Designer, Engineer glides the highlight and re-sorts the results. This is the pool the PM and Mira staff teams from.",
+  "suggestedUse": "Staffing beat, before the option cards.",
+  "moments": [
+    {
+      "atMs": 936,
+      "what": "filter: Researcher"
+    },
+    {
+      "atMs": 2371,
+      "what": "filter: Designer"
+    },
+    {
+      "atMs": 3803,
+      "what": "filter: Engineer"
+    },
+    {
+      "atMs": 4599,
+      "what": "engineer skills listed"
+    }
+  ],
+  "files": {
+    "full": "effects/staffing.skills-library/full.mp4",
+    "focus": "effects/staffing.skills-library/focus.mp4",
+    "slowmo": "effects/staffing.skills-library/slowmo.mp4",
+    "poster": "effects/staffing.skills-library/poster.png",
+    "timeline": "effects/staffing.skills-library/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      1440,
+      810
+    ]
+  },
+  "focusBoxCss": {
+    "x": 720,
+    "y": 55,
+    "w": 720,
+    "h": 405
+  },
+  "fps": 60,
+  "capturedFps": 244,
+  "durationMs": 5491,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": null,
+  "alpha": false
+}

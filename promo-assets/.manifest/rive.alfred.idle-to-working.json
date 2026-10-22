@@ -1,0 +1,34 @@
+{
+  "id": "rive.alfred.idle-to-working",
+  "kind": "rive-action",
+  "feature": "rive-status",
+  "title": "alfred (Writer (yellow pear, glasses + bowtie)): idle → working",
+  "demonstrates": "The moment an agent picks up a task: the keyboard and mittens animate in. Status changes are animated, not swapped.",
+  "suggestedUse": "Cut on the switch (400 ms) as the PM assigns work.",
+  "moments": [
+    {
+      "atMs": 400,
+      "what": "action switches to working; keyboard + mittens animate in"
+    }
+  ],
+  "rive": {
+    "stateMachine": "Agent",
+    "viewModel": "Agent",
+    "enumProperty": "action",
+    "value": "working"
+  },
+  "files": {
+    "hevcAlpha": "rive/alfred/idle-to-working.mov",
+    "webmAlpha": "rive/alfred/idle-to-working.webm",
+    "poster": "rive/alfred/idle-to-working.png",
+    "source": "rive/alfred/alfred.riv"
+  },
+  "size": [
+    1024,
+    1024
+  ],
+  "fps": 60,
+  "capturedFps": 254,
+  "durationMs": 2898,
+  "alpha": true
+}

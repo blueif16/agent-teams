@@ -1,0 +1,60 @@
+{
+  "id": "effect.reactions.go-ahead",
+  "kind": "effect",
+  "feature": "reactions",
+  "title": "👍 Go ahead: click a message, pick the order, the agent acts and answers",
+  "demonstrates": "The full reaction loop on the designer's latest message: left-click opens the quick-actions menu, the cursor sweeps the five orders (each grows, the hint line names it), 👍 lands as a chip under the message, the bubble bumps, Pia flips to working (header count + mascot), typing dots, then a reply quoting the order streams in right below. Reactions are instructions, not decoration.",
+  "suggestedUse": "The hero sequence. Cut on 'pick Go ahead' for the punch; the slow-mo covers the chip pop.",
+  "moments": [
+    {
+      "atMs": 1114,
+      "what": "left-click the agent's message"
+    },
+    {
+      "atMs": 1589,
+      "what": "quick-actions menu open"
+    },
+    {
+      "atMs": 4716,
+      "what": "pick Go ahead"
+    },
+    {
+      "atMs": 5515,
+      "what": "chip + status working + typing dots"
+    },
+    {
+      "atMs": 7616,
+      "what": "quoted reply finished streaming"
+    }
+  ],
+  "files": {
+    "full": "effects/reactions.go-ahead/full.mp4",
+    "focus": "effects/reactions.go-ahead/focus.mp4",
+    "slowmo": "effects/reactions.go-ahead/slowmo.mp4",
+    "poster": "effects/reactions.go-ahead/poster.png",
+    "timeline": "effects/reactions.go-ahead/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      1974,
+      1110
+    ]
+  },
+  "focusBoxCss": {
+    "x": 380,
+    "y": 256,
+    "w": 987,
+    "h": 555
+  },
+  "fps": 60,
+  "capturedFps": 183,
+  "durationMs": 8311,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "Pia's reply text is scripted (fetch stub for POST /api/chat); channel name and transcript polished (org.mjs).",
+  "alpha": false
+}

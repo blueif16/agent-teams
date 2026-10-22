@@ -1,0 +1,48 @@
+{
+  "id": "effect.rive-status.profile",
+  "kind": "effect",
+  "feature": "rive-status",
+  "title": "Agent profile: the big Rive mascot goes from idle to working, with its 'now' line",
+  "demonstrates": "Sleuth's profile header carries a large live mascot. When a task starts, the mascot animates into working, the status chip pops and the Now line says exactly what it's doing ('Reading Discord's Creator Revenue FAQ'). When the run ends it settles back.",
+  "suggestedUse": "Hero close-up for rive-status; crop to the mascot for a tight insert.",
+  "moments": [
+    {
+      "atMs": 300,
+      "what": "idle"
+    },
+    {
+      "atMs": 12709,
+      "what": "working: mascot + status chip + now line"
+    }
+  ],
+  "files": {
+    "full": "effects/rive-status.profile/full.mp4",
+    "focus": "effects/rive-status.profile/focus.mp4",
+    "slowmo": "effects/rive-status.profile/slowmo.mp4",
+    "poster": "effects/rive-status.profile/poster.png",
+    "timeline": "effects/rive-status.profile/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      1956,
+      1100
+    ]
+  },
+  "focusBoxCss": {
+    "x": 462,
+    "y": 0,
+    "w": 978,
+    "h": 550
+  },
+  "fps": 60,
+  "capturedFps": 133,
+  "durationMs": 15920,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "A scripted run on /api/runs.",
+  "alpha": false
+}

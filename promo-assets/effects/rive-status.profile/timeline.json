@@ -1,0 +1,25 @@
+{
+ "viewport": {
+  "w": 1440,
+  "h": 900,
+  "dpr": 2
+ },
+ "durationMs": 15920,
+ "focus": {
+  "x": 462,
+  "y": 0,
+  "w": 978,
+  "h": 550
+ },
+ "marks": [
+  {
+   "atMs": 300,
+   "what": "idle"
+  },
+  {
+   "atMs": 12709,
+   "what": "working: mascot + status chip + now line"
+  }
+ ],
+ "cursor": []
+}

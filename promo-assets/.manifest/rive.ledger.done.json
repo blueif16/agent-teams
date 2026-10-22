@@ -1,0 +1,29 @@
+{
+  "id": "rive.ledger.done",
+  "kind": "rive-action",
+  "feature": "rive-status",
+  "title": "ledger (Analyst (purple blob, glasses)): done",
+  "demonstrates": "Task finished: a green check badge appears. Work is accepted and handed back.",
+  "suggestedUse": "Payoff beats: artifacts delivered, project closed.",
+  "moments": [],
+  "rive": {
+    "stateMachine": "Agent",
+    "viewModel": "Agent",
+    "enumProperty": "action",
+    "value": "done"
+  },
+  "files": {
+    "hevcAlpha": "rive/ledger/done.mov",
+    "webmAlpha": "rive/ledger/done.webm",
+    "poster": "rive/ledger/done.png",
+    "source": "rive/ledger/ledger.riv"
+  },
+  "size": [
+    1024,
+    1024
+  ],
+  "fps": 60,
+  "capturedFps": 70,
+  "durationMs": 3987,
+  "alpha": true
+}

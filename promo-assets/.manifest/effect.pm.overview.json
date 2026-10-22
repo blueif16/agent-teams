@@ -1,0 +1,48 @@
+{
+  "id": "effect.pm.overview",
+  "kind": "effect",
+  "feature": "pm-coordination",
+  "title": "Team overview: the PM strip fills with progress",
+  "demonstrates": "The team panel opens on the PM strip: the progress segments fill one by one, the waiting-on-you pill pops, and the context bar shows how much of the PM's memory window is in use.",
+  "suggestedUse": "Opening shot of the team panel.",
+  "moments": [
+    {
+      "atMs": 1508,
+      "what": "open the team panel"
+    },
+    {
+      "atMs": 3204,
+      "what": "PM strip filled"
+    }
+  ],
+  "files": {
+    "full": "effects/pm.overview/full.mp4",
+    "focus": "effects/pm.overview/focus.mp4",
+    "slowmo": "effects/pm.overview/slowmo.mp4",
+    "poster": "effects/pm.overview/poster.png",
+    "timeline": "effects/pm.overview/timeline.json"
+  },
+  "size": {
+    "full": [
+      2880,
+      1800
+    ],
+    "focus": [
+      2880,
+      1640
+    ]
+  },
+  "focusBoxCss": {
+    "x": 0,
+    "y": 0,
+    "w": 1440,
+    "h": 820
+  },
+  "fps": 60,
+  "capturedFps": 113,
+  "durationMs": 4084,
+  "slowmoFactor": 3,
+  "cursor": true,
+  "staged": "None: real state.",
+  "alpha": false
+}
