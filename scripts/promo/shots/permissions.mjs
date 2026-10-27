@@ -129,7 +129,7 @@ export const EFFECTS = [
     demonstrates: "Sleuth asks to run a paid research query and an approval card lands. The owner picks 'Approve & allow for this project'. When Sleuth needs a similar query minutes later, no card appears and nobody is pinged: a green line says it was allowed by the owner's rule, decided by the policy engine and not the chat model. Agents keep working, within what the owner said yes to.",
     suggestedUse: "The 'agents don't interrupt you' beat. Cut on the green receipt line.",
     staged: "The approval card is fed through scripted /api/approvals and event stubs and Sleuth's messages are scripted runs. The 'Approve & allow for this project' button and both green policy lines are STAGED overlays in the app's visual language (the app has no such UI yet; grants from approvals are not minted yet). Nothing is written.",
-    stage: { cursor: true, fakeES: ["/api/runs", "/api/events"] },
+    stage: { cursor: true, streams: ["/api/runs", "/api/events"] },
     async setup({ page }) {
       await openChannel(page, GUILD);
       await rule(page, { kind: "json", url: `/api/approvals?project=${GUILD_PID}`, body: { approvals: [] } });

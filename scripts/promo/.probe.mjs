@@ -1,10 +1,11 @@
-import { launch, APP } from "./lib.mjs";
-import { installStage } from "./stage.mjs";
+import { launch, installStage } from "agent-recorder";
+import { installRuns } from "./runs-stage.mjs";
+const APP = "http://localhost:3000";
 import { polish } from "./org.mjs";
 import { installViewer } from "./viewer.mjs";
 const s = await launch({ dpr: 1 });
 s.page.on("console", (m) => m.type() === "error" && console.log("console:", m.text().slice(0, 200)));
-await installStage(s.page, {}); await polish(s.page); await installViewer(s.page, ["designer"]);
+await installStage(s.page, { streams: ["/api/runs"] }); await installRuns(s.page); await polish(s.page); await installViewer(s.page, ["designer"]);
 await s.page.goto(APP, { waitUntil: "load", timeout: 90000 });
 await s.page.waitForTimeout(1500);
 console.log("viewer installed:", await s.page.evaluate(() => typeof window.__viewer));

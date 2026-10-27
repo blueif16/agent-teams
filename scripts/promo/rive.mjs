@@ -4,7 +4,14 @@
 // Output: promo-assets/rive/<rig>/<clip>.{mov,webm,png} + the source .riv, listed in manifest.json.
 import { readFileSync, mkdirSync, copyFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { launch, setRate, recorder, encodeAlpha, poster, addToManifest, rel, ROOT, OUT } from "./lib.mjs";
+import { fileURLToPath } from "node:url";
+import { launch, setRate, recorder, encodeAlpha, poster, addToManifest as add, rel as relTo } from "agent-recorder";
+import { FEATURES } from "./features.mjs";
+
+const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "../..");
+const OUT = join(ROOT, "promo-assets");
+const addToManifest = (entry) => add(OUT, entry, FEATURES);
+const rel = (p) => relTo(OUT, p);
 
 const RIGS = ["felipe", "dottie", "alfred", "pip", "ledger", "pixel"];
 const WHO = { felipe: "PM (blue cloud, beret)", dottie: "Researcher (green bean)", alfred: "Writer (yellow pear, glasses + bowtie)", pip: "Designer (teal heart, sprout)", ledger: "Analyst (purple blob, glasses)", pixel: "Engineer (orange pixel, headphones)" };

@@ -4,7 +4,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { marked } from "marked";
-import { ROOT } from "./lib.mjs";
+import { fileURLToPath } from "node:url";
+
+const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "../..");
 
 const file = (p) => readFileSync(join(ROOT, ".data/projects/bookbird-run-1/files", p), "utf8");
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
