@@ -507,7 +507,7 @@ export const EFFECTS = [
     demonstrates: "Open the Plan tab and expand it: the PM's task graph (a DAG of who does what, in what order) fills the screen. Then the project moves on its own: the PM accepts Sleuth's ranking and the thesis unblocks, Sprocket's cost work is accepted, Swatch's core loop goes to review and is accepted, and the PM starts assembling the final brief. Each task's status ring changes as it happens, progress and milestones count up, and the owners' mascots in the channel header switch to working. Ends on the Board view with the work in its columns.",
     suggestedUse: "The PM-coordination hero. smart.mp4 hops to each task as it changes; slowmo works for the status flips.",
     staged: "The plan is the real Guildhall concept plan (rev 27); its status changes are staged step by step (served state + the app's own state:<pid> refresh event), and the agents' work is scripted runs.",
-    stage: { fakeES: ["/api/runs", "/api/events"] },
+    stage: { streams: ["/api/runs", "/api/events"] },
     async routes(page) {
       page.__planStep = 0;
       let real = null;
