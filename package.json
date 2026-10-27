@@ -39,7 +39,7 @@
     "@types/node": "^24.19.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "agent-recorder": "file:../agent-recorder",
+    "autocap": "github:blueif16/autocap",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "fast-check": "^4.10.2",

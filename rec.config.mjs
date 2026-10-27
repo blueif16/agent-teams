@@ -1,4 +1,4 @@
-// agent-teams adapter for agent-recorder:  npx rec ls | check | take | cut [shot-id-prefix …]
+// agent-teams adapter for autocap (github.com/blueif16/autocap):  npx rec ls | check | take | cut [shot-id-prefix …]
 // Restart `next dev` before a batch of takes: it leaks memory into swap and drops the capture fps.
 import { EFFECTS } from "./scripts/promo/shots.mjs";
 import { FEATURES } from "./scripts/promo/features.mjs";
