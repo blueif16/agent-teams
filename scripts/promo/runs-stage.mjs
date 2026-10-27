@@ -1,5 +1,5 @@
 // Agent runs on the fake /api/runs stream: events start|now|token|done, data {type, thread:"a:<agent>:p:<project>",
-// run, text?} (src/lib/live-runs.ts). Adds window.__stage.run(thread, text, opts) on top of agent-recorder's stage;
+// run, text?} (src/lib/live-runs.ts). Adds window.__stage.run(thread, text, opts) on top of autocap's stage;
 // it resolves (page time) when the run is done. Must be installed after the stage (rec.config.mjs prepare).
 const RUNS = () => {
   const S = window.__stage;

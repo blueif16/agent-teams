@@ -5,7 +5,7 @@
 import { readFileSync, mkdirSync, copyFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { launch, setRate, recorder, encodeAlpha, poster, addToManifest as add, rel as relTo } from "agent-recorder";
+import { launch, setRate, recorder, encodeAlpha, poster, addToManifest as add, rel as relTo } from "autocap";
 import { FEATURES } from "./features.mjs";
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "../..");

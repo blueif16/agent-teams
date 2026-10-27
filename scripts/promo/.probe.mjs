@@ -1,4 +1,4 @@
-import { launch, installStage } from "agent-recorder";
+import { launch, installStage } from "autocap";
 import { installRuns } from "./runs-stage.mjs";
 const APP = "http://localhost:3000";
 import { polish } from "./org.mjs";

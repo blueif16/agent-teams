@@ -1,9 +1,9 @@
 // The effect registry: one entry per interaction worth filming. Each says which core feature it shows
 // (features.mjs) and what it demonstrates, so the editing agent can cut by story beat without watching
-// everything. Agent replies are staged (agent-recorder stage + runs-stage.mjs): no live model is called.
+// everything. Agent replies are staged (autocap stage + runs-stage.mjs): no live model is called.
 //   setup  runs at full speed before recording (navigate, scroll, queue staged replies)
 //   act    runs slowed and recorded; d.mark(what, box) names the moments the editor will cut on
-import { rule } from "agent-recorder";
+import { rule } from "autocap";
 export { rule };
 
 export const CHANNEL = "bookbird-launch"; // staged name of bookbird-run-1 (org.mjs)
